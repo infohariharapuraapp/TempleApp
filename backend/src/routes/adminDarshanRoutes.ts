@@ -1,55 +1,33 @@
+
 import { Router } from 'express';
 
-import { authenticateToken } from '../middleware/authMiddleware';
-import { requireAdmin } from '../middleware/adminMiddleware';
+import {
+  authenticateToken,
+} from '../middleware/authMiddleware';
 
 import {
-  getAllDarshanSlots,
-  createDarshanSlot,
-  updateDarshanSlot,
-  updateDarshanSlotStatus,
+  requireAdmin,
+} from '../middleware/adminMiddleware';
+
+import {
+  getAdminTodayDarshan,
+  publishTodayDarshan,
 } from '../controllers/adminDarshanController';
 
 const router = Router();
 
-/*
- * Get all Darshan slots
- */
 router.get(
-  '/',
+  '/today',
   authenticateToken,
   requireAdmin,
-  getAllDarshanSlots
+  getAdminTodayDarshan
 );
 
-/*
- * Create Darshan slot
- */
 router.post(
-  '/',
+  '/today/publish',
   authenticateToken,
   requireAdmin,
-  createDarshanSlot
-);
-
-/*
- * Update Darshan slot
- */
-router.put(
-  '/:id',
-  authenticateToken,
-  requireAdmin,
-  updateDarshanSlot
-);
-
-/*
- * Activate / deactivate Darshan slot
- */
-router.patch(
-  '/:id/status',
-  authenticateToken,
-  requireAdmin,
-  updateDarshanSlotStatus
+  publishTodayDarshan
 );
 
 export default router;

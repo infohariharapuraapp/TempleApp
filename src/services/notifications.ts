@@ -1,14 +1,22 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-import { router } from 'expo-router';
-import { getToken } from './authStorage';
 
+import {
+  Platform,
+} from 'react-native';
 
+import {
+  router,
+} from 'expo-router';
+
+import {
+  getToken,
+} from './authStorage';
 
 // ========================================
 // EXPO GO DETECTION
 // ========================================
+
 const IS_EXPO_GO =
   Constants.executionEnvironment === 'storeClient';
 
@@ -16,54 +24,35 @@ const IS_EXPO_GO =
 // BACKEND URL
 // ========================================
 
+// LOCAL TESTING
 const API_BASE_URL =
-//'https://monk0y8jf9.execute-api.ap-south-1.amazonaws.com/api'
-   'https://templeapp-s96e.onrender.com/api';
- // 'http://192.168.0.110:5000/api';
+ 'https://templeapp-s96e.onrender.com/api';
+
+ //'http://192.168.0.122:5000/api';
+// PRODUCTION: Switch before building
+// const API_BASE_URL =
+   //'https://templeapp-s96e.onrender.com/api';
 
 // ========================================
-// REGISTER PUSH NOTIFICATIONS
+// NOTIFICATION INITIALIZATION
 // ========================================
 
-export async function registerForPushNotificationsAsync() {
-  // ------------------------------------
-  // EXPO GO
-  // ------------------------------------
+let notificationHandlerInitialized = false;
 
+export async function initializeNotificationHandler() {
   if (IS_EXPO_GO) {
     console.log(
-      'Push notifications are disabled in Expo Go.'
+      'Expo Go: Remote push notifications disabled.'
     );
-
-    console.log(
-      'Use an Android development build for push notifications.'
-    );
-
-    return null;
+    return;
   }
 
-  // ------------------------------------
-  // LOAD NOTIFICATIONS MODULE
-  // ------------------------------------
+  if (notificationHandlerInitialized) {
+    return;
+  }
 
   const Notifications =
     await import('expo-notifications');
-
-  // ------------------------------------
-  // PHYSICAL DEVICE CHECK
-  // ------------------------------------
-
-  if (!Device.isDevice) {
-    console.log(
-      'Push notifications require a physical Android/iOS device.'
-    );
-
-    return null;
-  }
-
-  // ------------------------------------
-  // NOTIFICATION HANDLER
-  // ------------------------------------
 
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -74,281 +63,312 @@ export async function registerForPushNotificationsAsync() {
     }),
   });
 
-  // ------------------------------------
-  // PERMISSION
-  // ------------------------------------
-
-  const {
-    status: existingStatus,
-  } =
-    await Notifications.getPermissionsAsync();
-
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const {
-      status,
-    } =
-      await Notifications.requestPermissionsAsync();
-
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.log(
-      'Push notification permission was not granted.'
-    );
-
-    return null;
-  }
-
-  // ------------------------------------
-  // ANDROID CHANNEL
-  // ------------------------------------
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(
-      'default',
-      {
-        name: 'Temple Notifications',
-
-        importance:
-          Notifications.AndroidImportance.MAX,
-
-        vibrationPattern: [
-          0,
-          250,
-          250,
-          250,
-        ],
-
-        sound: 'default',
-      }
-    );
-  }
-
-  // ------------------------------------
-  // EAS PROJECT ID
-  // ------------------------------------
-
-  const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
-
-  if (!projectId) {
-    console.error(
-      'EAS Project ID not found.'
-    );
-
-    return null;
-  }
+  notificationHandlerInitialized = true;
 
   console.log(
-    'EAS Project ID:',
-    projectId
+    'Notification foreground handler initialized.'
   );
+}
 
-  // ------------------------------------
-  // GET EXPO PUSH TOKEN
-  // ------------------------------------
+// ========================================
+// REGISTER PUSH NOTIFICATIONS
+// ========================================
+
+let registrationPromise:
+  Promise<string | null> | null = null;
+
+export async function registerForPushNotificationsAsync():
+  Promise<string | null> {
+
+  if (IS_EXPO_GO) {
+    console.log(
+      'Push notifications require a development or standalone build.'
+    );
+    return null;
+  }
+
+  if (!Device.isDevice) {
+    console.log(
+      'Push notifications require a physical device.'
+    );
+    return null;
+  }
+
+  // Prevent overlapping registration requests.
+  if (registrationPromise) {
+    return registrationPromise;
+  }
+
+  registrationPromise = performPushRegistration();
 
   try {
-    const token =
+    return await registrationPromise;
+  } finally {
+    registrationPromise = null;
+  }
+}
+
+async function performPushRegistration():
+  Promise<string | null> {
+
+  try {
+    const Notifications =
+      await import('expo-notifications');
+
+    await initializeNotificationHandler();
+
+    // ====================================
+    // ANDROID NOTIFICATION CHANNEL
+    // ====================================
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync(
+        'default',
+        {
+          name: 'Temple Notifications',
+          importance:
+            Notifications.AndroidImportance.MAX,
+          vibrationPattern: [
+            0,
+            250,
+            250,
+            250,
+          ],
+          sound: 'default',
+        }
+      );
+    }
+
+    // ====================================
+    // PERMISSIONS
+    // ====================================
+
+    const existingPermissions =
+      await Notifications.getPermissionsAsync();
+
+    let finalStatus = existingPermissions.status;
+
+    if (finalStatus !== 'granted') {
+      const requestedPermissions =
+        await Notifications.requestPermissionsAsync();
+
+      finalStatus = requestedPermissions.status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.warn(
+        'Notification permission not granted.'
+      );
+      return null;
+    }
+
+    // ====================================
+    // EAS PROJECT ID
+    // ====================================
+
+    const projectId =
+      Constants.easConfig?.projectId ??
+      Constants.expoConfig?.extra?.eas?.projectId;
+
+    if (!projectId) {
+      console.error(
+        'Missing EAS project ID.'
+      );
+      return null;
+    }
+
+    // ====================================
+    // GET EXPO PUSH TOKEN
+    // ====================================
+
+    const pushToken =
       await Notifications.getExpoPushTokenAsync({
         projectId,
       });
 
-    console.log(
-      '================================='
-    );
+    const expoPushToken = pushToken.data;
 
     console.log(
-      'EXPO PUSH TOKEN:',
-      token.data
+      'Expo push token generated successfully.'
     );
 
-    console.log(
-      '================================='
-    );
-
-    // ------------------------------------
-    // GET LOGIN JWT
-    // ------------------------------------
+    // ====================================
+    // REGISTER TOKEN WITH BACKEND
+    // ====================================
 
     const jwtToken = await getToken();
 
     if (!jwtToken) {
-      console.log(
-        'User is not logged in.'
+      console.warn(
+        'No login token. Push registration deferred.'
       );
-
-      console.log(
-        'Device token was not sent to backend.'
-      );
-
-      return token.data;
+      return expoPushToken;
     }
 
-    // ------------------------------------
-    // REGISTER DEVICE WITH BACKEND
-    // ------------------------------------
+    const response = await fetch(
+      `${API_BASE_URL}/notifications/register-device`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwtToken}`,
+        },
+        body: JSON.stringify({
+          expoPushToken,
+          platform: Platform.OS,
+          deviceName: Device.deviceName ?? null,
+        }),
+      }
+    );
+
+    const responseText = await response.text();
+
+    let responseData: any = null;
 
     try {
-      const response =
-        await fetch(
-          `${API_BASE_URL}/notifications/register-device`,
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-
-              Authorization:
-                `Bearer ${jwtToken}`,
-            },
-
-            body: JSON.stringify({
-              expoPushToken:
-                token.data,
-
-              platform:
-                Platform.OS,
-
-              deviceName:
-                Device.deviceName ??
-                null,
-            }),
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        console.error(
-          'Device registration failed:',
-          data
-        );
-
-        return token.data;
-      }
-
-      console.log(
-        'Device successfully registered:',
-        data
-      );
-
-    } catch (error) {
-      console.error(
-        'Failed to register device with backend:',
-        error
+      responseData = JSON.parse(responseText);
+    } catch {
+      console.warn(
+        'Device registration returned a non-JSON response.'
       );
     }
 
-    return token.data;
+    if (!response.ok || responseData?.success === false) {
+      console.error(
+        'Push device registration failed:',
+        response.status,
+        responseData ?? responseText
+      );
+      return expoPushToken;
+    }
+
+    console.log(
+      'Push device successfully registered with backend.'
+    );
+
+    return expoPushToken;
 
   } catch (error) {
     console.error(
-      'Failed to get Expo push token:',
+      'Push registration failed:',
       error
     );
-
     return null;
   }
 }
 
 // ========================================
-// HANDLE NOTIFICATION TAP
+// NOTIFICATION TAP HANDLING
 // ========================================
+
+const handledNotificationResponses =
+  new Set<string>();
 
 export function handleNotificationResponse(
   response: any
 ) {
   try {
+    const notificationId =
+      response?.notification?.request?.identifier;
+
+    if (
+      notificationId &&
+      handledNotificationResponses.has(notificationId)
+    ) {
+      return;
+    }
+
     const data =
-      response.notification.request
-        .content.data as any;
+      response?.notification?.request?.content?.data;
+
+    if (!data || typeof data !== 'object') {
+      return;
+    }
+
+    if (notificationId) {
+      handledNotificationResponses.add(notificationId);
+
+      // Bound memory use.
+      if (handledNotificationResponses.size > 100) {
+        const oldest =
+          handledNotificationResponses.values().next().value;
+
+        if (oldest) {
+          handledNotificationResponses.delete(oldest);
+        }
+      }
+    }
 
     console.log(
       'Notification tapped:',
-      data
+      data.type
     );
 
-    if (!data) {
-      return;
-    }
-
-    // ------------------------------------
+    // ====================================
     // ANNOUNCEMENT
-    // ------------------------------------
+    // ====================================
 
     if (data.type === 'announcement') {
       router.push({
-        pathname:
-          '/announcements' as any,
-
+        pathname: '/announcements' as any,
         params: {
-          id: String(
-            data.announcementId
-          ),
+          id: String(data.announcementId ?? ''),
         },
       });
-
       return;
     }
 
-    // ------------------------------------
+    // ====================================
     // DARSHAN VIDEO
-    // ------------------------------------
+    // ====================================
 
     if (data.type === 'darshan_video') {
-      router.push(
-        '/darshan-videos' as any
-      );
-
+      router.push('/darshan-videos' as any);
       return;
     }
 
-    // ------------------------------------
+    // ====================================
+    // TODAY'S DARSHAN
+    // ====================================
+
+    if (data.type === 'today_darshan') {
+      router.push('/darshan' as any);
+      return;
+    }
+
+    // ====================================
     // DEITY
-    // ------------------------------------
+    // ====================================
 
     if (data.type === 'deity') {
       router.push({
-        pathname:
-          '/deity/[id]' as any,
-
+        pathname: '/deity/[id]' as any,
         params: {
-          id: String(
-            data.deityId
-          ),
+          id: String(data.deityId ?? ''),
         },
       });
-
       return;
     }
 
-    // ------------------------------------
+    // ====================================
     // TEST NOTIFICATION
-    // ------------------------------------
+    // ====================================
 
     if (data.type === 'test') {
-      router.push(
-        '/(tabs)'
-      );
-
+      router.push('/(tabs)');
       return;
     }
 
-    // ------------------------------------
+    // ====================================
     // OTHER NOTIFICATIONS
-    // ------------------------------------
+    // ====================================
 
-    if (data.screen) {
-      router.push(
-        data.screen as any
-      );
+    if (
+      typeof data.screen === 'string' &&
+      data.screen.startsWith('/') &&
+      !data.screen.startsWith('//')
+    ) {
+      router.push(data.screen as any);
     }
 
   } catch (error) {
@@ -373,16 +393,13 @@ export async function handleInitialNotification() {
       await import('expo-notifications');
 
     const response =
-      await Notifications
-        .getLastNotificationResponseAsync();
+      await Notifications.getLastNotificationResponseAsync();
 
-    if (!response) {
-      return;
+    if (response) {
+      handleNotificationResponse(response);
+
+      await Notifications.clearLastNotificationResponseAsync();
     }
-
-    handleNotificationResponse(
-      response
-    );
 
   } catch (error) {
     console.error(
@@ -393,15 +410,11 @@ export async function handleInitialNotification() {
 }
 
 // ========================================
-// NOTIFICATION LISTENER
+// NOTIFICATION RESPONSE LISTENER
 // ========================================
 
 export async function initializeNotificationListener() {
   if (IS_EXPO_GO) {
-    console.log(
-      'Notification listener disabled in Expo Go.'
-    );
-
     return () => {};
   }
 
@@ -409,11 +422,12 @@ export async function initializeNotificationListener() {
     const Notifications =
       await import('expo-notifications');
 
+    await initializeNotificationHandler();
+
     const subscription =
-      Notifications
-        .addNotificationResponseReceivedListener(
-          handleNotificationResponse
-        );
+      Notifications.addNotificationResponseReceivedListener(
+        handleNotificationResponse
+      );
 
     return () => {
       subscription.remove();

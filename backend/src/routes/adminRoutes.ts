@@ -2,37 +2,27 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { requireAdmin } from '../middleware/adminMiddleware';
 import {
+  getAdminEventCategories,
+  createEventCategory,
+  updateEventCategory,
+} from '../controllers/eventCategoryController';
+import {
   getDashboardSummary,
   getAllUsers,
   getUserById,
-  getAllBuildings,
+
   updateUser,
-  getAllRoomBookings,
-   updateRoomBookingStatus,
-    getAllServiceBookings,
-     updateServiceBookingStatus,
-     updateServicePaymentStatus,
-       getAllRooms,
-         createRoom,
-           updateRoom,
-            updateRoomStatus,
-              getAllRoomTypes,
-                createRoomType,
-                updateRoomType,
+
+
                 getAllEvents,
 createEvent,
 updateEvent,
 updateEventStatus,
-                updateRoomPaymentStatus
+
 
             } from '../controllers/adminController';
 const router = Router();
-router.patch(
-  '/service-bookings/:id/payment-status',
-  authenticateToken,
-  requireAdmin,
-  updateServicePaymentStatus
-);
+
 /* =========================================================
    EVENTS
 ========================================================= */
@@ -64,79 +54,7 @@ router.patch(
   requireAdmin,
   updateEventStatus
 );
-router.get('/buildings', getAllBuildings);
-router.patch(
-  '/room-bookings/:id/payment-status',
-  authenticateToken,
-  requireAdmin,
-  updateRoomPaymentStatus
-);
-router.put(
-  '/room-types/:id',
-  authenticateToken,
-  requireAdmin,
-  updateRoomType
-);
-router.post(
-  '/room-types',
-  authenticateToken,
-  requireAdmin,
-  createRoomType
-);
-router.get(
-  '/room-types',
-  authenticateToken,
-  requireAdmin,
-  getAllRoomTypes
-);
-router.patch(
-  '/rooms/:id/status',
-  authenticateToken,
-  requireAdmin,
-  updateRoomStatus
-);
-router.put(
-  '/rooms/:id',
-  authenticateToken,
-  requireAdmin,
-  updateRoom
-);
-router.post(
-  '/rooms',
-  authenticateToken,
-  requireAdmin,
-  createRoom
-);
-router.get(
-  '/rooms',
-  authenticateToken,
-  requireAdmin,
-  getAllRooms
-);
-router.get(
-  '/service-bookings',
-  authenticateToken,
-  requireAdmin,
-  getAllServiceBookings
-);
-router.patch(
-  '/service-bookings/:id/status',
-  authenticateToken,
-  requireAdmin,
-  updateServiceBookingStatus
-);
-router.patch(
-  '/room-bookings/:id/status',
-  authenticateToken,
-  requireAdmin,
-  updateRoomBookingStatus
-);
-router.get(
-  '/room-bookings',
-  authenticateToken,
-  requireAdmin,
-  getAllRoomBookings
-);
+
 router.put(
   '/users/:id',
   authenticateToken,
@@ -162,5 +80,34 @@ router.get(
   requireAdmin,
   getDashboardSummary
 );
+
+/* =========================================================
+   EVENT CATEGORY MANAGEMENT
+========================================================= */
+
+// GET ALL EVENT CATEGORIES (ADMIN)
+router.get(
+  '/event-categories',
+  authenticateToken,
+  requireAdmin,
+  getAdminEventCategories
+);
+
+// CREATE EVENT CATEGORY
+router.post(
+  '/event-categories',
+  authenticateToken,
+  requireAdmin,
+  createEventCategory
+);
+
+// UPDATE CATEGORY NAME OR STATUS
+router.put(
+  '/event-categories/:id',
+  authenticateToken,
+  requireAdmin,
+  updateEventCategory
+);
+
 
 export default router;

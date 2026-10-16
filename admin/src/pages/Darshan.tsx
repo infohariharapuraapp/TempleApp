@@ -1,569 +1,516 @@
-import { useEffect, useState } from 'react';
+
+import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../lib/api';
 
-type DarshanSlot = {
+// ========================================
+// TYPES
+// ========================================
+
+type TodayDarshan = {
   id: number;
   name: string;
-  description?: string;
+  youtube_url: string;
+  youtube_video_id: string;
   darshan_date: string;
-  start_time: string;
-  end_time: string;
-  price: string | number;
-  capacity: number;
-  is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
+  published_at: string;
+  updated_at: string;
 };
 
-export default function Darshan() {
-  const [items, setItems] = useState<DarshanSlot[]>([]);
-  const [editing, setEditing] =
-    useState<Partial<DarshanSlot> | null>(null);
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+  message?: string;
+  unchanged?: boolean;
+  replaced?: boolean;
+};
 
-  const [loading, setLoading] = useState(false);
+// ========================================
+// EXTRACT YOUTUBE VIDEO ID
+// ========================================
+
+function extractVideoId(input: string): string | null {
+  try {
+    const url = new URL(input.trim());
+
+    if (url.protocol !== 'https:') {
+      return null;
+    }
+
+    const host = url.hostname.toLowerCase();
+    let id: string | null = null;
+
+    if (host === 'youtu.be' || host === 'www.youtu.be') {
+      id = url.pathname.split('/')[1] || null;
+    } else if (
+      [
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'music.youtube.com',
+        'youtube-nocookie.com',
+        'www.youtube-nocookie.com',
+      ].includes(host)
+    ) {
+      if (url.pathname === '/watch') {
+        id = url.searchParams.get('v');
+      } else {
+        const parts = url.pathname.split('/').filter(Boolean);
+
+        if (['embed', 'shorts', 'live'].includes(parts[0])) {
+          id = parts[1] || null;
+        }
+      }
+    }
+
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id)
+      ? id
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// ========================================
+// TODAY'S DARSHAN ADMIN
+// ========================================
+
+export default function Darshan() {
+  const [name, setName] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+
+  const [current, setCurrent] =
+    useState<TodayDarshan | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  async function loadDarshan() {
+  const videoId = extractVideoId(youtubeUrl);
+
+  const previewUrl = videoId
+    ? `https://www.youtube-nocookie.com/embed/${videoId}`
+    : null;
+
+  const currentVideoUrl = current
+    ? `https://www.youtube-nocookie.com/embed/${current.youtube_video_id}`
+    : null;
+
+  // ========================================
+  // LOAD TODAY'S DARSHAN
+  // ========================================
+
+  const loadTodayDarshan = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
-      const result = await apiRequest<{
-        success: boolean;
-        data: DarshanSlot[];
-      }>('/admin/darshan');
+      const response =
+        await apiRequest<ApiResponse<TodayDarshan | null>>(
+          '/admin/darshan/today'
+        );
 
-      setItems(result.data || []);
+      if (!response.success) {
+        throw new Error(
+          response.message || 'Failed to load Darshan.'
+        );
+      }
+
+      setCurrent(response.data);
+
+      if (response.data) {
+        setName(response.data.name);
+        setYoutubeUrl(response.data.youtube_url);
+      } else {
+        setName('');
+        setYoutubeUrl('');
+      }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Failed to load Darshan slots'
+          : 'Unable to load Darshan.'
       );
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    loadDarshan();
   }, []);
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    loadTodayDarshan();
+  }, [loadTodayDarshan]);
 
-    if (
-      !editing?.name ||
-      !editing.darshan_date ||
-      !editing.start_time ||
-      !editing.end_time ||
-      editing.price === undefined ||
-      editing.capacity === undefined
-    ) {
-      setError(
-        'Please fill all required Darshan fields.'
+  // ========================================
+  // PUBLISH OR REPLACE
+  // ========================================
+
+  const handlePublish = async () => {
+    setError('');
+    setMessage('');
+
+    if (!name.trim()) {
+      setError('Please enter Darshan name.');
+      return;
+    }
+
+    if (!videoId) {
+      setError('Please enter a valid YouTube video URL.');
+      return;
+    }
+
+    const isUnchanged =
+      current !== null &&
+      current.name === name.trim() &&
+      current.youtube_video_id === videoId;
+
+    if (isUnchanged) {
+      setMessage(
+        'This Darshan is already published. No changes are needed.'
       );
       return;
     }
 
+    const confirmed = window.confirm(
+      current
+        ? 'Replace today’s Darshan? Devotees may receive a new notification.'
+        : 'Publish today’s Darshan and notify devotees?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
-      setError('');
+      setPublishing(true);
 
-      const method = editing.id ? 'PUT' : 'POST';
+      const response =
+        await apiRequest<ApiResponse<TodayDarshan>>(
+          '/admin/darshan/today/publish',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              name: name.trim(),
+              youtube_url: youtubeUrl.trim(),
+            }),
+          }
+        );
 
-      const endpoint = editing.id
-        ? `/admin/darshan/${editing.id}`
-        : '/admin/darshan';
+      if (!response.success) {
+        throw new Error(
+          response.message || 'Failed to publish Darshan.'
+        );
+      }
 
-      await apiRequest(endpoint, {
-        method,
-        body: JSON.stringify({
-          name: editing.name,
-          description:
-            editing.description || null,
-          darshan_date:
-            editing.darshan_date,
-          start_time:
-            editing.start_time,
-          end_time:
-            editing.end_time,
-          price:
-            Number(editing.price),
-          capacity:
-            Number(editing.capacity),
-          is_active:
-            editing.is_active !== undefined
-              ? editing.is_active
-              : true,
-        }),
-      });
+      setCurrent(response.data);
 
-      setEditing(null);
-      await loadDarshan();
+      setName(response.data.name);
+      setYoutubeUrl(response.data.youtube_url);
+
+      setMessage(
+        response.message ||
+          'Darshan published successfully.'
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Failed to save Darshan slot'
+          : 'Failed to publish Darshan.'
       );
+    } finally {
+      setPublishing(false);
     }
-  }
+  };
 
-  async function toggleStatus(
-    item: DarshanSlot
-  ) {
-    try {
-      setError('');
-
-      await apiRequest(
-        `/admin/darshan/${item.id}/status`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({
-            is_active: !item.is_active,
-          }),
-        }
-      );
-
-      await loadDarshan();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to update Darshan status'
-      );
-    }
-  }
-
-  function formatDate(value?: string) {
-    if (!value) return '—';
-
-    return value.substring(0, 10);
-  }
-
-  function formatTime(value?: string) {
-    if (!value) return '—';
-
-    return value.substring(0, 5);
-  }
-
-  function formatAmount(
-    value?: string | number
-  ) {
-    if (
-      value === undefined ||
-      value === null
-    ) {
-      return '—';
-    }
-
-    return `₹${Number(value).toLocaleString(
-      'en-IN'
-    )}`;
-  }
+  // ========================================
+  // RENDER
+  // ========================================
 
   return (
-    <Page
-      title="Darshan"
-      subtitle="Manage Darshan slots displayed in the devotee app"
-      action={
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Today's Darshan</h1>
+          <p>
+            Publish the daily Darshan video for devotees.
+          </p>
+        </div>
+
         <button
           type="button"
-          className="primary"
-          onClick={() =>
-            setEditing({
-              is_active: true,
-              price: 0,
-              capacity: 1,
-            })
-          }
+          className="primary-button"
+          onClick={loadTodayDarshan}
+          disabled={loading || publishing}
         >
-          + Add Darshan
+          {loading ? 'Refreshing...' : 'Refresh'}
         </button>
-      }
-    >
+      </div>
+
       {error && (
-        <div className="error">
+        <div className="error-message">
           {error}
         </div>
       )}
 
-      {editing && (
-        <form
-          className="form-card"
-          onSubmit={save}
+      {message && (
+        <div
+          className="card"
+          role="status"
+          style={{
+            marginBottom: 20,
+            borderLeft: '4px solid #3F8554',
+          }}
         >
-          <h3>
-            {editing.id
-              ? 'Edit Darshan'
-              : 'Add Darshan'}
-          </h3>
-
-          <div className="grid2">
-            <label>
-              Darshan Name
-
-              <input
-                value={
-                  editing.name || ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    name:
-                      e.target.value,
-                  })
-                }
-                placeholder="Morning Darshan"
-                required
-              />
-            </label>
-
-            <label>
-              Date
-
-              <input
-                type="date"
-                value={
-                  editing.darshan_date ||
-                  ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    darshan_date:
-                      e.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <label>
-              Start Time
-
-              <input
-                type="time"
-                value={
-                  editing.start_time ||
-                  ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    start_time:
-                      e.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <label>
-              End Time
-
-              <input
-                type="time"
-                value={
-                  editing.end_time ||
-                  ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    end_time:
-                      e.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <label>
-              Price
-
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={
-                  editing.price ??
-                  ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    price:
-                      e.target.value,
-                  })
-                }
-                required
-              />
-            </label>
-
-            <label>
-              Capacity
-
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={
-                  editing.capacity ??
-                  ''
-                }
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    capacity:
-                      Number(
-                        e.target.value
-                      ),
-                  })
-                }
-                required
-              />
-            </label>
-          </div>
-
-          <label>
-            Description
-
-            <textarea
-              value={
-                editing.description ||
-                ''
-              }
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  description:
-                    e.target.value,
-                })
-              }
-              placeholder="Describe this Darshan slot"
-            />
-          </label>
-
-          <label>
-            Status
-
-            <select
-              value={
-                editing.is_active
-                  ? 'active'
-                  : 'inactive'
-              }
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  is_active:
-                    e.target.value ===
-                    'active',
-                })
-              }
-            >
-              <option value="active">
-                Active
-              </option>
-
-              <option value="inactive">
-                Inactive
-              </option>
-            </select>
-          </label>
-
-          <div className="actions">
-            <button
-              type="button"
-              onClick={() =>
-                setEditing(null)
-              }
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="primary"
-            >
-              {editing.id
-                ? 'Update Darshan'
-                : 'Save Darshan'}
-            </button>
-          </div>
-        </form>
+          {message}
+        </div>
       )}
 
-      <div className="card">
-        <div className="section-header">
-          <div>
-            <h2>Darshan Slots</h2>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        {/* PUBLISH FORM */}
 
-            <p>
-              Existing Darshan slots from
-              the backend
+        <div className="card">
+          <div className="section-header">
+            <div>
+              <h2>
+                {current
+                  ? 'Update Today’s Darshan'
+                  : 'Publish Today’s Darshan'}
+              </h2>
+
+              <p>
+                Enter a Darshan name and YouTube video link.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <label
+              htmlFor="darshan-name"
+              style={{ display: 'block', marginBottom: 8 }}
+            >
+              Darshan Name
+            </label>
+
+            <input
+              id="darshan-name"
+              type="text"
+              value={name}
+              maxLength={200}
+              onChange={(event) =>
+                setName(event.target.value)
+              }
+              placeholder="Example: Sri Sharada Devi Darshan"
+              disabled={loading || publishing}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <label
+              htmlFor="darshan-youtube"
+              style={{ display: 'block', marginBottom: 8 }}
+            >
+              YouTube Video URL
+            </label>
+
+            <input
+              id="darshan-youtube"
+              type="url"
+              value={youtubeUrl}
+              onChange={(event) =>
+                setYoutubeUrl(event.target.value)
+              }
+              placeholder="https://www.youtube.com/watch?v=..."
+              disabled={loading || publishing}
+              style={{ width: '100%' }}
+            />
+
+            <p
+              style={{
+                marginTop: 8,
+                fontSize: 12,
+                color: '#81776d',
+              }}
+            >
+              Supported: YouTube watch, short, live and
+              youtu.be links.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={loadDarshan}
-            disabled={loading}
+          <div style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handlePublish}
+              disabled={
+                loading ||
+                publishing ||
+                !name.trim() ||
+                !videoId
+              }
+            >
+              {publishing
+                ? 'Publishing...'
+                : current
+                ? 'Replace Darshan'
+                : 'Publish Darshan'}
+            </button>
+          </div>
+
+          <p
+            style={{
+              marginTop: 14,
+              fontSize: 12,
+              color: '#81776d',
+              lineHeight: 1.6,
+            }}
           >
-            {loading
-              ? 'Refreshing...'
-              : 'Refresh'}
-          </button>
+            Publishing a new or changed Darshan creates
+            a notification for devotees. Submitting
+            unchanged details will not create a duplicate.
+          </p>
         </div>
 
-        {loading && items.length === 0 ? (
-          <p>
-            Loading Darshan slots...
-          </p>
-        ) : items.length === 0 ? (
-          <p>
-            No Darshan slots found.
-          </p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Price</th>
-                  <th>Capacity</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+        {/* VIDEO PREVIEW */}
 
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong>
-                        {item.name}
-                      </strong>
-
-                      {item.description && (
-                        <small
-                          style={{
-                            display:
-                              'block',
-                            marginTop:
-                              '4px',
-                            color:
-                              '#81776d',
-                          }}
-                        >
-                          {
-                            item.description
-                          }
-                        </small>
-                      )}
-                    </td>
-
-                    <td>
-                      {formatDate(
-                        item.darshan_date
-                      )}
-                    </td>
-
-                    <td>
-                      {formatTime(
-                        item.start_time
-                      )}
-                      {' – '}
-                      {formatTime(
-                        item.end_time
-                      )}
-                    </td>
-
-                    <td>
-                      {formatAmount(
-                        item.price
-                      )}
-                    </td>
-
-                    <td>
-                      {item.capacity}
-                    </td>
-
-                    <td>
-                      <span className="badge">
-                        {item.is_active
-                          ? 'Active'
-                          : 'Inactive'}
-                      </span>
-                    </td>
-
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditing(
-                            item
-                          )
-                        }
-                      >
-                        Edit
-                      </button>{' '}
-
-                      <button
-                        type="button"
-                        className={
-                          item.is_active
-                            ? 'danger'
-                            : ''
-                        }
-                        onClick={() =>
-                          toggleStatus(
-                            item
-                          )
-                        }
-                      >
-                        {item.is_active
-                          ? 'Deactivate'
-                          : 'Activate'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="card">
+          <div className="section-header">
+            <div>
+              <h2>Video Preview</h2>
+              <p>
+                Check the YouTube video before publishing.
+              </p>
+            </div>
           </div>
+
+          {previewUrl ? (
+            <div style={{ marginTop: 20 }}>
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  aspectRatio: '16 / 9',
+                  backgroundColor: '#000',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                }}
+              >
+                <iframe
+                  key={videoId}
+                  title="Darshan video preview"
+                  src={previewUrl}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 0,
+                  }}
+                />
+              </div>
+
+              <p
+                style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  color: '#81776d',
+                }}
+              >
+                Preview only — this video is not published
+                until you click Publish or Replace.
+              </p>
+            </div>
+          ) : (
+            <div
+              style={{
+                marginTop: 20,
+                padding: 30,
+                border: '1px dashed #D8C9B5',
+                borderRadius: 12,
+                textAlign: 'center',
+                color: '#81776d',
+              }}
+            >
+              Enter a valid YouTube URL to preview
+              the video here.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CURRENTLY PUBLISHED VIDEO */}
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="section-header">
+          <div>
+            <h2>Currently Published Darshan</h2>
+            <p>
+              The Darshan video available to devotees today.
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p style={{ marginTop: 20 }}>
+            Loading today's Darshan...
+          </p>
+        ) : current && currentVideoUrl ? (
+          <div style={{ marginTop: 20 }}>
+            <h3>{current.name}</h3>
+
+            <p
+              style={{
+                marginTop: 8,
+                marginBottom: 16,
+                color: '#81776d',
+              }}
+            >
+              Darshan Date: {current.darshan_date.slice(0, 10)}
+            </p>
+
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 720,
+                aspectRatio: '16 / 9',
+                borderRadius: 12,
+                overflow: 'hidden',
+                backgroundColor: '#000',
+              }}
+            >
+              <iframe
+                key={current.youtube_video_id}
+                title="Currently published Darshan"
+                src={currentVideoUrl}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 0,
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <p
+            style={{
+              marginTop: 20,
+              color: '#81776d',
+            }}
+          >
+            No Darshan video has been published today.
+          </p>
         )}
       </div>
-    </Page>
-  );
-}
-
-function Page({
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <main className="content">
-      <div className="page-head">
-        <div>
-          <h2>{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-
-        {action}
-      </div>
-
-      {children}
-    </main>
+    </div>
   );
 }

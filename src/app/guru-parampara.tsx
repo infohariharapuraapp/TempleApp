@@ -1,6 +1,8 @@
-import { router } from 'expo-router';
-import React from 'react';
+
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Platform,
@@ -13,81 +15,130 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { API_BASE_URL, apiRequest } from '@/services/api';
+
+// ========================================
+// SCREEN DIMENSIONS
+// ========================================
+
 const { width } = Dimensions.get('window');
 
-const GURUS = [
- 
+// ========================================
+// TYPES
+// ========================================
 
-  {
-    id: '3',
-    name: 'Bhagavatpāda Śaṅkara',
-    title: 'BHAGAVATPĀDA',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/shankaracharya.jpg',
-    verse:
-      'श्रुतिस्मृतिपुराणानामालयं करुणालयम् । नमामि भगवत्पादं शङ्करं लोकशङ्करम् ॥',
-    transliteration:
-      'śrutismṛtipurāṇānāmālayaṃ karuṇālayam ∣ namāmi bhagavatpādaṃ śaṅkaraṃ lokaśaṅkaram ∥3∥',
-    translation:
-      'I bow down to Bhagavatpāda Śaṅkara—the abode of the Śruti (Vedas), Smṛti, and Purāṇas, the very embodiment of compassion, and the one who brings auspiciousness to the entire world.',
-  },
-  {
-    id: '4',
-    name: 'Guru Sureśvara',
-    title: 'GURU',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/sureshwaracharya.jpg',
-    verse:
-      'वन्देऽहं शङ्कराचार्यसच्छिष्यम् ज्ञानसागरम् । सुरेश्वरं गरुं धीरं धर्मब्रह्मविदुत्तमम् ॥',
-    transliteration:
-      'vande’haṃ śaṅkarācāryasacchiṣyaṃ jñānasāgaram ∣ sureśvaraṃ guruṃ dhīraṃ dharmabrahmaviduttamam ∥4∥',
-    translation:
-      'I bow to the noble Guru Sureśvara—the true disciple of Śrī Śaṅkarācārya, an ocean of wisdom, steadfast and composed, the supreme knower of Dharma and Brahman.',
-  },
-  {
-    id: '5',
-    name: 'Sri Swayamprakasha Krishna Yogeendra Saraswathi MahaSwamiji',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g1.jpg',
-    verse:
-      'सौराष्ट्रेषु जनिं प्राप्य दक्षाश्रममुपागताः तुङ्गातीरे तपोनुष्ठा: आदिशङ्करदीक्षिताः । अतोप्यधिकतेजसः श्री कृष्णयोगीन्द्रवराः सदा शिष्योपदेशकाः तान् विनीतो नमाम्यहम् ॥',
-    transliteration:
-      'saurāṣtreṣu janiṃ prāpya dakṣāśramamupāgatāḥ tuṅgātīre taponiṣṭhāḥ ādiśaṅkaradīkṣitāḥ ∣ atopyadhikatejasaḥ śrīkṛṣṇayogīndravarāḥ sadā śiṣyopadeśakāḥ tān vinīto namāmyaham ∥5∥',
-    translation:
-      'Born in the land of Saurāṣṭra and later arriving at the hermitage of Dakṣa, they performed intense austerities on the banks of the river Tuṅgā and were initiated by Ādi Śaṅkarācārya. Among them, the most radiant and exalted was Śrī Kṛṣṇa Yogīndra, ever engaged in mentoring disciples. To that venerable teacher, I bow down with humility.',
-  },
-  {
-    id: '6',
-    name: 'Sri Swayamprakasha Ramananda Saraswathi MahaSwamiji – III',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g3.jpg',
-    verse:
-      'शारदाकरुणापात्रं रामानन्दयतीश्वरम् । पुङ्गनूरुपुराधीशं सद्गुरुं तमहं भजे ॥',
-    transliteration:
-      'śāradākaruṇāpātraṃ rāmānandayatīśvaram ∣ puṅganūrupurādhīśaṃ sadguruṃ tamahaṃ bhaje ∥27∥',
-    translation:
-      'I worship that noble Guru, Śrī Rāmānanda Yatīśvara—the worthy recipient of Goddess Śāradā’s grace and compassion, the revered spiritual master and head of Puṅganūru.',
-  },
-  {
-    id: '7',
-    name: 'Sri Swayamprakasha Abhinava Ramananda Saraswathi MahaSwamiji',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g2.jpg',
-    verse:
-      'हरिहरपुराधीशं श्रीचक्रार्चनतत्परम् । सदाभिनवपूर्वं तं रामानन्दगरुं भजे ॥',
-    transliteration:
-      'hariharapurādhīśaṃ śrīcakrārcanatatparam ∣ sadābhinavapūrvaṃ taṃ rāmānandaguruṃ bhaje ∥28∥',
-    translation:
-      'I adore my Guru, Śrī Rāmānanda—the ever-youthful master of Hariharapura, who is deeply devoted to the worship of the sacred Śrīcakra.',
-  },
-];
+type Guru = {
+  id: number;
+  name: string;
+  title: string | null;
+  image_url: string | null;
+  verse: string | null;
+  transliteration: string | null;
+  translation: string | null;
+  display_order: number;
+  is_active: boolean;
+};
+
+type GuruResponse = {
+  success: boolean;
+  data: Guru[];
+  message?: string;
+};
+
+// ========================================
+// IMAGE URL HELPER
+// ========================================
+
+function resolveGuruImage(
+  url: string | null
+): string | null {
+  if (!url?.trim()) {
+    return null;
+  }
+
+  const value = url.trim();
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  const origin = API_BASE_URL.replace(/\/api\/?$/, '');
+
+  return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
+// ========================================
+// GURU PARAMPARA SCREEN
+// ========================================
 
 export default function GuruParamparaScreen() {
+  const [gurus, setGurus] = useState<Guru[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // ========================================
+  // FETCH GURUS FROM BACKEND
+  // ========================================
+
+  const loadGurus = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await apiRequest<GuruResponse>(
+        '/guru-parampara'
+      );
+
+      if (
+        response.success &&
+        Array.isArray(response.data)
+      ) {
+        const activeGurus = response.data
+          .filter((guru) => guru.is_active)
+          .sort(
+            (a, b) =>
+              a.display_order - b.display_order ||
+              a.id - b.id
+          );
+
+        setGurus(activeGurus);
+      } else {
+        setGurus([]);
+        setError(
+          response.message ||
+            'Unable to load Guru Parampara.'
+        );
+      }
+    } catch (err) {
+      console.error(
+        'Guru Parampara loading error:',
+        err
+      );
+
+      setError(
+        'Unable to load Guru Parampara. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refresh whenever this page becomes active
+  useFocusEffect(
+    useCallback(() => {
+      void loadGurus();
+    }, [loadGurus])
+  );
+
+  // ========================================
+  // SCREEN UI
+  // ========================================
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top']}
+    >
       <StatusBar
         barStyle="dark-content"
         backgroundColor="#FFF9F0"
@@ -108,7 +159,9 @@ export default function GuruParamparaScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>SACRED LINEAGE</Text>
+            <Text style={styles.eyebrow}>
+              SACRED LINEAGE
+            </Text>
 
             <Text style={styles.title}>
               Guru Parampara
@@ -124,77 +177,159 @@ export default function GuruParamparaScreen() {
         {/* DIVIDER */}
         <View style={styles.dividerContainer}>
           <View style={styles.dividerLine} />
+
           <View style={styles.dividerDiamond}>
-            <Text style={styles.diamondText}>✦</Text>
+            <Text style={styles.diamondText}>
+              ✦
+            </Text>
           </View>
+
           <View style={styles.dividerLine} />
         </View>
 
         {/* GURU CARDS */}
         <View style={styles.cardsContainer}>
-          {GURUS.map((guru, index) => (
-            <TouchableOpacity
-              key={guru.id}
-              activeOpacity={0.94}
-              style={styles.card}
+          {loading ? (
+            <View
+              style={{
+                paddingVertical: 40,
+                alignItems: 'center',
+              }}
             >
-              {/* IMAGE */}
-              <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: guru.image }}
-                  style={styles.image}
-                  resizeMode="contain"
-                />
+              <ActivityIndicator
+                size="large"
+                color="#A96819"
+              />
 
-                {/* IMAGE OVERLAY */}
-                <View style={styles.imageOverlay} />
+              <Text
+                style={[
+                  styles.bottomText,
+                  { marginTop: 12 },
+                ]}
+              >
+                Loading Guru Parampara...
+              </Text>
+            </View>
+          ) : error ? (
+            <View
+              style={{
+                alignItems: 'center',
+                paddingVertical: 32,
+              }}
+            >
+              <Text style={styles.bottomText}>
+                {error}
+              </Text>
 
-                <View style={styles.imageLabel}>
-                  <Text style={styles.imageLabelText}>SACRED LINEAGE</Text>
-                </View>
-
-                {/* NUMBER */}
-                <View style={styles.numberBadge}>
-                  <Text style={styles.numberText}>
-                    {String(index + 1).padStart(2, '0')}
-                  </Text>
-                </View>
-
-                {/* ROLE */}
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleText}>
-                    {guru.title}
-                  </Text>
-                </View>
-              </View>
-
-              {/* CONTENT */}
-              <View style={styles.cardContent}>
-                <Text style={styles.name}>
-                  {guru.name}
+              <TouchableOpacity
+                onPress={() => void loadGurus()}
+                style={[
+                  styles.bottomBackButton,
+                  { marginTop: 16 },
+                ]}
+              >
+                <Text style={styles.bottomBackText}>
+                  Retry
                 </Text>
+              </TouchableOpacity>
+            </View>
+          ) : gurus.length === 0 ? (
+            <Text
+              style={[
+                styles.bottomText,
+                { paddingVertical: 32 },
+              ]}
+            >
+              Guru Parampara information will be
+              available soon.
+            </Text>
+          ) : (
+            gurus.map((guru, index) => {
+              const imageUrl = resolveGuruImage(
+                guru.image_url
+              );
 
-                <View style={styles.smallLine} />
+              return (
+                <TouchableOpacity
+                  key={guru.id}
+                  activeOpacity={0.94}
+                  style={styles.card}
+                >
+                  {/* IMAGE */}
+                  <View style={styles.imageContainer}>
+                    <Image
+                      source={
+                        imageUrl
+                          ? { uri: imageUrl }
+                          : require('@/assets/images/icon.png')
+                      }
+                      style={styles.image}
+                      resizeMode="contain"
+                    />
 
-                <Text style={styles.verse}>
-                  {guru.verse}
-                </Text>
+                    {/* IMAGE OVERLAY */}
+                    <View style={styles.imageOverlay} />
 
-                <Text style={styles.transliteration}>
-                  {guru.transliteration}
-                </Text>
+                    <View style={styles.imageLabel}>
+                      <Text style={styles.imageLabelText}>
+                        SACRED LINEAGE
+                      </Text>
+                    </View>
 
-                <Text style={styles.bio}>
-                  “{guru.translation}”
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                    {/* NUMBER */}
+                    <View style={styles.numberBadge}>
+                      <Text style={styles.numberText}>
+                        {String(index + 1).padStart(2, '0')}
+                      </Text>
+                    </View>
+
+                    {/* ROLE */}
+                    {!!guru.title && (
+                      <View style={styles.roleBadge}>
+                        <Text style={styles.roleText}>
+                          {guru.title}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* CONTENT */}
+                  <View style={styles.cardContent}>
+                    <Text style={styles.name}>
+                      {guru.name}
+                    </Text>
+
+                    <View style={styles.smallLine} />
+
+                    {!!guru.verse && (
+                      <Text style={styles.verse}>
+                        {guru.verse}
+                      </Text>
+                    )}
+
+                    {!!guru.transliteration && (
+                      <Text style={styles.transliteration}>
+                        {guru.transliteration}
+                      </Text>
+                    )}
+
+                    {!!guru.translation && (
+                      <Text style={styles.bio}>
+                        “{guru.translation}”
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
 
         {/* BOTTOM MESSAGE */}
         <View style={styles.bottomSection}>
-          <Text style={styles.bottomSymbol}>✦</Text>
+          <Text style={styles.bottomSymbol}>
+            ✦
+          </Text>
 
           <Text style={styles.bottomTitle}>
             A Legacy of Wisdom
@@ -212,7 +347,10 @@ export default function GuruParamparaScreen() {
           activeOpacity={0.85}
           onPress={() => router.back()}
         >
-          <Text style={styles.bottomBackIcon}>‹</Text>
+          <Text style={styles.bottomBackIcon}>
+            ‹
+          </Text>
+
           <Text style={styles.bottomBackText}>
             Back
           </Text>
@@ -223,6 +361,10 @@ export default function GuruParamparaScreen() {
     </SafeAreaView>
   );
 }
+
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -236,8 +378,7 @@ const styles = StyleSheet.create({
     paddingBottom: 35,
   },
 
-  /* HEADER */
-
+  // HEADER
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -307,8 +448,7 @@ const styles = StyleSheet.create({
     maxWidth: 330,
   },
 
-  /* DIVIDER */
-
+  // DIVIDER
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -337,8 +477,7 @@ const styles = StyleSheet.create({
     color: '#B8781F',
   },
 
-  /* CARDS */
-
+  // CARDS
   cardsContainer: {
     width: '100%',
   },
@@ -359,7 +498,7 @@ const styles = StyleSheet.create({
           width: 0,
           height: 6,
         },
-        shadowOpacity: 0.10,
+        shadowOpacity: 0.1,
         shadowRadius: 13,
       },
       android: {
@@ -368,9 +507,8 @@ const styles = StyleSheet.create({
     }),
   },
 
-  /* IMAGE */
-
-imageContainer: {
+  // IMAGE
+  imageContainer: {
     width: '100%',
     height: width < 360 ? 215 : 235,
     backgroundColor: '#F5E9D8',
@@ -453,8 +591,7 @@ imageContainer: {
     color: '#A96819',
   },
 
-  /* CARD CONTENT */
-
+  // CARD CONTENT
   cardContent: {
     paddingHorizontal: 17,
     paddingTop: 16,
@@ -533,8 +670,7 @@ imageContainer: {
     marginTop: -1,
   },
 
-  /* BOTTOM */
-
+  // BOTTOM
   bottomSection: {
     alignItems: 'center',
     paddingHorizontal: 25,

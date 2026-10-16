@@ -101,6 +101,10 @@ export const registerDevice = async (
 // SEND TEST PUSH NOTIFICATION
 // ========================================
 
+// ========================================
+// SEND TEST PUSH NOTIFICATION
+// ========================================
+
 export const sendTestNotification = async (
   req: AuthRequest,
   res: Response
@@ -115,20 +119,71 @@ export const sendTestNotification = async (
       });
     }
 
-    await sendPushNotificationToUser(
+    console.log(
+      'Test notification requested for user:',
+      userId
+    );
+
+    // ====================================
+    // SEND PUSH NOTIFICATION
+    // ====================================
+
+    const result = await sendPushNotificationToUser(
       userId,
       'Temple App',
       'This is a test push notification 🙏',
       {
         type: 'test',
-        screen: 'home',
+        screen: '/(tabs)',
       }
+    );
+
+    // ====================================
+    // NO DEVICE OR FAILED SUBMISSION
+    // ====================================
+
+    if (!result.success || result.sent === 0) {
+      console.warn(
+        'Test push notification not submitted:',
+        result
+      );
+
+      return res.status(200).json({
+        success: false,
+        message:
+          'No push notification was accepted by Expo. Check device registration and backend logs.',
+        data: {
+          acceptedCount: result.sent ?? 0,
+          notificationId:
+            'notificationId' in result
+              ? result.notificationId
+              : null,
+        },
+      });
+    }
+
+    // ====================================
+    // EXPO ACCEPTED THE PUSH
+    // ====================================
+
+    console.log(
+      'Test notification accepted by Expo:',
+      result
     );
 
     return res.status(200).json({
       success: true,
-      message: 'Test notification sent',
+      message:
+        'Push notification accepted by Expo. Device delivery is not yet confirmed.',
+      data: {
+        acceptedCount: result.sent,
+        notificationId:
+          'notificationId' in result
+            ? result.notificationId
+            : null,
+      },
     });
+
   } catch (error) {
     console.error(
       'Test notification error:',

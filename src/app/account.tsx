@@ -155,7 +155,7 @@ export default function AccountScreen() {
             icon="📋"
             title="My Bookings"
             description="View your room and seva bookings"
-            onPress={() => router.push('/bookings')}
+          onPress={() => router.push('/website-bookings')}
           />
 
           <AccountItem

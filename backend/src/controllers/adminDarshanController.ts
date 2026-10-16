@@ -1,512 +1,367 @@
+
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { pool } from '../db';
+import { sendNotificationRecord } from '../services/notificationService';
 
-import {
-  createNotification,
-  sendNotificationRecord,
-} from '../services/notificationService';
+// ========================================
+// TYPES
+// ========================================
 
-/* =========================================================
-   GET ALL DARSHAN SLOTS
-========================================================= */
-
-export const getAllDarshanSlots = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         id,
-         name,
-         description,
-         darshan_date,
-         start_time,
-         end_time,
-         price,
-         capacity,
-         is_active,
-         created_at,
-         updated_at
-       FROM darshan_slots
-       ORDER BY
-         darshan_date ASC,
-         start_time ASC,
-         id ASC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error(
-      'Get all darshan slots error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch Darshan slots',
-    });
-  }
+type TodayDarshan = {
+  id: number;
+  name: string;
+  youtube_url: string;
+  youtube_video_id: string;
+  darshan_date: string;
+  published_at: Date;
+  updated_at: Date;
+  notification_id: number | null;
 };
 
-/* =========================================================
-   CREATE DARSHAN SLOT
-========================================================= */
+// ========================================
+// YOUTUBE URL VALIDATION
+// ========================================
 
-export const createDarshanSlot = async (
-  req: AuthRequest,
-  res: Response
-) => {
+function extractYouTubeVideoId(
+  input: string
+): string | null {
   try {
-    const {
-      name,
-      description,
-      darshan_date,
-      start_time,
-      end_time,
-      price,
-      capacity,
-      is_active,
-    } = req.body;
+    const url = new URL(input.trim());
+    const host = url.hostname.toLowerCase();
+
+    if (url.protocol !== 'https:') {
+      return null;
+    }
+
+    let videoId: string | null = null;
 
     if (
-      !name ||
-      !darshan_date ||
-      !start_time ||
-      !end_time ||
-      price === undefined ||
-      capacity === undefined
+      host === 'youtu.be' ||
+      host === 'www.youtu.be'
     ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Name, date, start time, end time, price and capacity are required',
-      });
-    }
-
-    if (Number(price) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Price cannot be negative',
-      });
-    }
-
-    if (Number(capacity) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Capacity must be greater than 0',
-      });
-    }
-
-    if (end_time <= start_time) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'End time must be later than start time',
-      });
-    }
-
-    const darshanIsActive =
-      is_active !== undefined
-        ? Boolean(is_active)
-        : true;
-
-    const result = await pool.query(
-      `INSERT INTO darshan_slots (
-         name,
-         description,
-         darshan_date,
-         start_time,
-         end_time,
-         price,
-         capacity,
-         is_active
-       )
-       VALUES (
-         $1,
-         $2,
-         $3,
-         $4,
-         $5,
-         $6,
-         $7,
-         $8
-       )
-       RETURNING
-         id,
-         name,
-         description,
-         darshan_date,
-         start_time,
-         end_time,
-         price,
-         capacity,
-         is_active,
-         created_at,
-         updated_at`,
+      videoId = url.pathname.split('/')[1] || null;
+    } else if (
       [
-        name.trim(),
-        description || null,
-        darshan_date,
-        start_time,
-        end_time,
-        Number(price),
-        Number(capacity),
-        darshanIsActive,
-      ]
-    );
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'music.youtube.com',
+        'www.youtube-nocookie.com',
+        'youtube-nocookie.com',
+      ].includes(host)
+    ) {
+      if (url.pathname === '/watch') {
+        videoId = url.searchParams.get('v');
+      } else {
+        const parts = url.pathname
+          .split('/')
+          .filter(Boolean);
 
-    const createdDarshan = result.rows[0];
-
-    /* =====================================================
-       SEND NOTIFICATION FOR NEW ACTIVE DARSHAN
-    ===================================================== */
-
-    if (createdDarshan.is_active) {
-      try {
-        const notification =
-          await createNotification({
-            title: `🛕 ${createdDarshan.name}`,
-
-            body:
-              `Darshan is available on ` +
-              `${createdDarshan.darshan_date} ` +
-              `from ${createdDarshan.start_time} ` +
-              `to ${createdDarshan.end_time}.`,
-
-            notificationType: 'darshan',
-
-            data: {
-              type: 'darshan',
-              darshanId: createdDarshan.id,
-              screen: '/darshan',
-            },
-
-            targetType: 'all',
-          });
-
-        await sendNotificationRecord(
-          notification.id
-        );
-      } catch (notificationError) {
-        /*
-         * Notification failure should NOT
-         * cause Darshan creation to fail.
-         */
-        console.error(
-          'Darshan notification error:',
-          notificationError
-        );
+        if (
+          ['live', 'shorts', 'embed'].includes(
+            parts[0]
+          )
+        ) {
+          videoId = parts[1] || null;
+        }
       }
     }
 
-    return res.status(201).json({
-      success: true,
-      message:
-        'Darshan slot created successfully',
-      data: createdDarshan,
-    });
-  } catch (error) {
-    console.error(
-      'Create Darshan slot error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to create Darshan slot',
-    });
+    return videoId &&
+      /^[A-Za-z0-9_-]{11}$/.test(videoId)
+      ? videoId
+      : null;
+  } catch {
+    return null;
   }
-};
+}
 
-/* =========================================================
-   UPDATE DARSHAN SLOT
-========================================================= */
+// ========================================
+// GET TODAY'S DARSHAN
+// GET /api/admin/darshan/today
+// ========================================
 
-export const updateDarshanSlot = async (
-  req: AuthRequest,
+export const getAdminTodayDarshan = async (
+  _req: AuthRequest,
   res: Response
 ) => {
   try {
-    const { id } = req.params;
-
-    const {
-      name,
-      description,
-      darshan_date,
-      start_time,
-      end_time,
-      price,
-      capacity,
-      is_active,
-    } = req.body;
-
-    if (
-      !name ||
-      !darshan_date ||
-      !start_time ||
-      !end_time ||
-      price === undefined ||
-      capacity === undefined
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Name, date, start time, end time, price and capacity are required',
-      });
-    }
-
-    if (Number(price) < 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Price cannot be negative',
-      });
-    }
-
-    if (Number(capacity) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Capacity must be greater than 0',
-      });
-    }
-
-    if (end_time <= start_time) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'End time must be later than start time',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE darshan_slots
-       SET
-         name = $1,
-         description = $2,
-         darshan_date = $3,
-         start_time = $4,
-         end_time = $5,
-         price = $6,
-         capacity = $7,
-         is_active = $8,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9
-       RETURNING
-         id,
-         name,
-         description,
-         darshan_date,
-         start_time,
-         end_time,
-         price,
-         capacity,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        name.trim(),
-        description || null,
-        darshan_date,
-        start_time,
-        end_time,
-        Number(price),
-        Number(capacity),
-        is_active !== undefined
-          ? Boolean(is_active)
-          : true,
-        id,
-      ]
+    const result = await pool.query<TodayDarshan>(
+      `
+      SELECT *
+      FROM today_darshan_videos
+      WHERE darshan_date =
+        (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+      LIMIT 1
+      `
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message:
-          'Darshan slot not found',
-      });
-    }
 
     return res.json({
       success: true,
-      message:
-        'Darshan slot updated successfully',
-      data: result.rows[0],
+      data: result.rows[0] ?? null,
     });
   } catch (error) {
     console.error(
-      'Update Darshan slot error:',
+      'Get today darshan error:',
       error
     );
 
     return res.status(500).json({
       success: false,
-      message:
-        'Failed to update Darshan slot',
+      message: "Failed to fetch today's Darshan",
     });
   }
 };
 
-/* =========================================================
-   UPDATE DARSHAN ACTIVE STATUS
-========================================================= */
+// ========================================
+// PUBLISH OR REPLACE TODAY'S DARSHAN
+// POST /api/admin/darshan/today/publish
+// ========================================
 
-export const updateDarshanSlotStatus = async (
+export const publishTodayDarshan = async (
   req: AuthRequest,
   res: Response
 ) => {
+  const { name, youtube_url } = req.body || {};
+
+  if (
+    typeof name !== 'string' ||
+    !name.trim() ||
+    name.trim().length > 200
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enter a valid Darshan name.',
+    });
+  }
+
+  if (
+    typeof youtube_url !== 'string' ||
+    youtube_url.length > 2048
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enter a valid YouTube URL.',
+    });
+  }
+
+  const videoId = extractYouTubeVideoId(
+    youtube_url
+  );
+
+  if (!videoId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid YouTube video URL.',
+    });
+  }
+
+  const cleanName = name.trim();
+  const canonicalUrl =
+    `https://www.youtube.com/watch?v=${videoId}`;
+
+  let client;
+
   try {
-    const { id } = req.params;
-    const { is_active } = req.body;
+    client = await pool.connect();
+  } catch (error) {
+    console.error('Database connection error:', error);
 
-    if (typeof is_active !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        message:
-          'is_active must be true or false',
-      });
-    }
+    return res.status(500).json({
+      success: false,
+      message: 'Database connection failed.',
+    });
+  }
 
-    /* =====================================================
-       GET CURRENT STATUS BEFORE UPDATE
-    ===================================================== */
+  let darshan: TodayDarshan | null = null;
+  let notificationId: number | null = null;
+  let replaced = false;
+  let unchanged = false;
+
+  try {
+    await client.query('BEGIN');
+
+    // Serialize publishing requests.
+    await client.query(
+      'SELECT pg_advisory_xact_lock($1)',
+      [20261013]
+    );
 
     const existingResult =
-      await pool.query(
+      await client.query<TodayDarshan>(
         `
-        SELECT
-          id,
-          name,
-          darshan_date,
-          start_time,
-          end_time,
-          is_active
-        FROM darshan_slots
-        WHERE id = $1
-        `,
-        [id]
+        SELECT *
+        FROM today_darshan_videos
+        WHERE darshan_date =
+          (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+        FOR UPDATE
+        `
       );
 
-    if (
-      existingResult.rows.length === 0
-    ) {
-      return res.status(404).json({
-        success: false,
-        message:
-          'Darshan slot not found',
-      });
-    }
-
-    const previousDarshan =
-      existingResult.rows[0];
-
-    const result = await pool.query(
-      `UPDATE darshan_slots
-       SET
-         is_active = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING
-         id,
-         name,
-         description,
-         darshan_date,
-         start_time,
-         end_time,
-         price,
-         capacity,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        is_active,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message:
-          'Darshan slot not found',
-      });
-    }
-
-    const updatedDarshan =
-      result.rows[0];
-
-    /* =====================================================
-       SEND NOTIFICATION ONLY WHEN:
-       INACTIVE → ACTIVE
-    ===================================================== */
+    const existing =
+      existingResult.rows[0] ?? null;
 
     if (
-      previousDarshan.is_active ===
-        false &&
-      updatedDarshan.is_active ===
-        true
+      existing &&
+      existing.name === cleanName &&
+      existing.youtube_video_id === videoId
     ) {
-      try {
-        const notification =
-          await createNotification({
-            title: `🛕 ${updatedDarshan.name}`,
+      unchanged = true;
+      darshan = existing;
+    } else {
+      replaced = existing !== null;
 
-            body:
-              `Darshan is available on ` +
-              `${updatedDarshan.darshan_date} ` +
-              `from ${updatedDarshan.start_time} ` +
-              `to ${updatedDarshan.end_time}.`,
+      const saveResult =
+        await client.query<TodayDarshan>(
+          `
+          INSERT INTO today_darshan_videos (
+            name,
+            youtube_url,
+            youtube_video_id,
+            darshan_date,
+            published_at,
+            updated_at
+          )
+          VALUES (
+            $1,
+            $2,
+            $3,
+            (NOW() AT TIME ZONE 'Asia/Kolkata')::date,
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (darshan_date)
+          DO UPDATE SET
+            name = EXCLUDED.name,
+            youtube_url = EXCLUDED.youtube_url,
+            youtube_video_id =
+              EXCLUDED.youtube_video_id,
+            published_at = NOW(),
+            updated_at = NOW(),
+            notification_id = NULL
+          RETURNING *
+          `,
+          [
+            cleanName,
+            canonicalUrl,
+            videoId,
+          ]
+        );
 
-            notificationType:
-              'darshan',
+      darshan = saveResult.rows[0];
 
-            data: {
-              type: 'darshan',
-              darshanId:
-                updatedDarshan.id,
+      // Create notification in the same
+      // transaction as the Darshan update.
+      const notificationResult =
+        await client.query<{ id: number }>(
+          `
+          INSERT INTO notifications (
+            title,
+            body,
+            notification_type,
+            data,
+            target_type,
+            status
+          )
+          VALUES (
+            $1,
+            $2,
+            'today_darshan',
+            $3::jsonb,
+            'all',
+            'pending'
+          )
+          RETURNING id
+          `,
+          [
+            replaced
+              ? "🛕 Today's Darshan Updated"
+              : "🛕 Today's Darshan",
+            replaced
+              ? `${cleanName} has been updated. Tap to watch.`
+              : `${cleanName} is now available. Tap to watch.`,
+            JSON.stringify({
+              type: 'today_darshan',
               screen: '/darshan',
-            },
-
-            targetType: 'all',
-          });
-
-        await sendNotificationRecord(
-          notification.id
+              darshanId: darshan.id,
+            }),
+          ]
         );
-      } catch (notificationError) {
-        /*
-         * Notification failure should NOT
-         * cause status update to fail.
-         */
-        console.error(
-          'Darshan status notification error:',
-          notificationError
+
+      notificationId =
+        notificationResult.rows[0].id;
+
+      const updateResult =
+        await client.query<TodayDarshan>(
+          `
+          UPDATE today_darshan_videos
+          SET notification_id = $1
+          WHERE id = $2
+          RETURNING *
+          `,
+          [notificationId, darshan.id]
         );
-      }
+
+      darshan = updateResult.rows[0];
     }
 
-    return res.json({
-      success: true,
-      message:
-        'Darshan slot status updated successfully',
-      data: updatedDarshan,
-    });
+    await client.query('COMMIT');
   } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error(
+        'Darshan rollback error:',
+        rollbackError
+      );
+    }
+
     console.error(
-      'Update Darshan slot status error:',
+      'Publish Darshan error:',
       error
     );
 
     return res.status(500).json({
       success: false,
-      message:
-        'Failed to update Darshan slot status',
+      message: "Failed to publish today's Darshan.",
     });
+  } finally {
+    client.release();
   }
+
+  // Send after successful DB commit.
+  // A push failure does not undo publication.
+  let pushResult: unknown = null;
+
+  if (notificationId !== null) {
+    try {
+      pushResult = await sendNotificationRecord(
+        notificationId
+      );
+    } catch (error) {
+      console.error(
+        'Darshan push notification error:',
+        error
+      );
+    }
+  }
+
+  return res.status(
+    unchanged || replaced ? 200 : 201
+  ).json({
+    success: true,
+    message: unchanged
+      ? 'This Darshan is already published.'
+      : replaced
+        ? "Today's Darshan updated successfully."
+        : "Today's Darshan published successfully.",
+    data: darshan,
+    unchanged,
+    replaced,
+    notification: {
+      id: notificationId,
+      result: pushResult,
+    },
+  });
 };

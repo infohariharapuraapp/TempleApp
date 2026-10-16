@@ -1,11 +1,12 @@
 
 import React, {
-  useEffect,
+  useCallback,
   useState,
 } from 'react';
 
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,587 +15,330 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+
+import { WebView } from 'react-native-webview';
+
+import { Ionicons } from '@expo/vector-icons';
+
 import { useTranslation } from 'react-i18next';
+
 import { apiRequest } from '@/services/api';
 
-type DarshanSlot = {
+// ========================================
+// TYPES
+// ========================================
+
+type TodayDarshan = {
   id: number;
   name: string;
-  description?: string;
+  youtube_url: string;
+  youtube_video_id: string;
   darshan_date: string;
-  start_time: string;
-  end_time: string;
-  price: string | number;
-  capacity: number;
-  is_active: boolean;
+  published_at: string;
+  updated_at: string;
 };
 
-const LOCALES: Record<string, string> = {
-  en: 'en-IN',
-  te: 'te-IN',
-  kn: 'kn-IN',
-  hi: 'hi-IN',
-  ta: 'ta-IN',
+type ApiResponse = {
+  success: boolean;
+  data: TodayDarshan | null;
+  message?: string;
 };
 
-export default function DarshanScreen() {
+// ========================================
+// COLORS
+// ========================================
 
-  const { t, i18n } = useTranslation();
+const COLORS = {
+  background: '#FFFDF8',
+  white: '#FFFFFF',
+  maroon: '#6B1720',
+  maroonDark: '#541018',
+  gold: '#C69A3A',
+  goldSoft: '#F7EBD7',
+  border: '#E8DCCB',
+  text: '#30241F',
+  muted: '#8E8175',
+};
 
-  const [slots, setSlots] =
-    useState<DarshanSlot[]>([]);
+// ========================================
+// FORMAT DATE
+// ========================================
 
-  const [allSlots, setAllSlots] =
-    useState<DarshanSlot[]>([]);
+function formatDarshanDate(
+  dateString: string
+): string {
+  const date = new Date(
+    `${dateString}T12:00:00+05:30`
+  );
+
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
+// ========================================
+// SCREEN
+// ========================================
+
+export default function TodayDarshanScreen() {
+  const { t } = useTranslation();
+
+  const [darshan, setDarshan] =
+    useState<TodayDarshan | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [allLoading, setAllLoading] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [refreshing, setRefreshing] =
+    useState(false);
+
   const [error, setError] = useState('');
 
-  const locale = LOCALES[i18n.language] || 'en-IN';
-
   // ========================================
-  // LOAD TODAY'S DARSHAN
+  // FETCH TODAY'S DARSHAN
   // ========================================
 
-  async function loadDarshan() {
+  const loadDarshan = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
-    try {
+        setError('');
 
-      setLoading(true);
-      setError('');
+        const response =
+          await apiRequest<ApiResponse>(
+            '/darshan/today'
+          );
 
-      const result = await apiRequest<{
-        success: boolean;
-        data: DarshanSlot[];
-      }>('/darshan');
+        if (!response.success) {
+          throw new Error(
+            response.message ||
+              'Unable to load Darshan.'
+          );
+        }
 
-      setSlots(result.data || []);
-
-    } catch (err) {
-
-      console.error('Darshan API error:', err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : t('darshan.loadError')
-      );
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }
-
-  // ========================================
-  // LOAD ALL DARSHANS
-  // ========================================
-
-  async function loadAllDarshan(displayAll = true) {
-
-    try {
-
-      setAllLoading(true);
-      setError('');
-
-      const result = await apiRequest<{
-        success: boolean;
-        data: DarshanSlot[];
-      }>('/darshan/all');
-
-      setAllSlots(result.data || []);
-
-      if (displayAll) {
-        setShowAll(true);
+        setDarshan(response.data);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to load Darshan.'
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
+    },
+    []
+  );
 
-    } catch (err) {
+  // Refresh whenever the screen receives focus.
+  useFocusEffect(
+    useCallback(() => {
+      loadDarshan();
+    }, [loadDarshan])
+  );
 
-      console.error('All Darshan API error:', err);
-      setError(t('darshan.loadError'));
-
-    } finally {
-
-      setAllLoading(false);
-
-    }
-
-  }
-
-  // ========================================
-  // INITIAL LOAD
-  // ========================================
-
-  useEffect(() => {
-
-    loadDarshan();
-    loadAllDarshan(false);
-
-  }, []);
+  const videoUrl = darshan
+    ? `https://www.youtube-nocookie.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`
+    : null;
 
   // ========================================
-  // UPCOMING DARSHANS
-  // ========================================
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const upcomingSlots = allSlots
-    .filter((slot) => {
-
-      const dateString =
-        slot.darshan_date?.substring(0, 10);
-
-      if (!dateString || !slot.is_active) {
-        return false;
-      }
-
-      const darshanDate =
-        new Date(`${dateString}T00:00:00`);
-
-      return (
-        !Number.isNaN(darshanDate.getTime()) &&
-        darshanDate > today
-      );
-
-    })
-    .sort((a, b) =>
-      a.darshan_date.substring(0, 10).localeCompare(
-        b.darshan_date.substring(0, 10)
-      )
-    );
-
-  // ========================================
-  // FORMAT TIME
-  // ========================================
-
-  function formatTime(value: string) {
-
-    if (!value) return '';
-
-    const [hourString, minute] =
-      value.substring(0, 5).split(':');
-
-    const hour = Number(hourString);
-
-    if (!Number.isFinite(hour)) return value;
-
-    const period =
-      hour >= 12
-        ? t('darshan.pm')
-        : t('darshan.am');
-
-    return `${hour % 12 || 12}:${minute} ${period}`;
-
-  }
-
-  // ========================================
-  // FORMAT DATE
-  // ========================================
-
-  function formatDate(value: string) {
-
-    if (!value) return '';
-
-    const date = new Date(
-      `${value.substring(0, 10)}T00:00:00`
-    );
-
-    if (Number.isNaN(date.getTime())) {
-      return value.substring(0, 10);
-    }
-
-    return date.toLocaleDateString(locale, {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-
-  }
-
-  // ========================================
-  // DARSHAN ICON
-  // ========================================
-
-  function getIcon(name: string) {
-
-    const lower = name.toLowerCase();
-
-    if (lower.includes('morning')) return '🌅';
-    if (lower.includes('afternoon')) return '☀️';
-    if (lower.includes('evening')) return '🌇';
-    if (lower.includes('special')) return '🌸';
-
-    return '🙏';
-
-  }
-
-  // ========================================
-  // RENDER CARD
-  // ========================================
-
-  function renderCard(
-    slot: DarshanSlot,
-    prefix: string
-  ) {
-
-    return (
-
-      <View
-        key={`${prefix}-${slot.id}`}
-        style={styles.darshanCard}
-      >
-
-        <View style={styles.cardTop}>
-
-          <View style={styles.cardContent}>
-
-            <Text style={styles.cardTitle}>
-              {slot.name}
-            </Text>
-
-            <Text style={styles.cardTime}>
-              {formatTime(slot.start_time)}
-              {' – '}
-              {formatTime(slot.end_time)}
-            </Text>
-
-          </View>
-
-          <Text style={styles.cardIcon}>
-            {getIcon(slot.name)}
-          </Text>
-
-        </View>
-
-        <Text style={styles.cardDate}>
-          {formatDate(slot.darshan_date)}
-        </Text>
-
-        <Text style={styles.cardDescription}>
-          {slot.description ||
-            t('darshan.descriptionFallback')}
-        </Text>
-
-        <View style={styles.infoRow}>
-
-          <Text style={styles.price}>
-            ₹{Number(slot.price).toLocaleString(locale)}
-          </Text>
-
-          <Text style={styles.capacity}>
-            {t('darshan.capacity', {
-              count: slot.capacity,
-            })}
-          </Text>
-
-        </View>
-
-      </View>
-
-    );
-
-  }
-
-  // ========================================
-  // EMPTY STATE
-  // ========================================
-
-  function renderEmpty(
-    title: string,
-    description: string
-  ) {
-
-    return (
-
-      <View style={styles.emptyBox}>
-
-        <Text style={styles.emptyIcon}>🙏</Text>
-
-        <Text style={styles.emptyTitle}>
-          {title}
-        </Text>
-
-        <Text style={styles.emptyText}>
-          {description}
-        </Text>
-
-      </View>
-
-    );
-
-  }
-
-  // ========================================
-  // SCREEN
+  // RENDER
   // ========================================
 
   return (
-
-    <SafeAreaView style={styles.container}>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-
-        {/* HEADER */}
-
-        <View style={styles.header}>
-
-          <Text style={styles.smallTitle}>
-            {t('darshan.templeServices')}
-          </Text>
-
-          <Text style={styles.title}>
-            {t('darshan.title')} 🙏
-          </Text>
-
-          <Text style={styles.subtitle}>
-            {t('darshan.subtitle')}
-          </Text>
-
-        </View>
-
-        {/* TODAY'S DARSHAN */}
-
-        <Text style={styles.sectionTitle}>
-          {t('darshan.today')}
-        </Text>
-
-        {loading ? (
-
-          <View style={styles.loadingBox}>
-
-            <ActivityIndicator
-              size="large"
-              color="#8B4513"
-            />
-
-            <Text style={styles.loadingText}>
-              {t('darshan.loading')}
-            </Text>
-
-          </View>
-
-        ) : error && slots.length === 0 ? (
-
-          <View style={styles.errorBox}>
-
-            <Text style={styles.errorText}>
-              {error}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadDarshan}
-            >
-              <Text style={styles.retryText}>
-                {t('darshan.retry')}
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-
-        ) : slots.length === 0 ? (
-
-          renderEmpty(
-            t('darshan.noSlots'),
-            t('darshan.checkLater')
-          )
-
-        ) : (
-
-          slots.map((slot) =>
-            renderCard(slot, 'today')
-          )
-
-        )}
-
-        {/* VIEW ALL */}
-
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom']}
+    >
+      <View style={styles.header}>
         <TouchableOpacity
-          style={styles.viewAllButton}
-          onPress={() => loadAllDarshan(true)}
-          disabled={allLoading}
+          onPress={() => router.back()}
+          style={styles.backButton}
         >
-
-          <Text style={styles.viewAllText}>
-            {allLoading
-              ? t('darshan.loadingShort')
-              : showAll
-                ? t('darshan.refreshAll')
-                : t('darshan.viewAll')}
-          </Text>
-
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color={COLORS.maroon}
+          />
         </TouchableOpacity>
 
-        {/* ALL DARSHANS */}
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>
+            Today's Darshan
+          </Text>
 
-        {showAll && (
+          <Text style={styles.headerSubtitle}>
+            Sacred moments from the temple
+          </Text>
+        </View>
+      </View>
 
-          <>
-
-            <Text style={styles.sectionTitle}>
-              {t('darshan.all')}
-            </Text>
-
-            {allSlots.length === 0
-              ? renderEmpty(
-                  t('darshan.noSlots'),
-                  t('darshan.checkLater')
-                )
-              : allSlots.map((slot) =>
-                  renderCard(slot, 'all')
-                )}
-
-          </>
-
-        )}
-
-        {/* UPCOMING DARSHANS */}
-
-        <Text style={styles.sectionTitle}>
-          {t('darshan.upcoming')}
-        </Text>
-
-        {allLoading && allSlots.length === 0 ? (
-
-          <View style={styles.loadingBox}>
-
-            <ActivityIndicator
-              size="small"
-              color="#8B4513"
+      {loading && !refreshing ? (
+        <View style={styles.center}>
+          <ActivityIndicator
+            size="large"
+            color={COLORS.maroon}
+          />
+          <Text style={styles.statusText}>
+            Loading today's Darshan...
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() =>
+                loadDarshan(true)
+              }
+              colors={[COLORS.maroon]}
             />
+          }
+        >
+          {error ? (
+            <View style={styles.emptyCard}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={42}
+                color={COLORS.muted}
+              />
 
-            <Text style={styles.loadingText}>
-              {t('darshan.loadingUpcoming')}
-            </Text>
+              <Text style={styles.emptyTitle}>
+                Unable to load Darshan
+              </Text>
 
-          </View>
-
-        ) : upcomingSlots.length === 0 ? (
-
-          <View style={styles.emptyBox}>
-
-            <Text style={styles.emptyIcon}>🙏</Text>
-
-            <Text style={styles.emptyTitle}>
-              {t('darshan.noUpcoming')}
-            </Text>
-
-            <Text style={styles.emptyText}>
-              {t('darshan.upcomingLater')}
-            </Text>
-
-            {error ? (
+              <Text style={styles.emptyDescription}>
+                {error}
+              </Text>
 
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={() => loadAllDarshan(false)}
-                disabled={allLoading}
+                onPress={() => loadDarshan()}
               >
                 <Text style={styles.retryText}>
-                  {t('darshan.retry')}
+                  Try Again
                 </Text>
               </TouchableOpacity>
+            </View>
+          ) : darshan && videoUrl ? (
+            <>
+              <View style={styles.introCard}>
+                <View style={styles.iconCircle}>
+                  <Ionicons
+                    name="flower-outline"
+                    size={25}
+                    color={COLORS.gold}
+                  />
+                </View>
 
-            ) : null}
+                <Text style={styles.introTitle}>
+                  Divine Darshan
+                </Text>
 
-          </View>
+                <Text style={styles.introDescription}>
+                  Experience today's sacred Darshan
+                  from wherever you are.
+                </Text>
+              </View>
 
-        ) : (
+              <View style={styles.videoCard}>
+                <View style={styles.videoHeader}>
+                  <Text style={styles.videoTitle}>
+                    {darshan.name}
+                  </Text>
 
-          upcomingSlots.map((slot) =>
-            renderCard(slot, 'upcoming')
-          )
+                  <Text style={styles.videoDate}>
+                    {formatDarshanDate(
+                      darshan.darshan_date
+                    )}
+                  </Text>
+                </View>
 
-        )}
+                <View style={styles.videoContainer}>
+                  <WebView
+                    key={darshan.youtube_video_id}
+                    source={{ uri: videoUrl }}
+                    style={styles.webview}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    allowsFullscreenVideo
+                    allowsInlineMediaPlayback
+                    mediaPlaybackRequiresUserAction
+                    startInLoadingState
+                    renderLoading={() => (
+                      <View style={styles.videoLoading}>
+                        <ActivityIndicator
+                          color={COLORS.gold}
+                          size="large"
+                        />
+                      </View>
+                    )}
+                  />
+                </View>
 
-        <TouchableOpacity
-          style={styles.viewAllButton}
-          onPress={() => loadAllDarshan(false)}
-          disabled={allLoading}
-        >
+                <View style={styles.videoFooter}>
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={19}
+                    color={COLORS.maroon}
+                  />
 
-          <Text style={styles.viewAllText}>
-            {allLoading
-              ? t('darshan.loadingShort')
-              : t('darshan.refreshUpcoming')}
-          </Text>
+                  <Text style={styles.videoFooterText}>
+                    Watch today's Darshan
+                  </Text>
+                </View>
+              </View>
 
-        </TouchableOpacity>
+              <View style={styles.infoCard}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={21}
+                  color={COLORS.gold}
+                />
 
-        {/* SPECIAL DARSHAN */}
+                <Text style={styles.infoText}>
+                  Receive notifications whenever
+                  today's Darshan is published
+                  or updated.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyCard}>
+              <Ionicons
+                name="videocam-outline"
+                size={46}
+                color={COLORS.gold}
+              />
 
-        <Text style={styles.sectionTitle}>
-          {t('darshan.special')}
-        </Text>
-
-        <View style={styles.specialCard}>
-
-          <Text style={styles.specialIcon}>🌸</Text>
-
-          <Text style={styles.specialTitle}>
-            {t('darshan.specialBooking')}
-          </Text>
-
-          <Text style={styles.specialText}>
-            {t('darshan.specialDescription')}
-          </Text>
-
-          <TouchableOpacity style={styles.bookButton}>
-
-            <Text style={styles.bookButtonText}>
-              {t('darshan.book')}
-            </Text>
-
-          </TouchableOpacity>
-
-        </View>
-
-        {/* GUIDELINES */}
-
-        <Text style={styles.sectionTitle}>
-          {t('darshan.guidelines')}
-        </Text>
-
-        <View style={styles.guidelineCard}>
-
-          {[
-            t('darshan.guideline1'),
-            t('darshan.guideline2'),
-            t('darshan.guideline3'),
-            t('darshan.guideline4'),
-          ].map((guideline, index) => (
-
-            <View
-              key={index}
-              style={styles.guidelineRow}
-            >
-
-              <Text style={styles.check}>✓</Text>
-
-              <Text style={styles.guidelineText}>
-                {guideline}
+              <Text style={styles.emptyTitle}>
+                Today's Darshan
               </Text>
 
+              <Text style={styles.emptyDescription}>
+                Today's Darshan video has not
+                been published yet. Please
+                check again later.
+              </Text>
             </View>
-
-          ))}
-
-        </View>
-
-      </ScrollView>
-
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
-
   );
-
 }
 
 // ========================================
@@ -602,265 +346,198 @@ export default function DarshanScreen() {
 // ========================================
 
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F0',
-  },
-
-  content: {
-    padding: 20,
-    paddingBottom: 40,
+    backgroundColor: COLORS.background,
   },
 
   header: {
-    marginBottom: 24,
-  },
-
-  smallTitle: {
-    fontSize: 13,
-    color: '#9A7655',
-    marginBottom: 5,
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#4A2C18',
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 6,
-    lineHeight: 20,
-  },
-
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4A2C18',
-    marginTop: 8,
-    marginBottom: 14,
-  },
-
-  darshanCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 17,
-    marginBottom: 12,
-    elevation: 2,
-  },
-
-  cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
 
-  cardContent: {
+  backButton: {
+    marginRight: 14,
+    padding: 5,
+  },
+
+  headerText: {
     flex: 1,
   },
 
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4A2C18',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.maroon,
   },
 
-  cardTime: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#A05216',
-    marginTop: 6,
-  },
-
-  cardIcon: {
-    fontSize: 30,
-    marginLeft: 12,
-  },
-
-  cardDate: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#9A7655',
-    marginTop: 10,
-  },
-
-  cardDescription: {
-    fontSize: 13,
-    color: '#777',
-    lineHeight: 19,
-    marginTop: 8,
-  },
-
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-
-  price: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8B4513',
-  },
-
-  capacity: {
+  headerSubtitle: {
+    marginTop: 3,
     fontSize: 12,
-    color: '#777',
+    color: COLORS.muted,
   },
 
-  viewAllButton: {
-    backgroundColor: '#8B4513',
-    borderRadius: 24,
-    paddingVertical: 13,
-    paddingHorizontal: 12,
+  content: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 24,
   },
 
-  viewAllText: {
-    color: '#FFFFFF',
+  statusText: {
+    marginTop: 12,
+    color: COLORS.muted,
     fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
   },
 
-  loadingBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 25,
+  introCard: {
     alignItems: 'center',
-    marginBottom: 20,
-  },
-
-  loadingText: {
-    marginTop: 10,
-    color: '#777',
-    fontSize: 13,
-  },
-
-  errorBox: {
-    backgroundColor: '#FFF0ED',
+    padding: 24,
     borderRadius: 18,
-    padding: 20,
+    backgroundColor: COLORS.goldSoft,
     marginBottom: 20,
   },
 
-  errorText: {
-    color: '#B42318',
-    fontSize: 13,
+  iconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
 
-  retryButton: {
-    backgroundColor: '#8B4513',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    marginTop: 12,
+  introTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.maroon,
   },
 
-  retryText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  introDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.muted,
+    textAlign: 'center',
+    marginTop: 8,
   },
 
-  emptyBox: {
-    backgroundColor: '#FFFFFF',
+  videoCard: {
     borderRadius: 18,
-    padding: 25,
-    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     marginBottom: 20,
   },
 
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+  videoHeader: {
+    padding: 18,
+  },
+
+  videoTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: COLORS.maroonDark,
+  },
+
+  videoDate: {
+    marginTop: 6,
+    fontSize: 13,
+    color: COLORS.muted,
+  },
+
+  videoContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+  },
+
+  webview: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+
+  videoLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+
+  videoFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    gap: 8,
+  },
+
+  videoFooterText: {
+    color: COLORS.maroon,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.goldSoft,
+    gap: 12,
+  },
+
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 19,
+    color: COLORS.text,
+  },
+
+  emptyCard: {
+    padding: 30,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    marginTop: 30,
   },
 
   emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#4A2C18',
-    textAlign: 'center',
-  },
-
-  emptyText: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 5,
-    textAlign: 'center',
-  },
-
-  specialCard: {
-    backgroundColor: '#F4E0C5',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-  },
-
-  specialIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-
-  specialTitle: {
     fontSize: 19,
-    fontWeight: '700',
-    color: '#4A2C18',
+    fontWeight: '800',
+    color: COLORS.maroon,
+    marginTop: 16,
   },
 
-  specialText: {
+  emptyDescription: {
     fontSize: 13,
-    color: '#6E5542',
-    lineHeight: 20,
-    marginTop: 7,
-    marginBottom: 17,
+    lineHeight: 21,
+    color: COLORS.muted,
+    textAlign: 'center',
+    marginTop: 12,
   },
 
-  bookButton: {
-    backgroundColor: '#8B4513',
-    borderRadius: 24,
-    paddingVertical: 13,
-    alignItems: 'center',
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: COLORS.maroon,
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
 
-  bookButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  retryText: {
+    color: COLORS.white,
     fontWeight: '700',
   },
-
-  guidelineCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-  },
-
-  guidelineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-
-  check: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#8B4513',
-    width: 25,
-  },
-
-  guidelineText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#6E5542',
-    lineHeight: 19,
-  },
-
 });

@@ -42,7 +42,9 @@ example
 /ios
 /android
 
-# Environment and database backups.env*.sql
+# Environment and database backups
+.env
+*.sql
 temple_app_backup.sql
 temple_app_neon.sql
 
@@ -51,3 +53,6 @@ backend.7z
 src.zip
 
 /backend/.env
+
+# Firebase Android configuration
+/google-services.json

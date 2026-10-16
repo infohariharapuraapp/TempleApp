@@ -158,7 +158,7 @@ export default function ProfileScreen() {
             icon="🎫"
             title="My Bookings"
             subtitle="View your temple bookings"
-            onPress={() => router.push('/bookings')}
+            onPress={() => router.push('/website-bookings')}
           />
 
           <ProfileRow

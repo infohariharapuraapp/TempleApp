@@ -1,4 +1,3 @@
-
 import {
   Stack,
   router,
@@ -14,28 +13,41 @@ import {
 
 import * as SplashScreen from 'expo-splash-screen';
 
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import Constants from 'expo-constants';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import {
+  AnimatedSplashOverlay,
+} from '@/components/animated-icon';
 
 import {
   getToken,
   removeToken,
 } from '@/services/authStorage';
 
-import { apiRequest } from '@/services/api';
+import {
+  apiRequest,
+} from '@/services/api';
+
+import {
+  registerForPushNotificationsAsync,
+  initializeNotificationHandler,
+  initializeNotificationListener,
+  handleInitialNotification,
+} from '@/services/notifications';
 
 SplashScreen.preventAutoHideAsync();
-
 
 // ========================================
 // ROOT LAYOUT
 // ========================================
 
 export default function RootLayout() {
-
   const segments = useSegments();
 
   const rootNavigationState =
@@ -44,330 +56,308 @@ export default function RootLayout() {
   const [authChecking, setAuthChecking] =
     useState(true);
 
+  const [languageChecking, setLanguageChecking] =
+    useState(true);
+
+  const [authenticated, setAuthenticated] =
+    useState(false);
+
+  const notificationRegistrationStarted =
+    useRef(false);
+
+  const initialNotificationHandled =
+    useRef(false);
 
   // ========================================
   // LANGUAGE INITIALIZATION
   // ========================================
 
-  const [languageChecking, setLanguageChecking] =
-    useState(true);
-
-
   useEffect(() => {
-
     let mounted = true;
 
+    const initializeLanguage = async () => {
+      try {
+        await loadSavedLanguage();
 
-    const initializeLanguage =
-      async () => {
-
-        try {
-
-          // --------------------------------
-          // LOAD SAVED USER LANGUAGE
-          // --------------------------------
-
-          await loadSavedLanguage();
-
-
-          console.log(
-            'App language initialized successfully.'
-          );
-
-        } catch (error) {
-
-          console.error(
-            'Language initialization failed:',
-            error
-          );
-
-        } finally {
-
-          if (mounted) {
-
-            setLanguageChecking(false);
-
-          }
-
+        console.log(
+          'App language initialized successfully.'
+        );
+      } catch (error) {
+        console.error(
+          'Language initialization failed:',
+          error
+        );
+      } finally {
+        if (mounted) {
+          setLanguageChecking(false);
         }
-
-      };
-
+      }
+    };
 
     initializeLanguage();
 
-
     return () => {
-
       mounted = false;
-
     };
-
   }, []);
-
 
   // ========================================
   // AUTHENTICATION CHECK
   // ========================================
 
   useEffect(() => {
-
     if (!rootNavigationState?.key) {
       return;
     }
 
-    checkAuthentication();
-
-  }, [rootNavigationState?.key]);
-
-
-  // ========================================
-  // NOTIFICATIONS
-  // ========================================
-
-  useEffect(() => {
-
-    const initializeNotifications =
-      async () => {
-
-        try {
-
-          // --------------------------------
-          // CHECK EXPO GO
-          // --------------------------------
-
-          const isExpoGo =
-            Constants.appOwnership === 'expo';
-
-
-          if (isExpoGo) {
-
-            console.log(
-              'Expo Go detected. Push notifications disabled.'
-            );
-
-            return;
-          }
-
-
-          // --------------------------------
-          // LOAD NOTIFICATION SERVICE
-          // --------------------------------
-
-          const notificationService =
-            await import(
-              '@/services/notifications'
-            );
-
-
-          // --------------------------------
-          // INITIAL NOTIFICATION
-          // --------------------------------
-
-          await notificationService
-            .handleInitialNotification();
-
-
-          // --------------------------------
-          // NOTIFICATION LISTENER
-          // --------------------------------
-
-          const cleanup =
-            await notificationService
-              .initializeNotificationListener();
-
-
-          return cleanup;
-
-        } catch (error) {
-
-          console.error(
-            'Notification initialization failed:',
-            error
-          );
-
-        }
-
-      };
-
-
-    let cleanup:
-      (() => void) | undefined;
-
     let cancelled = false;
 
-
-    initializeNotifications()
-      .then((cleanupFunction) => {
+    const checkAuthentication = async () => {
+      try {
+        const token = await getToken();
 
         if (cancelled) {
-
-          cleanupFunction?.();
-
           return;
-
         }
 
-        cleanup = cleanupFunction;
-
-      });
-
-
-    return () => {
-
-      cancelled = true;
-
-      cleanup?.();
-
-    };
-
-  }, []);
-
-
-  // ========================================
-  // AUTHENTICATION
-  // ========================================
-
-  const checkAuthentication =
-    async () => {
-
-      try {
-
-        // ----------------------------------
-        // GET TOKEN
-        // ----------------------------------
-
-        const token =
-          await getToken();
-
-
-        // ----------------------------------
-        // CURRENT ROUTE
-        // ----------------------------------
-
-        const firstSegment =
-          segments[0];
-
+        const firstSegment = segments[0];
 
         const isAuthScreen =
           firstSegment === 'login' ||
           firstSegment === 'register' ||
           firstSegment === 'forgot-password';
 
-
-        // ==================================
-        // NO TOKEN
-        // ==================================
-
         if (!token) {
+          setAuthenticated(false);
 
-          if (isAuthScreen) {
-
-            setAuthChecking(false);
-
-            return;
-
+          if (!isAuthScreen) {
+            router.replace('/login');
           }
 
-
-          router.replace('/login');
-
-          setAuthChecking(false);
-
           return;
-
         }
 
-
-        // ==================================
-        // VALIDATE TOKEN
-        // ==================================
-
         try {
-
           const response =
             await apiRequest('/auth/me');
 
+          if (cancelled) {
+            return;
+          }
 
           if (!response.success) {
-
             throw new Error(
               'Invalid session'
             );
-
           }
 
-
-          // --------------------------------
-          // USER IS ALREADY LOGGED IN
-          // --------------------------------
+          setAuthenticated(true);
 
           if (isAuthScreen) {
-
             router.replace('/(tabs)');
-
-            setAuthChecking(false);
-
-            return;
-
           }
-
-
-          setAuthChecking(false);
-
         } catch (error) {
+          if (cancelled) {
+            return;
+          }
 
           console.log(
             'Session validation failed:',
             error
           );
 
-
+          // Existing authentication behavior is
+          // preserved for now. We will separately
+          // improve network-error handling.
           await removeToken();
 
+          setAuthenticated(false);
+
+          notificationRegistrationStarted.current =
+            false;
 
           router.replace('/login');
-
-
-          setAuthChecking(false);
-
         }
-
       } catch (error) {
+        if (cancelled) {
+          return;
+        }
 
         console.error(
           'Authentication check failed:',
           error
         );
 
-
-        await removeToken();
-
+        setAuthenticated(false);
 
         router.replace('/login');
-
-
-        setAuthChecking(false);
-
+      } finally {
+        if (!cancelled) {
+          setAuthChecking(false);
+        }
       }
-
     };
 
+    checkAuthentication();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rootNavigationState?.key]);
 
   // ========================================
-  // AUTH AND LANGUAGE CHECK LOADING
+  // INITIALIZE NOTIFICATION HANDLER
+  // AND RESPONSE LISTENER
+  // ========================================
+
+  useEffect(() => {
+    const isExpoGo =
+      Constants.executionEnvironment ===
+      'storeClient';
+
+    if (isExpoGo) {
+      console.log(
+        'Expo Go detected. Remote push notifications disabled.'
+      );
+
+      return;
+    }
+
+    let cancelled = false;
+
+    let cleanup:
+      (() => void) | undefined;
+
+    const initializeNotifications =
+      async () => {
+        try {
+          await initializeNotificationHandler();
+
+          const cleanupFunction =
+            await initializeNotificationListener();
+
+          if (cancelled) {
+            cleanupFunction();
+            return;
+          }
+
+          cleanup = cleanupFunction;
+
+          console.log(
+            'Notification listener initialized.'
+          );
+        } catch (error) {
+          console.error(
+            'Notification initialization failed:',
+            error
+          );
+        }
+      };
+
+    initializeNotifications();
+
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, []);
+
+  // ========================================
+  // REGISTER DEVICE FOR RETURNING USERS
+  // ========================================
+
+  useEffect(() => {
+    if (
+      !authenticated ||
+      authChecking ||
+      languageChecking
+    ) {
+      return;
+    }
+
+    if (notificationRegistrationStarted.current) {
+      return;
+    }
+
+    notificationRegistrationStarted.current = true;
+
+    const registerDevice = async () => {
+      try {
+        const token =
+          await registerForPushNotificationsAsync();
+
+        if (token) {
+          console.log(
+            'Push token registration attempted.'
+          );
+        } else {
+          console.warn(
+            'Push token registration unavailable.'
+          );
+        }
+      } catch (error) {
+        console.error(
+          'Push registration error:',
+          error
+        );
+      }
+    };
+
+    registerDevice();
+  }, [
+    authenticated,
+    authChecking,
+    languageChecking,
+  ]);
+
+  // ========================================
+  // HANDLE INITIAL NOTIFICATION
+  // AFTER AUTHENTICATION
+  // ========================================
+
+  useEffect(() => {
+    if (
+      !authenticated ||
+      authChecking ||
+      languageChecking ||
+      !rootNavigationState?.key
+    ) {
+      return;
+    }
+
+    if (initialNotificationHandled.current) {
+      return;
+    }
+
+    initialNotificationHandled.current = true;
+
+    const processInitialNotification =
+      async () => {
+        try {
+          await handleInitialNotification();
+        } catch (error) {
+          console.error(
+            'Initial notification error:',
+            error
+          );
+        }
+      };
+
+    processInitialNotification();
+  }, [
+    authenticated,
+    authChecking,
+    languageChecking,
+    rootNavigationState?.key,
+  ]);
+
+  // ========================================
+  // LOADING
   // ========================================
 
   if (authChecking || languageChecking) {
-
-    return (
-      <>
-        <AnimatedSplashOverlay />
-      </>
-    );
-
+    return <AnimatedSplashOverlay />;
   }
-
 
   // ========================================
   // APPLICATION
@@ -375,163 +365,116 @@ export default function RootLayout() {
 
   return (
     <>
-
       <AnimatedSplashOverlay />
-
 
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       >
+        {/* AUTHENTICATION */}
 
-        {/* Authentication */}
+        <Stack.Screen name="login" />
+
+        <Stack.Screen name="register" />
+
+        <Stack.Screen name="forgot-password" />
+
+        {/* MAIN APPLICATION */}
+
+        <Stack.Screen name="(tabs)" />
+
+        {/* DEITIES */}
+
+        <Stack.Screen name="deity/[id]" />
+
+        {/* POOJA / SEVA */}
+
+        <Stack.Screen name="pooja-details" />
+
+        <Stack.Screen name="pooja-date" />
+
+        <Stack.Screen name="pooja-devotee" />
+
+        <Stack.Screen name="pooja-payment" />
+
+        <Stack.Screen name="pooja-confirmation" />
+
+        {/* DARSHAN */}
+
+        <Stack.Screen name="darshan" />
+
+        <Stack.Screen name="darshan-videos" />
+
+        {/* GURU VANI */}
 
         <Stack.Screen
-          name="login"
+          name="guru-vani/index"
+          options={{
+            headerShown: false,
+          }}
         />
 
         <Stack.Screen
-          name="register"
+          name="guru-vani/[id]"
+          options={{
+            headerShown: false,
+          }}
         />
+
+        {/* EVENTS */}
+
+        <Stack.Screen name="events" />
 
         <Stack.Screen
-          name="forgot-password"
+          name="events/[id]"
+          options={{
+            headerShown: false,
+          }}
         />
 
+        {/* ANNOUNCEMENTS */}
 
-        {/* Main Application */}
+        <Stack.Screen name="announcements" />
 
-        <Stack.Screen
-          name="(tabs)"
-        />
+        {/* BOOKINGS */}
 
+        <Stack.Screen name="bookings" />
 
-        {/* Deities */}
+        <Stack.Screen name="donations" />
 
-        <Stack.Screen
-          name="deity/[id]"
-        />
+        {/* TEMPLE INFORMATION */}
 
+        <Stack.Screen name="about" />
 
-        {/* Pooja / Seva */}
+        <Stack.Screen name="publications" />
 
-        <Stack.Screen
-          name="pooja-details"
-        />
+        <Stack.Screen name="gallery" />
 
-        <Stack.Screen
-          name="pooja-date"
-        />
+        {/* ROOMS */}
 
-        <Stack.Screen
-          name="pooja-devotee"
-        />
+        <Stack.Screen name="rooms" />
 
-        <Stack.Screen
-          name="pooja-payment"
-        />
+        {/* ACCOUNT */}
 
-        <Stack.Screen
-          name="pooja-confirmation"
-        />
+        <Stack.Screen name="profile" />
 
+        <Stack.Screen name="account" />
 
-        {/* Darshan */}
+        <Stack.Screen name="my-bookings" />
 
-        <Stack.Screen
-          name="darshan"
-        />
+        {/* OTHER */}
 
-        <Stack.Screen
-          name="darshan-videos"
-        />
+        <Stack.Screen name="nearby" />
 
+        <Stack.Screen name="contact" />
 
-        {/* Events */}
+        <Stack.Screen name="policies" />
 
-        <Stack.Screen
-          name="events"
-        />
+        {/* LANGUAGE SETTINGS */}
 
-
-        {/* Announcements */}
-
-        <Stack.Screen
-          name="announcements"
-        />
-
-
-        {/* Bookings */}
-
-        <Stack.Screen
-          name="bookings"
-        />
-
-        <Stack.Screen
-          name="donations"
-        />
-
-
-        {/* Temple Information */}
-
-        <Stack.Screen
-          name="about"
-        />
-
-        <Stack.Screen
-          name="publications"
-        />
-
-        <Stack.Screen
-          name="gallery"
-        />
-
-
-        {/* Rooms */}
-
-        <Stack.Screen
-          name="rooms"
-        />
-
-
-        {/* Account */}
-
-        <Stack.Screen
-          name="profile"
-        />
-
-        <Stack.Screen
-          name="account"
-        />
-
-        <Stack.Screen
-          name="my-bookings"
-        />
-
-
-        {/* Other */}
-
-        <Stack.Screen
-          name="nearby"
-        />
-
-        <Stack.Screen
-          name="contact"
-        />
-
-        <Stack.Screen
-          name="policies"
-        />
-        {/* Language Settings */}
-
-<Stack.Screen
-  name="language-settings"
-/>
-
+        <Stack.Screen name="language-settings" />
       </Stack>
-
     </>
   );
-
 }

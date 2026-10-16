@@ -72,11 +72,6 @@ export default function MenuScreen() {
           />
 
           <MenuItem
-            title={t('menu.poojaSeva', 'Pooja & Seva')}
-            onPress={() => router.push('/pooja-details')}
-          />
-
-          <MenuItem
             title={t('menu.gallery', 'Gallery')}
             onPress={() => router.push('/gallery')}
           />
@@ -90,6 +85,12 @@ export default function MenuScreen() {
             title={t('features.rooms')}
             onPress={() => router.push('/room-booking')}
           />
+          {/* POOJA SERVICES */}
+
+<MenuItem
+  title={t('menu.poojaServices', 'Pooja Services')}
+  onPress={() => router.push('/pooja-services' as any)}
+/>
 
           <MenuItem
             title={t('menu.account', 'My Account')}
@@ -117,25 +118,21 @@ export default function MenuScreen() {
           />
 
 
-          {/* ================================= */}
-          {/* LANGUAGE SETTINGS                 */}
-          {/* ================================= */}
+          {/* LANGUAGE SETTINGS */}
 
-        <MenuItem
-  title={t('common.language')}
-  onPress={() =>
-    router.push({
-      pathname: '/language-settings' as any,
-    })
-  }
-/>
+          <MenuItem
+            title={t('common.language')}
+            onPress={() =>
+              router.push('/language-settings')
+            }
+          />
+
         </View>
 
       </ScrollView>
 
     </SafeAreaView>
   );
-
 }
 
 
@@ -168,7 +165,6 @@ function MenuItem({
 
     </TouchableOpacity>
   );
-
 }
 
 

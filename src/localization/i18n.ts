@@ -35,6 +35,16 @@ import homeTa from './home.ta.json';
 
 
 // ========================================
+// EVENTS TRANSLATIONS
+// ========================================
+
+import eventsEn from './events.en.json';
+import eventsTe from './events.te.json';
+import eventsKn from './events.kn.json';
+import eventsHi from './events.hi.json';
+import eventsTa from './events.ta.json';
+
+// ========================================
 // DEITIES TRANSLATIONS
 // ========================================
 
@@ -95,8 +105,9 @@ const resources = {
       ...en,
       ...homeEn,
       ...deitiesEn,
-       ...activitiesEn,
-       ...communityEn,
+      ...activitiesEn,
+      ...communityEn,
+      ...eventsEn,
     },
   },
 
@@ -107,6 +118,7 @@ const resources = {
       ...deitiesTe,
       ...activitiesTe,
       ...communityTe,
+      ...eventsTe,
     },
   },
 
@@ -117,6 +129,7 @@ const resources = {
       ...deitiesKn,
       ...activitiesKn,
       ...communityKn,
+      ...eventsKn,
     },
   },
 
@@ -128,6 +141,7 @@ const resources = {
       ...deitiesHi,
        ...activitiesHi,
        ...communityHi,
+       ...eventsHi,
       
     },
   },
@@ -139,6 +153,7 @@ const resources = {
       ...deitiesTa,
       ...activitiesTa,
       ...communityTa,
+      ...eventsTa,
     },
   },
 
@@ -250,6 +265,7 @@ export async function changeAppLanguage(
   }
 
 }
+
 
 
 // ========================================

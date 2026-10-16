@@ -1,7 +1,7 @@
 import { getToken } from '@/services/authStorage';
 
 const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
-//const API_BASE_URL = 'http://192.168.0.110:5000/api';
+//const API_BASE_URL = 'http://192.168.0.122:5000/api';
 //const API_BASE_URL = 'https://monk0y8jf9.execute-api.ap-south-1.amazonaws.com/api';
 
 

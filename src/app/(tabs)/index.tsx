@@ -1,12 +1,13 @@
-import { apiRequest, API_BASE_URL } from '@/services/api';
-import { router, useFocusEffect } from 'expo-router';
+import { API_BASE_URL, apiRequest } from '@/services/api';
 import {
   setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Animated,
   Easing,
@@ -23,7 +24,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 
 const COLORS = {
   bg: '#FFFCF7',
@@ -59,81 +59,24 @@ const FONTS = {
   }),
 };
 
-const GURU_DATA = [
- 
-  {
-    id: '3',
-    name: 'Bhagavatpāda Śaṅkara',
-    title: 'BHAGAVATPĀDA',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/shankaracharya.jpg',
-    verse:
-      'श्रुतिस्मृतिपुराणानामालयं करुणालयम् । नमामि भगवत्पादं शङ्करं लोकशङ्करम् ॥',
-    transliteration:
-      'śrutismṛtipurāṇānāmālayaṃ karuṇālayam ∣ namāmi bhagavatpādaṃ śaṅkaraṃ lokaśaṅkaram ∥3∥',
-    translation:
-      'I bow down to Bhagavatpāda Śaṅkara—the abode of the Śruti (Vedas), Smṛti, and Purāṇas, the very embodiment of compassion, and the one who brings auspiciousness to the entire world.',
-  },
-  {
-    id: '4',
-    name: 'Guru Sureśvara',
-    title: 'GURU',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/sureshwaracharya.jpg',
-    verse:
-      'वन्देऽहं शङ्कराचार्यसच्छिष्यम् ज्ञानसागरम् । सुरेश्वरं गरुं धीरं धर्मब्रह्मविदुत्तमम् ॥',
-    transliteration:
-      'vande’haṃ śaṅkarācāryasacchiṣyaṃ jñānasāgaram ∣ sureśvaraṃ guruṃ dhīraṃ dharmabrahmaviduttamam ∥4∥',
-    translation:
-      'I bow to the noble Guru Sureśvara—the true disciple of Śrī Śaṅkarācārya, an ocean of wisdom, steadfast and composed, the supreme knower of Dharma and Brahman.',
-  },
-  {
-    id: '5',
-    name: 'Sri Swayamprakasha Krishna Yogeendra Saraswathi MahaSwamiji',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g1.jpg',
-    verse:
-      'सौराष्ट्रेषु जनिं प्राप्य दक्षाश्रममुपागताः तुङ्गातीरे तपोनुष्ठा: आदिशङ्करदीक्षिताः । अतोप्यधिकतेजसः श्री कृष्णयोगीन्द्रवराः सदा शिष्योपदेशकाः तान् विनीतो नमाम्यहम् ॥',
-    transliteration:
-      'saurāṣtreṣu janiṃ prāpya dakṣāśramamupāgatāḥ tuṅgātīre taponiṣṭhāḥ ādiśaṅkaradīkṣitāḥ ∣ atopyadhikatejasaḥ śrīkṛṣṇayogīndravarāḥ sadā śiṣyopadeśakāḥ tān vinīto namāmyaham ∥5∥',
-    translation:
-      'Born in the land of Saurāṣṭra and later arriving at the hermitage of Dakṣa, they performed intense austerities on the banks of the river Tuṅgā and were initiated by Ādi Śaṅkarācārya. Among them, the most radiant and exalted was Śrī Kṛṣṇa Yogīndra, ever engaged in mentoring disciples. To that venerable teacher, I bow down with humility.',
-  },
-  {
-    id: '6',
-    name: 'Sri Swayamprakasha Ramananda Saraswathi MahaSwamiji – III',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g3.jpg',
-    verse:
-      'शारदाकरुणापात्रं रामानन्दयतीश्वरम् । पुङ्गनूरुपुराधीशं सद्गुरुं तमहं भजे ॥',
-    transliteration:
-      'śāradākaruṇāpātraṃ rāmānandayatīśvaram ∣ puṅganūrupurādhīśaṃ sadguruṃ tamahaṃ bhaje ∥27∥',
-    translation:
-      'I worship that noble Guru, Śrī Rāmānanda Yatīśvara—the worthy recipient of Goddess Śāradā’s grace and compassion, the revered spiritual master and head of Puṅganūru.',
-  },
-  {
-    id: '7',
-    name: 'Sri Swayamprakasha Abhinava Ramananda Saraswathi MahaSwamiji',
-    title: 'MAHASWAMIJI',
-    image:
-      'https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g2.jpg',
-    verse:
-      'हरिहरपुराधीशं श्रीचक्रार्चनतत्परम् । सदाभिनवपूर्वं तं रामानन्दगरुं भजे ॥',
-    transliteration:
-      'hariharapurādhīśaṃ śrīcakrārcanatatparam ∣ sadābhinavapūrvaṃ taṃ rāmānandaguruṃ bhaje ∥28∥',
-    translation:
-      'I adore my Guru, Śrī Rāmānanda—the ever-youthful master of Hariharapura, who is deeply devoted to the worship of the sacred Śrīcakra.',
-  },
-];
+type Guru = {
+  id: number;
+  name: string;
+  title: string | null;
+  image_url: string | null;
+  verse: string | null;
+  transliteration: string | null;
+  translation: string | null;
+  display_order: number;
+  is_active: boolean;
+};
 
 const QUICK_ACTIONS = [
   { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
   { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
-  { icon: '🎫', titleKey: 'home.quickBookings', route: '/bookings' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
-  { icon: '🛕', titleKey: 'home.quickDeities', route: '/deities' },
+  { icon: '🖼️', titleKey: 'Gallery', route: '/gallery' },
+
   { icon: '🪔', titleKey: 'home.quickSeva', route: '/seva-registration' },
 ];
 
@@ -150,13 +93,15 @@ type DarshanVideo = {
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   useFocusEffect(
-  useCallback(() => {
-    loadUnreadNotificationCount();
-  }, [])
-);
+    useCallback(() => {
+      loadUnreadNotificationCount();
+    }, [])
+  );
   const { width } = useWindowDimensions();
   const [events, setEvents] = useState<any[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [gurus, setGurus] = useState<Guru[]>([]);
+  const [gurusLoading, setGurusLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [darshanVideos, setDarshanVideos] = useState<DarshanVideo[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -236,49 +181,71 @@ export default function HomeScreen() {
   }, [heroPulse, omRotate]);
 
   useEffect(() => {
-  const startWelcomeAudio = async () => {
-    try {
-      console.log('🔊 Home audio status:', playerStatus);
+    const startWelcomeAudio = async () => {
+      try {
+        console.log('🔊 Home audio status:', playerStatus);
 
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        interruptionMode: 'doNotMix',
-      });
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: 'doNotMix',
+        });
 
-      console.log('🎵 Audio mode configured successfully');
+        console.log('🎵 Audio mode configured successfully');
 
-      if (!playerStatus.isLoaded) {
-        console.log('⏳ Welcome audio is still loading...');
+        if (!playerStatus.isLoaded) {
+          console.log('⏳ Welcome audio is still loading...');
+          console.log('📁 Audio file: home-welcome.mp3');
+          return;
+        }
+
+        console.log('✅ Welcome audio loaded successfully');
         console.log('📁 Audio file: home-welcome.mp3');
-        return;
+        console.log('▶️ Playing temple welcome audio');
+
+        player.volume = 1;
+        player.seekTo(0);
+        player.play();
+
+        console.log('🔊 Temple welcome audio play() called');
+      } catch (error) {
+        console.error('❌ Welcome audio error:', error);
       }
+    };
 
-      console.log('✅ Welcome audio loaded successfully');
-      console.log('📁 Audio file: home-welcome.mp3');
-      console.log('▶️ Playing temple welcome audio');
+    startWelcomeAudio();
 
-      player.volume = 1;
-      player.seekTo(0);
-      player.play();
+    return () => {
+      console.log('🛑 Home audio effect cleanup');
+    };
+  }, [playerStatus.isLoaded]);
 
-      console.log('🔊 Temple welcome audio play() called');
+  useEffect(() => {
+    loadEvents();
+    loadDarshanVideos();
+    void loadGurus();
+
+  }, []);
+
+  const loadGurus = async () => {
+    try {
+      setGurusLoading(true);
+      const response = await apiRequest<{
+        success: boolean;
+        data: Guru[];
+      }>('/guru-parampara');
+
+      if (response.success && Array.isArray(response.data)) {
+        setGurus(response.data);
+      } else {
+        setGurus([]);
+      }
     } catch (error) {
-      console.error('❌ Welcome audio error:', error);
+      console.error('Home Guru Parampara error:', error);
+      setGurus([]);
+    } finally {
+      setGurusLoading(false);
     }
   };
-
-  startWelcomeAudio();
-
-  return () => {
-    console.log('🛑 Home audio effect cleanup');
-  };
-}, [playerStatus.isLoaded]);
-
-useEffect(() => {
-  loadEvents();
-  loadDarshanVideos();
-  
-}, []);
 
   const loadEvents = async () => {
     try {
@@ -296,25 +263,25 @@ useEffect(() => {
   };
 
   const loadUnreadNotificationCount = async () => {
-  try {
-    const response = await apiRequest(
-      '/notifications/unread-count'
-    );
-
-    if (response.success) {
-      setUnreadNotificationCount(
-        response.data?.unreadCount || 0
+    try {
+      const response = await apiRequest(
+        '/notifications/unread-count'
       );
-    }
-  } catch (error) {
-    console.error(
-      'Unread notification count error:',
-      error
-    );
 
-    setUnreadNotificationCount(0);
-  }
-};
+      if (response.success) {
+        setUnreadNotificationCount(
+          response.data?.unreadCount || 0
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Unread notification count error:',
+        error
+      );
+
+      setUnreadNotificationCount(0);
+    }
+  };
   const loadDarshanVideos = async () => {
     try {
       const response = await apiRequest<{
@@ -434,15 +401,15 @@ useEffect(() => {
             >
               <Text style={styles.notificationIcon}>🔔</Text>
 
-{unreadNotificationCount > 0 && (
-  <View style={styles.notificationBadge}>
-    <Text style={styles.notificationBadgeText}>
-      {unreadNotificationCount > 99
-        ? '99+'
-        : unreadNotificationCount}
-    </Text>
-  </View>
-)}
+              {unreadNotificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadNotificationCount > 99
+                      ? '99+'
+                      : unreadNotificationCount}
+                  </Text>
+                </View>
+              )}
             </AnimatedTouchable>
           </View>
 
@@ -502,8 +469,8 @@ useEffect(() => {
               </Text>
 
               <Text style={styles.bannerText}>
-                 {t('home.heroDescription')}
-               </Text>
+                {t('home.heroDescription')}
+              </Text>
 
               <AnimatedTouchable
                 style={styles.bannerButton}
@@ -519,7 +486,7 @@ useEffect(() => {
             </View>
           </Animated.View>
 
-          
+
 
           {/* Quick Access */}
           <SectionHeading
@@ -537,7 +504,7 @@ useEffect(() => {
                 onPress={() => router.push(item.route as any)}
               />
             ))}
-                   </View>
+          </View>
 
           {/* Dharma Sandeham */}
           <TouchableOpacity
@@ -583,7 +550,7 @@ useEffect(() => {
               <Text style={styles.videoSectionSubtitle}>{t('home.videoSubtitle')}</Text>
             </View>
             <TouchableOpacity
-            onPress={() => router.push('/darshan-videos')}
+              onPress={() => router.push('/darshan-videos')}
               activeOpacity={0.7}
               style={styles.videoViewAll}
             >
@@ -607,9 +574,8 @@ useEffect(() => {
               const thumbnail = video.thumbnail_url
                 ? video.thumbnail_url.startsWith('http')
                   ? video.thumbnail_url
-                  : `${API_BASE_URL.replace(/\/api\/?$/, '')}${
-                      video.thumbnail_url.startsWith('/') ? '' : '/'
-                    }${video.thumbnail_url}`
+                  : `${API_BASE_URL.replace(/\/api\/?$/, '')}${video.thumbnail_url.startsWith('/') ? '' : '/'
+                  }${video.thumbnail_url}`
                 : '';
 
               return (
@@ -691,36 +657,7 @@ useEffect(() => {
             </View>
           </AnimatedTouchable>
 
-          {/* Agasthya */}
-          <SectionHeading
-            title={t('home.agasthya')}
-            subtitle={t('home.agasthyaSubtitle')}
-          />
 
-          <AnimatedTouchable
-            style={styles.agasthyaCard}
-            onPress={() => router.push('/agasthya')}
-          >
-            <View style={styles.agasthyaGlow} />
-            <View style={styles.agasthyaIconCircle}>
-              <Text style={styles.agasthyaIcon}>ॐ</Text>
-            </View>
-
-            <View style={styles.agasthyaContent}>
-              <Text style={styles.cardEyebrow}>{t('home.devotionalStories')}</Text>
-              <Text style={styles.agasthyaTitle}>
-                {t('home.storiesTitle')}
-              </Text>
-              <Text style={styles.agasthyaText}>
-                 {t('home.storiesDescription')}
-               </Text>
-
-              <View style={styles.smallLink}>
-                <Text style={styles.smallLinkText}>{t('home.exploreAgasthya')}</Text>
-                <Text style={styles.smallLinkArrow}>›</Text>
-              </View>
-            </View>
-          </AnimatedTouchable>
 
           {/* Guru Parampara */}
           <View style={styles.sectionHeader}>
@@ -740,30 +677,38 @@ useEffect(() => {
           </View>
 
           <Text style={styles.sectionIntro}>
-                {t('home.guruIntro')}
-              </Text>
+            {t('home.guruIntro')}
+          </Text>
 
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.guruScroll}
           >
-            {GURU_DATA.map((guru, index) => (
-              <AnimatedGuruCard
-                key={guru.id}
-                guru={guru}
-                index={index}
-                onPress={() => router.push('/guru-parampara')}
-              />
-            ))}
+            {gurusLoading ? (
+              <Text style={styles.sectionIntro}>Loading Guru Parampara...</Text>
+            ) : gurus.length > 0 ? (
+              gurus.map((guru, index) => (
+                <AnimatedGuruCard
+                  key={guru.id}
+                  guru={guru}
+                  index={index}
+                  onPress={() => router.push('/guru-parampara')}
+                />
+              ))
+            ) : (
+              <Text style={styles.sectionIntro}>
+                Guru Parampara information will be available soon.
+              </Text>
+            )}
           </ScrollView>
 
           {/* Room Booking */}
-         {/* Room Booking */}
-<AnimatedTouchable
-  style={styles.roomBookingCard}
-  onPress={() => router.push('/room-booking')}
->
+          {/* Room Booking */}
+          <AnimatedTouchable
+            style={styles.roomBookingCard}
+            onPress={() => router.push('/room-booking')}
+          >
             <View style={styles.roomGlow} />
             <View style={styles.roomBookingContent}>
               <View style={styles.stayBadge}>
@@ -773,8 +718,8 @@ useEffect(() => {
               <Text style={styles.roomBookingTitle}>{t('home.roomBooking')}</Text>
 
               <Text style={styles.roomBookingText}>
-                 {t('home.roomDescription')}
-               </Text>
+                {t('home.roomDescription')}
+              </Text>
 
               <View style={styles.roomBookingButton}>
                 <Text style={styles.roomBookingButtonText}>{t('home.bookRoom')}</Text>
@@ -814,11 +759,11 @@ useEffect(() => {
                 date={
                   event.event_date
                     ? new Date(event.event_date)
-                        .toLocaleDateString(({ en: 'en-US', te: 'te-IN', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN' } as Record<string, string>)[i18n.language] || 'en-US', {
-                          month: 'short',
-                          day: '2-digit',
-                        })
-                        .toUpperCase()
+                      .toLocaleDateString(({ en: 'en-US', te: 'te-IN', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN' } as Record<string, string>)[i18n.language] || 'en-US', {
+                        month: 'short',
+                        day: '2-digit',
+                      })
+                      .toUpperCase()
                     : t('home.date')
                 }
                 title={event.title}
@@ -838,32 +783,7 @@ useEffect(() => {
             </View>
           )}
 
-          {/* Devotional */}
-          <SectionHeading
-            title={t('home.devotional')}
-            subtitle={t('home.devotionalSubtitle')}
-          />
 
-          <AnimatedTouchable
-            style={styles.devotionalCard}
-            onPress={() => router.push('/darshan')}
-          >
-            <View style={styles.devotionalIconCircle}>
-              <Text style={styles.devotionalIcon}>🪔</Text>
-            </View>
-
-            <View style={styles.devotionalContent}>
-              <Text style={styles.devotionalTag}>{t('home.dailyPractice')}</Text>
-              <Text style={styles.devotionalTitle}>{t('home.dailyPrayer')}</Text>
-              <Text style={styles.devotionalText}>
-                {t('home.dailyDescription')}
-              </Text>
-            </View>
-
-            <View style={styles.devotionalArrowCircle}>
-              <Text style={styles.arrowSmall}>›</Text>
-            </View>
-          </AnimatedTouchable>
 
           {/* About Us */}
           <SectionHeading
@@ -900,16 +820,16 @@ useEffect(() => {
               <View style={styles.aboutUsDivider} />
 
               <Text style={styles.aboutUsText}>
-                 {t('home.aboutParagraph1')}
-               </Text>
+                {t('home.aboutParagraph1')}
+              </Text>
 
               <Text style={styles.aboutUsText}>
-                 {t('home.aboutParagraph2')}
-               </Text>
+                {t('home.aboutParagraph2')}
+              </Text>
 
               <Text style={styles.aboutUsText}>
-                 {t('home.aboutParagraph3')}
-               </Text>
+                {t('home.aboutParagraph3')}
+              </Text>
 
               <View style={styles.aboutUsReadMore}>
                 <Text style={styles.aboutUsReadMoreText}>{t('home.readMore')}</Text>
@@ -931,18 +851,24 @@ useEffect(() => {
               subtitle={t('home.knowBeforeVisit')}
               onPress={() => router.push('/about')}
             />
-            <ServiceRow
-              icon="📿"
-              title={t('home.poojaServices')}
-              subtitle={t('home.sacredRituals')}
-              onPress={() => router.push('/pooja')}
-            />
+
             <ServiceRow
               icon="🪔"
               title={t('home.sevaRegistration')}
               subtitle={t('home.participateSeva')}
               onPress={() => router.push('/seva-registration')}
             />
+            {/* POOJA SERVICES */}
+
+<ServiceRow
+  icon="🙏"
+  title={t('home.poojaServices', 'Pooja Services')}
+  subtitle={t(
+    'home.poojaServicesSubtitle',
+    'Explore temple poojas and booking options'
+  )}
+  onPress={() => router.push('/pooja-services' as any)}
+/>
             <ServiceRow
               icon="📍"
               title={t('home.templeLocation')}
@@ -1120,7 +1046,7 @@ function AnimatedGuruCard({
   index,
   onPress,
 }: {
-  guru: (typeof GURU_DATA)[number];
+  guru: Guru;
   index: number;
   onPress: () => void;
 }) {
@@ -1158,7 +1084,7 @@ function AnimatedGuruCard({
       >
         <View>
           <Image
-            source={{ uri: guru.image }}
+            source={guru.image_url ? { uri: guru.image_url } : require('@/assets/images/icon.png')}
             style={styles.guruImage}
             resizeMode="contain"
           />
@@ -1169,13 +1095,13 @@ function AnimatedGuruCard({
         </View>
 
         <View style={styles.guruBody}>
-          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : t('home.bhagavatpada')}</Text>
+          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : guru.title === 'BHAGAVATPĀDA' ? t('home.bhagavatpada') : guru.title || ''}</Text>
           <Text style={styles.guruName} numberOfLines={3}>{guru.name}</Text>
           <Text style={styles.guruVerse} numberOfLines={3}>
             {guru.verse}
           </Text>
           <Text style={styles.guruTranslation} numberOfLines={3}>
-            “{t('home.guruMeanings.' + guru.id, { defaultValue: guru.translation })}”
+            “{guru.translation || ''}”
           </Text>
 
           <View style={styles.guruReadRow}>
@@ -2145,60 +2071,6 @@ const styles = StyleSheet.create({
     marginLeft: 7,
   },
 
-  agasthyaCard: {
-    position: 'relative',
-    flexDirection: 'row',
-    backgroundColor: '#FFFEFB',
-    borderRadius: 25,
-    padding: 17,
-    marginBottom: 27,
-    borderWidth: 1,
-    borderColor: '#E8D8C4',
-    overflow: 'hidden',
-    shadowColor: COLORS.brown,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-
-  agasthyaGlow: {
-    position: 'absolute',
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    right: -85,
-    top: -70,
-    backgroundColor: 'rgba(197,138,42,0.10)',
-  },
-
-  agasthyaIconCircle: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    backgroundColor: COLORS.cream,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: '#E5CDAF',
-    shadowColor: COLORS.gold,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 2,
-    transform: [{ rotate: '-2deg' }],
-  },
-
-  agasthyaIcon: {
-    fontFamily: FONTS.display,
-    fontSize: 31,
-    color: COLORS.gold,
-  },
-
-  agasthyaContent: {
-    flex: 1,
-  },
 
   cardEyebrow: {
     fontFamily: FONTS.medium,
@@ -2209,21 +2081,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  agasthyaTitle: {
-    fontFamily: FONTS.display,
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '700',
-    color: COLORS.brown,
-    marginBottom: 5,
-  },
-
-  agasthyaText: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    lineHeight: 17,
-    color: COLORS.muted,
-  },
 
   smallLink: {
     flexDirection: 'row',
@@ -2743,7 +2600,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8D5B7',
   },
-aboutUsCard: {
+  aboutUsCard: {
     position: 'relative',
     minHeight: 515,
     borderRadius: 26,
@@ -2991,25 +2848,24 @@ aboutUsCard: {
     marginTop: 7,
   },
   notificationBadge: {
-  position: 'absolute',
-  top: 4,
-  right: 3,
-  minWidth: 18,
-  height: 18,
-  borderRadius: 9,
-  paddingHorizontal: 4,
-  backgroundColor: '#C64732',
-  borderWidth: 1.5,
-  borderColor: COLORS.white,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
+    position: 'absolute',
+    top: 4,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#C64732',
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-notificationBadgeText: {
-  color: COLORS.white,
-  fontSize: 9,
-  fontWeight: '800',
-  lineHeight: 12,
-},
+  notificationBadgeText: {
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
 });
-  

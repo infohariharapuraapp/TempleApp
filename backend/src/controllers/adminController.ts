@@ -242,1176 +242,7 @@ export const updateUser = async (
   }
 };
 
-/* =========================================================
-   ROOM BOOKINGS
-========================================================= */
 
-export const getAllRoomBookings = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         rb.id,
-         rb.booking_id,
-         rb.user_id,
-         u.full_name,
-         u.email,
-         u.phone,
-         rb.room_id,
-         r.room_number,
-         rt.name AS room_type_name,
-         rb.check_in,
-         rb.check_out,
-         rb.number_of_guests,
-         rb.total_amount,
-         rb.booking_status,
-         rb.payment_status,
-         rb.special_requests,
-         rb.created_at,
-         rb.updated_at
-       FROM room_bookings rb
-
-       INNER JOIN users u
-         ON rb.user_id = u.id
-
-       INNER JOIN rooms r
-         ON rb.room_id = r.id
-
-       INNER JOIN room_types rt
-         ON r.room_type_id = rt.id
-
-       ORDER BY rb.created_at DESC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error(
-      'Get all room bookings error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch room bookings',
-    });
-  }
-};
-
-export const updateRoomBookingStatus = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-    const { booking_status } = req.body;
-
-    const allowedStatuses = [
-      'pending',
-      'confirmed',
-      'cancelled',
-    ];
-
-    if (!allowedStatuses.includes(booking_status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking status',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE room_bookings
-       SET
-         booking_status = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING
-         id,
-         booking_id,
-         user_id,
-         room_id,
-         check_in,
-         check_out,
-         number_of_guests,
-         total_amount,
-         booking_status,
-         payment_status,
-         special_requests,
-         created_at,
-         updated_at`,
-      [
-        booking_status,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room booking not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Room booking status updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Update room booking status error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update room booking status',
-    });
-  }
-};
-
-export const updateRoomPaymentStatus = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-    const { payment_status } = req.body;
-
-    const allowedStatuses = [
-      'pending',
-      'paid',
-      'failed',
-      'refunded',
-    ];
-
-    if (
-      !payment_status ||
-      !allowedStatuses.includes(payment_status)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment status',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE room_bookings
-       SET
-         payment_status = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING
-         id,
-         booking_id,
-         user_id,
-         room_id,
-         check_in,
-         check_out,
-         number_of_guests,
-         total_amount,
-         booking_status,
-         payment_status,
-         special_requests,
-         created_at,
-         updated_at`,
-      [
-        payment_status,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room booking not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Room payment status updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Update room payment status error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update room payment status',
-    });
-  }
-};
-
-/* =========================================================
-   SERVICE BOOKINGS
-========================================================= */
-
-export const getAllServiceBookings = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         sb.id,
-         sb.booking_id,
-         sb.user_id,
-         u.full_name,
-         u.email,
-         u.phone,
-         sb.service_type,
-         sb.booking_date,
-         sb.booking_time,
-         sb.number_of_devotees,
-         sb.total_amount,
-         sb.booking_status,
-         sb.payment_status,
-         sb.special_requests,
-         sb.created_at,
-         sb.updated_at
-       FROM service_bookings sb
-
-       INNER JOIN users u
-         ON sb.user_id = u.id
-
-       ORDER BY sb.created_at DESC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error(
-      'Get all service bookings error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch service bookings',
-    });
-  }
-};
-
-export const updateServiceBookingStatus = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-    const { booking_status } = req.body;
-
-    const allowedStatuses = [
-      'pending',
-      'confirmed',
-      'cancelled',
-    ];
-
-    if (!allowedStatuses.includes(booking_status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking status',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE service_bookings
-       SET
-         booking_status = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING
-         id,
-         booking_id,
-         user_id,
-         service_type,
-         booking_date,
-         booking_time,
-         number_of_devotees,
-         total_amount,
-         booking_status,
-         payment_status,
-         special_requests,
-         created_at,
-         updated_at`,
-      [
-        booking_status,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service booking not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Service booking status updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Update service booking status error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update service booking status',
-    });
-  }
-};
-
-export const updateServicePaymentStatus = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-    const { payment_status } = req.body;
-
-    const allowedStatuses = [
-      'pending',
-      'paid',
-      'failed',
-      'refunded',
-    ];
-
-    if (
-      !payment_status ||
-      !allowedStatuses.includes(payment_status)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment status',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE service_bookings
-       SET
-         payment_status = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING
-         id,
-         booking_id,
-         user_id,
-         service_type,
-         booking_date,
-         booking_time,
-         number_of_devotees,
-         total_amount,
-         booking_status,
-         payment_status,
-         special_requests,
-         created_at,
-         updated_at`,
-      [
-        payment_status,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service booking not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Service payment status updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Update service payment status error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update service payment status',
-    });
-  }
-};
-
-/* =========================================================
-   ROOMS
-========================================================= */
-
-/*
-  GET ALL ROOMS FOR ADMIN
-
-  Important:
-  Room information comes from:
-    rooms
-    room_types
-
-  This keeps Rooms and Room Types properly separated.
-*/
-
-export const getAllRooms = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         r.id,
-         r.room_number,
-         r.floor,
-         r.status,
-         r.description,
-         r.image_url,
-         r.is_active,
-         r.room_type_id,
-         r.building_id,
-
-         b.name AS building_name,
-         b.code AS building_code,
-
-         rt.name AS room_type_name,
-         rt.description AS room_type_description,
-         rt.capacity,
-         rt.price_per_night,
-
-         r.created_at,
-         r.updated_at
-
-       FROM rooms r
-
-       INNER JOIN buildings b
-         ON r.building_id = b.id
-
-       INNER JOIN room_types rt
-         ON r.room_type_id = rt.id
-
-       ORDER BY
-         b.id ASC,
-         r.floor ASC,
-         r.room_number ASC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error('Get all rooms error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch rooms',
-    });
-  }
-};
-
-
-/*
-  CREATE ROOM
-
-  Expected frontend body:
-
-  {
-    "room_number": "103",
-    "room_type_id": 1,
-    "status": "available"
-  }
-*/
-export const createRoom = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const {
-      room_number,
-      room_type_id,
-      building_id,
-      status,
-    } = req.body;
-
-    if (!room_number || !room_type_id || !building_id) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Room number, room type and building are required',
-      });
-    }
-
-    const roomTypeResult = await pool.query(
-      `SELECT id
-       FROM room_types
-       WHERE id = $1
-         AND is_active = TRUE`,
-      [room_type_id]
-    );
-
-    if (roomTypeResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room type not found',
-      });
-    }
-
-    const buildingResult = await pool.query(
-      `SELECT id
-       FROM buildings
-       WHERE id = $1
-         AND is_active = TRUE`,
-      [building_id]
-    );
-
-    if (buildingResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Building not found',
-      });
-    }
-
-    const allowedStatuses = [
-      'available',
-      'maintenance',
-      'unavailable',
-    ];
-
-    const roomStatus = status || 'available';
-
-    if (!allowedStatuses.includes(roomStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid room status',
-      });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO rooms (
-         room_number,
-         room_type_id,
-         building_id,
-         status
-       )
-       VALUES ($1, $2, $3, $4)
-       RETURNING
-         id,
-         room_number,
-         room_type_id,
-         building_id,
-         status,
-         created_at,
-         updated_at`,
-      [
-        room_number,
-        room_type_id,
-        building_id,
-        roomStatus,
-      ]
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: 'Room created successfully',
-      data: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error('Create room error:', error);
-
-    if (error.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        message: 'Room number already exists',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create room',
-    });
-  }
-};
-
-
-/*
-  UPDATE ROOM
-*/
-export const updateRoom = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      room_number,
-      room_type_id,
-      building_id,
-      status,
-    } = req.body;
-
-    if (!room_number || !room_type_id || !building_id) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Room number, room type and building are required',
-      });
-    }
-
-    const allowedStatuses = [
-      'available',
-      'maintenance',
-      'unavailable',
-    ];
-
-    const roomStatus = status || 'available';
-
-    if (!allowedStatuses.includes(roomStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid room status',
-      });
-    }
-
-    const roomTypeResult = await pool.query(
-      `SELECT id
-       FROM room_types
-       WHERE id = $1
-         AND is_active = TRUE`,
-      [room_type_id]
-    );
-
-    if (roomTypeResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room type not found',
-      });
-    }
-
-    const buildingResult = await pool.query(
-      `SELECT id
-       FROM buildings
-       WHERE id = $1
-         AND is_active = TRUE`,
-      [building_id]
-    );
-
-    if (buildingResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Building not found',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE rooms
-       SET
-         room_number = $1,
-         room_type_id = $2,
-         building_id = $3,
-         status = $4,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5
-       RETURNING
-         id,
-         room_number,
-         room_type_id,
-         building_id,
-         status,
-         created_at,
-         updated_at`,
-      [
-        room_number,
-        room_type_id,
-        building_id,
-        roomStatus,
-        id,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: 'Room updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error('Update room error:', error);
-
-    if (error.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        message: 'Room number already exists',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update room',
-    });
-  }
-};
-
-/*
-  UPDATE ROOM STATUS
-*/
-
-export const updateRoomStatus = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const allowedStatuses = [
-      'available',
-      'maintenance',
-      'unavailable',
-    ];
-
-    if (
-      !status ||
-      !allowedStatuses.includes(status)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid room status',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE rooms
-       SET
-         status = $1,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-
-       RETURNING
-         id,
-         room_number,
-         room_type_id,
-         status,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        status,
-        id,
-      ]
-    );
-
-    if (
-      result.rows.length === 0
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Room status updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Update room status error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update room status',
-    });
-  }
-};
-
-
-/*
-  DEACTIVATE ROOM
-
-  We do not physically delete the room.
-  This preserves booking history.
-*/
-
-export const deactivateRoom = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      `UPDATE rooms
-       SET
-         is_active = FALSE,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-
-       RETURNING
-         id,
-         room_number,
-         room_type_id,
-         status,
-         is_active,
-         created_at,
-         updated_at`,
-      [id]
-    );
-
-    if (
-      result.rows.length === 0
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: 'Room not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Room deactivated successfully',
-      data: result.rows[0],
-    });
-  } catch (error) {
-    console.error(
-      'Deactivate room error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to deactivate room',
-    });
-  }
-};
-
-
-/* =========================================================
-   ROOM TYPES
-========================================================= */
-
-export const getAllRoomTypes = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         id,
-         name,
-         description,
-         capacity,
-         price_per_night,
-         image_url,
-         is_active,
-         created_at,
-         updated_at
-       FROM room_types
-       ORDER BY id ASC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error(
-      'Get all room types error:',
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to fetch room types',
-    });
-  }
-};
-
-export const createRoomType = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const {
-      name,
-      description,
-      capacity,
-      price_per_night,
-      image_url,
-    } = req.body;
-
-    if (
-      !name ||
-      capacity === undefined ||
-      price_per_night === undefined
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Name, capacity and price per night are required',
-      });
-    }
-
-    if (Number(capacity) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Capacity must be greater than 0',
-      });
-    }
-
-    if (Number(price_per_night) < 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Price per night cannot be negative',
-      });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO room_types (
-         name,
-         description,
-         capacity,
-         price_per_night,
-         image_url,
-         is_active
-       )
-       VALUES (
-         $1,
-         $2,
-         $3,
-         $4,
-         $5,
-         TRUE
-       )
-
-       RETURNING
-         id,
-         name,
-         description,
-         capacity,
-         price_per_night,
-         image_url,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        name.trim(),
-        description || null,
-        Number(capacity),
-        Number(price_per_night),
-        image_url || null,
-      ]
-    );
-
-    return res.status(201).json({
-      success: true,
-      message:
-        'Room type created successfully',
-      data: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error(
-      'Create room type error:',
-      error
-    );
-
-    if (error.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        message:
-          'Room type already exists',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to create room type',
-    });
-  }
-};
-
-export const updateRoomType = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      name,
-      description,
-      capacity,
-      price_per_night,
-      image_url,
-    } = req.body;
-
-    if (
-      !name ||
-      capacity === undefined ||
-      price_per_night === undefined
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Name, capacity and price per night are required',
-      });
-    }
-
-    if (Number(capacity) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Capacity must be greater than 0',
-      });
-    }
-
-    if (Number(price_per_night) < 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Price per night cannot be negative',
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE room_types
-       SET
-         name = $1,
-         description = $2,
-         capacity = $3,
-         price_per_night = $4,
-         image_url = $5,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $6
-
-       RETURNING
-         id,
-         name,
-         description,
-         capacity,
-         price_per_night,
-         image_url,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        name.trim(),
-        description || null,
-        Number(capacity),
-        Number(price_per_night),
-        image_url || null,
-        id,
-      ]
-    );
-
-    if (
-      result.rows.length === 0
-    ) {
-      return res.status(404).json({
-        success: false,
-        message:
-          'Room type not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message:
-        'Room type updated successfully',
-      data: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error(
-      'Update room type error:',
-      error
-    );
-
-    if (error.code === '23505') {
-      return res.status(409).json({
-        success: false,
-        message:
-          'Room type already exists',
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message:
-        'Failed to update room type',
-    });
-  }
-};
-export const getAllBuildings = async (
-  req: AuthRequest,
-  res: Response
-) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         id,
-         name,
-         code,
-         description,
-         is_active,
-         created_at
-       FROM buildings
-       WHERE is_active = TRUE
-       ORDER BY id ASC`
-    );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
-  } catch (error) {
-    console.error('Get all buildings error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch buildings',
-    });
-  }
-};
-/* =========================================================
-   EVENTS
-========================================================= */
 /* =========================================================
    EVENTS
 ========================================================= */
@@ -1511,31 +342,34 @@ async function createEventReminderNotification(
 /**
  * GET ALL EVENTS FOR ADMIN
  */
+
 export const getAllEvents = async (
-  req: AuthRequest,
+  _req: AuthRequest,
   res: Response
 ) => {
   try {
     const result = await pool.query(
-      `
-      SELECT
-        id,
-        title,
-        description,
-        image_url,
-        event_date,
-        start_time,
-        end_time,
-        location,
-        is_active,
-        created_at,
-        updated_at
-      FROM events
-      ORDER BY
-        event_date ASC NULLS LAST,
-        start_time ASC NULLS LAST,
-        id ASC
-      `
+      `SELECT
+         e.id,
+         e.title,
+         e.description,
+         e.image_url,
+         e.event_date,
+         e.start_time,
+         e.end_time,
+         e.location,
+         e.category_id,
+         c.name AS category_name,
+         e.is_active,
+         e.created_at,
+         e.updated_at
+       FROM events e
+       LEFT JOIN event_categories c
+         ON e.category_id = c.id
+       ORDER BY
+         e.event_date ASC NULLS LAST,
+         e.start_time ASC NULLS LAST,
+         e.id ASC`
     );
 
     return res.json({
@@ -1543,10 +377,7 @@ export const getAllEvents = async (
       data: result.rows,
     });
   } catch (error) {
-    console.error(
-      'Get all events error:',
-      error
-    );
+    console.error('Get all events error:', error);
 
     return res.status(500).json({
       success: false,
@@ -1559,6 +390,7 @@ export const getAllEvents = async (
 /**
  * CREATE EVENT
  */
+
 export const createEvent = async (
   req: AuthRequest,
   res: Response
@@ -1572,45 +404,74 @@ export const createEvent = async (
       start_time,
       end_time,
       location,
+      category_id,
     } = req.body;
 
-    if (!title || !event_date) {
+    if (
+      typeof title !== 'string' ||
+      !title.trim() ||
+      typeof event_date !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(event_date)
+    ) {
       return res.status(400).json({
         success: false,
-        message:
-          'Title and event date are required',
+        message: 'Valid title and event date are required',
       });
     }
 
-    /*
-     * Create event
-     */
+    if (
+      !Number.isSafeInteger(category_id) ||
+      category_id <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid event category is required',
+      });
+    }
+
+    const categoryResult = await pool.query(
+      `SELECT id
+       FROM event_categories
+       WHERE id = $1 AND is_active = TRUE`,
+      [category_id]
+    );
+
+    if (categoryResult.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected event category is unavailable',
+      });
+    }
+
     const result = await pool.query(
-      `
-      INSERT INTO events (
-        title,
-        description,
-        image_url,
-        event_date,
-        start_time,
-        end_time,
-        location,
-        is_active
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
-      RETURNING
-        id,
-        title,
-        description,
-        image_url,
-        event_date,
-        start_time,
-        end_time,
-        location,
-        is_active,
-        created_at,
-        updated_at
-      `,
+      `INSERT INTO events (
+         title,
+         description,
+         image_url,
+         event_date,
+         start_time,
+         end_time,
+         location,
+         category_id,
+         is_active
+       )
+       VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8, TRUE
+       )
+       RETURNING
+         id,
+         title,
+         description,
+         image_url,
+         event_date,
+         start_time,
+         end_time,
+         location,
+         category_id,
+         is_active,
+         created_at,
+         updated_at`,
       [
         title.trim(),
         description || null,
@@ -1619,80 +480,55 @@ export const createEvent = async (
         start_time || null,
         end_time || null,
         location || null,
+        category_id,
       ]
     );
 
     const event = result.rows[0];
 
-    /*
-     * -------------------------------------------------------
-     * 1. SEND NEW EVENT NOTIFICATION
-     * -------------------------------------------------------
-     */
+    // SEND NEW EVENT NOTIFICATION
     try {
-      const notification =
-        await createNotification({
-          title: `📅 ${event.title}`,
-          body:
-            `New event: ${event.title}` +
-            `${
-              event.start_time
-                ? ` on ${event.event_date} at ${event.start_time}`
-                : ` on ${event.event_date}`
-            }${
-              event.location
-                ? ` at ${event.location}`
-                : ''
-            }.`,
-          notificationType: 'event',
-          data: {
-            type: 'event',
-            eventId: event.id,
-            screen: '/events',
-          },
-          targetType: 'all',
-          scheduledAt: null,
-        });
+      const notification = await createNotification({
+        title: `📅 ${event.title}`,
+        body:
+          `New event: ${event.title}` +
+          `${
+            event.start_time
+              ? ` on ${event.event_date} at ${event.start_time}`
+              : ` on ${event.event_date}`
+          }${
+            event.location
+              ? ` at ${event.location}`
+              : ''
+          }.`,
+        notificationType: 'event',
+        data: {
+          type: 'event',
+          eventId: event.id,
+          screen: '/events',
+        },
+        targetType: 'all',
+        scheduledAt: null,
+      });
 
-      await sendNotificationRecord(
-        notification.id
-      );
-
-      console.log(
-        `New event notification processed for event ${event.id}`
-      );
+      await sendNotificationRecord(notification.id);
     } catch (notificationError) {
-      /*
-       * Notification failure must NOT fail event creation.
-       */
       console.error(
         'Event notification error:',
         notificationError
       );
     }
 
-
-    /*
-     * -------------------------------------------------------
-     * 2. CREATE EVENT REMINDER
-     * -------------------------------------------------------
-     */
-    await createEventReminderNotification(
-      event
-    );
-
+    // SCHEDULE 24-HOUR EVENT REMINDER
+    await createEventReminderNotification(event);
 
     return res.status(201).json({
       success: true,
       message: 'Event created successfully',
       data: event,
     });
-
   } catch (error) {
-    console.error(
-      'Create event error:',
-      error
-    );
+    console.error('Create event error:', error);
 
     return res.status(500).json({
       success: false,
@@ -1702,9 +538,11 @@ export const createEvent = async (
 };
 
 
+
 /**
  * UPDATE EVENT
  */
+
 export const updateEvent = async (
   req: AuthRequest,
   res: Response
@@ -1720,74 +558,94 @@ export const updateEvent = async (
       start_time,
       end_time,
       location,
+      category_id,
     } = req.body;
 
-    if (!title || !event_date) {
+    if (
+      typeof title !== 'string' ||
+      !title.trim() ||
+      typeof event_date !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(event_date)
+    ) {
       return res.status(400).json({
         success: false,
-        message:
-          'Title and event date are required',
+        message: 'Valid title and event date are required',
       });
     }
 
+    const existingResult = await pool.query(
+      `SELECT id, category_id, is_active
+       FROM events
+       WHERE id = $1`,
+      [id]
+    );
 
-    /*
-     * Make sure event exists
-     */
-    const existingResult =
-      await pool.query(
-        `
-        SELECT
-          id,
-          title,
-          event_date,
-          start_time,
-          is_active
-        FROM events
-        WHERE id = $1
-        `,
-        [id]
-      );
-
-    if (
-      existingResult.rows.length === 0
-    ) {
+    if (existingResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Event not found',
       });
     }
 
+    const selectedCategoryId =
+      category_id === undefined
+        ? existingResult.rows[0].category_id
+        : category_id;
 
-    /*
-     * Update event
-     */
+    if (
+      !Number.isSafeInteger(selectedCategoryId) ||
+      selectedCategoryId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid event category is required',
+      });
+    }
+
+    const categoryResult = await pool.query(
+      `SELECT id
+       FROM event_categories
+       WHERE id = $1
+         AND (is_active = TRUE OR id = $2)`,
+      [
+        selectedCategoryId,
+        existingResult.rows[0].category_id,
+      ]
+    );
+
+    if (categoryResult.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected event category is unavailable',
+      });
+    }
+
     const result = await pool.query(
-      `
-      UPDATE events
-      SET
-        title = $1,
-        description = $2,
-        image_url = $3,
-        event_date = $4,
-        start_time = $5,
-        end_time = $6,
-        location = $7,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
-      RETURNING
-        id,
-        title,
-        description,
-        image_url,
-        event_date,
-        start_time,
-        end_time,
-        location,
-        is_active,
-        created_at,
-        updated_at
-      `,
+      `UPDATE events
+       SET
+         title = $1,
+         description = $2,
+         image_url = $3,
+         event_date = $4,
+         start_time = $5,
+         end_time = $6,
+         location = $7,
+         category_id = $8,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $9
+       RETURNING
+         id,
+         title,
+         description,
+         image_url,
+         event_date,
+         start_time,
+         end_time,
+         location,
+         category_id,
+         is_active,
+         created_at,
+         updated_at`,
       [
         title.trim(),
         description || null,
@@ -1796,55 +654,37 @@ export const updateEvent = async (
         start_time || null,
         end_time || null,
         location || null,
+        selectedCategoryId,
         id,
       ]
     );
 
     const event = result.rows[0];
 
-
-    /*
-     * -------------------------------------------------------
-     * CANCEL OLD SCHEDULED REMINDER
-     * -------------------------------------------------------
-     */
+    // CANCEL PREVIOUS SCHEDULED REMINDERS
     await pool.query(
-      `
-      UPDATE notifications
-      SET
-        status = 'cancelled',
-        updated_at = CURRENT_TIMESTAMP
-      WHERE notification_type = 'event_reminder'
-        AND data->>'eventId' = $1
-        AND status = 'scheduled'
-      `,
+      `UPDATE notifications
+       SET
+         status = 'cancelled',
+         updated_at = CURRENT_TIMESTAMP
+       WHERE notification_type = 'event_reminder'
+         AND data->>'eventId' = $1
+         AND status = 'scheduled'`,
       [String(id)]
     );
 
-
-    /*
-     * -------------------------------------------------------
-     * CREATE NEW REMINDER
-     * -------------------------------------------------------
-     */
+    // SCHEDULE NEW REMINDER IF PUBLISHED
     if (event.is_active) {
-      await createEventReminderNotification(
-        event
-      );
+      await createEventReminderNotification(event);
     }
-
 
     return res.json({
       success: true,
       message: 'Event updated successfully',
       data: event,
     });
-
   } catch (error) {
-    console.error(
-      'Update event error:',
-      error
-    );
+    console.error('Update event error:', error);
 
     return res.status(500).json({
       success: false,

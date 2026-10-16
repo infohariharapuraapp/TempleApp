@@ -1,58 +1,208 @@
-import React from 'react';
+
+import React, {
+  useCallback,
+  useState,
+} from 'react';
+
 import {
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-const publications = [
-  {
-    title: 'Magazines',
-    icon: '📰',
-    description:
-      'Read temple magazines, spiritual articles and monthly publications.',
-  },
-  {
-    title: 'Books',
-    icon: '📚',
-    description:
-      'Explore spiritual books, temple literature and devotional publications.',
-  },
-  {
-    title: 'News & Updates',
-    icon: '📢',
-    description:
-      'Read the latest temple announcements, news and important updates.',
-  },
-  {
-    title: 'eBooks & Downloads',
-    icon: '📖',
-    description:
-      'Access available digital books, PDFs and devotional reading material.',
-  },
-];
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+
+import { apiRequest } from '@/services/api';
+
+// ========================================
+// TYPES
+// ========================================
+
+type PublicationCategory = {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  display_order: number;
+  is_active: boolean;
+};
+
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+  message?: string;
+};
+
+// ========================================
+// SCREEN
+// ========================================
 
 export default function PublicationsScreen() {
+  const [categories, setCategories] = useState<
+    PublicationCategory[]
+  >([]);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+
+  // ========================================
+  // LOAD CATEGORIES
+  // ========================================
+
+  const loadCategories = useCallback(async (
+    showLoading = true
+  ) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      setError('');
+
+      const response = await apiRequest<
+        ApiResponse<PublicationCategory[]>
+      >('/publications/categories');
+
+      if (!response.success) {
+        throw new Error(
+          response.message ||
+          'Failed to load publication categories'
+        );
+      }
+
+      setCategories(response.data || []);
+    } catch (err) {
+      console.error(
+        'Publication categories error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load publications'
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Refresh when screen becomes active
+  useFocusEffect(
+    useCallback(() => {
+      void loadCategories();
+
+      return () => {};
+    }, [loadCategories])
+  );
+
+  // ========================================
+  // PULL TO REFRESH
+  // ========================================
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    void loadCategories(false);
+  };
+
+  // ========================================
+  // CATEGORY ICON
+  // ========================================
+
+  const getCategoryIcon = (
+    category: PublicationCategory
+  ) => {
+    if (category.icon?.trim()) {
+      return category.icon;
+    }
+
+    const name = category.name.toLowerCase();
+
+    if (name.includes('magazine')) {
+      return '📰';
+    }
+
+    if (name.includes('ebook')) {
+      return '📖';
+    }
+
+    if (name.includes('book')) {
+      return '📚';
+    }
+
+    if (
+      name.includes('news') ||
+      name.includes('update')
+    ) {
+      return '📢';
+    }
+
+    return '📚';
+  };
+
+  // ========================================
+  // NAVIGATION
+  // ========================================
+
+  const openCategory = (
+    category: PublicationCategory
+  ) => {
+    router.push({
+      pathname: '/publications/category/[id]',
+      params: {
+        id: String(category.id),
+        name: category.name,
+      },
+    });
+  };
+
+  // ========================================
+  // UI
+  // ========================================
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#B66A2C']}
+          />
+        }
       >
-        <Text style={styles.smallTitle}>TEMPLE RESOURCES</Text>
+        <Text style={styles.smallTitle}>
+          TEMPLE RESOURCES
+        </Text>
 
-        <Text style={styles.title}>Publications 📚</Text>
+        <Text style={styles.title}>
+          Publications 📚
+        </Text>
 
         <Text style={styles.subtitle}>
-          Explore books, magazines, news and devotional reading material.
+          Explore books, magazines, news and
+          devotional reading material.
         </Text>
 
         <View style={styles.banner}>
-          <Text style={styles.bannerIcon}>📖</Text>
+          <Text style={styles.bannerIcon}>
+            📖
+          </Text>
 
           <View style={styles.bannerContent}>
             <Text style={styles.bannerTitle}>
@@ -60,8 +210,8 @@ export default function PublicationsScreen() {
             </Text>
 
             <Text style={styles.bannerText}>
-              Discover publications and devotional resources
-              from the temple.
+              Discover publications and devotional
+              resources from the temple.
             </Text>
           </View>
         </View>
@@ -70,40 +220,101 @@ export default function PublicationsScreen() {
           Explore Publications
         </Text>
 
-        <View style={styles.cardContainer}>
-          {publications.map((item) => (
+        {loading && (
+          <View style={styles.centerBox}>
+            <ActivityIndicator
+              size="large"
+              color="#B66A2C"
+            />
+
+            <Text style={styles.message}>
+              Loading publications...
+            </Text>
+          </View>
+        )}
+
+        {!loading && error !== '' && (
+          <View style={styles.centerBox}>
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+
             <TouchableOpacity
-              key={item.title}
-              style={styles.card}
-              activeOpacity={0.8}
+              style={styles.retryButton}
+              onPress={() => void loadCategories()}
             >
-              <View style={styles.iconBox}>
-                <Text style={styles.icon}>{item.icon}</Text>
-              </View>
+              <Text style={styles.retryText}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-              <View style={styles.cardContent}>
-                <View style={styles.titleRow}>
-                  <Text style={styles.cardTitle}>
-                    {item.title}
+        {!loading &&
+          !error &&
+          categories.length === 0 && (
+            <View style={styles.centerBox}>
+              <Text style={styles.emptyIcon}>
+                📚
+              </Text>
+
+              <Text style={styles.emptyTitle}>
+                No Publications Available
+              </Text>
+
+              <Text style={styles.message}>
+                Publication categories will
+                appear here once added by
+                the temple administration.
+              </Text>
+            </View>
+          )}
+
+        {!loading && !error && (
+          <View style={styles.cardContainer}>
+            {categories.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.card}
+                activeOpacity={0.8}
+                onPress={() => openCategory(item)}
+              >
+                <View style={styles.iconBox}>
+                  <Text style={styles.icon}>
+                    {getCategoryIcon(item)}
                   </Text>
-
-                  <Text style={styles.arrow}>›</Text>
                 </View>
 
-                <Text style={styles.cardText}>
-                  {item.description}
-                </Text>
+                <View style={styles.cardContent}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.cardTitle}>
+                      {item.name}
+                    </Text>
 
-                <Text style={styles.viewText}>
-                  Explore ›
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+                    <Text style={styles.arrow}>
+                      ›
+                    </Text>
+                  </View>
+
+                  {!!item.description && (
+                    <Text style={styles.cardText}>
+                      {item.description}
+                    </Text>
+                  )}
+
+                  <Text style={styles.viewText}>
+                    Explore ›
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoIcon}>🙏</Text>
+          <Text style={styles.infoIcon}>
+            🙏
+          </Text>
 
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>
@@ -111,15 +322,18 @@ export default function PublicationsScreen() {
             </Text>
 
             <Text style={styles.infoText}>
-              Books, magazines and downloadable publications
-              will be connected through the admin system later.
+              Explore spiritual books, magazines,
+              articles and downloadable publications
+              shared by the temple.
             </Text>
           </View>
         </View>
 
         <TouchableOpacity
           style={styles.homeButton}
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() =>
+            router.replace('/(tabs)')
+          }
         >
           <Text style={styles.homeButtonText}>
             Back to Home
@@ -129,6 +343,10 @@ export default function PublicationsScreen() {
     </SafeAreaView>
   );
 }
+
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
   container: {
@@ -240,11 +458,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#4A2C18',
+    flex: 1,
   },
 
   arrow: {
     fontSize: 22,
     color: '#B66A2C',
+    marginLeft: 8,
   },
 
   cardText: {
@@ -306,5 +526,52 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+
+  centerBox: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+  },
+
+  message: {
+    fontSize: 12,
+    color: '#777',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 19,
+  },
+
+  errorText: {
+    fontSize: 12,
+    color: '#B42318',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  retryButton: {
+    backgroundColor: '#B66A2C',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  retryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+
+  emptyIcon: {
+    fontSize: 35,
+  },
+
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4A2C18',
+    marginTop: 10,
   },
 });

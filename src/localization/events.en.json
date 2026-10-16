@@ -1,0 +1,23 @@
+
+{
+  "events": {
+    "community": "Temple Community",
+    "title": "Temple Events",
+    "subtitle": "Explore temple celebrations and special occasions",
+    "upcoming": "Upcoming Events",
+    "past": "Past Events",
+    "categories": "Event Categories",
+    "allCategories": "All Categories",
+    "viewDetails": "View Details",
+    "noEvents": "No events found in this category.",
+    "loadError": "Unable to load events. Please try again.",
+    "retry": "Retry",
+    "date": "Event Date",
+    "timings": "Timings",
+    "location": "Location",
+    "aboutEvent": "About This Event",
+    "descriptionFallback": "More details will be available soon.",
+    "invalidEvent": "Invalid event.",
+    "eventUnavailable": "This event is no longer available."
+  }
+}
