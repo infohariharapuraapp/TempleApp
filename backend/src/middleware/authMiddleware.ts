@@ -46,3 +46,52 @@ export const authenticateToken = (
     });
   }
 };
+
+export const optionalAuthenticateToken = (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.slice(7).trim();
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET as string
+    );
+
+    if (
+      typeof decoded !== 'string' &&
+      typeof decoded.userId === 'number' &&
+      Number.isSafeInteger(decoded.userId) &&
+      decoded.userId > 0
+    ) {
+      req.user = {
+        userId: decoded.userId,
+        email:
+          typeof decoded.email === 'string'
+            ? decoded.email
+            : '',
+        role:
+          typeof decoded.role === 'string'
+            ? decoded.role
+            : '',
+      };
+    }
+  } catch {
+    // Invalid or expired token:
+    // Continue as a public visitor.
+  }
+
+  next();
+};

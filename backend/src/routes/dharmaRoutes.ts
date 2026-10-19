@@ -11,11 +11,14 @@ import {
       reportDharmaContent,
        reviewDharmaReport,
        getAdminDharmaReports,
+       
 } from '../controllers/dharmaController';
 
 import {
   authenticateToken,
+    optionalAuthenticateToken,
 } from '../middleware/authMiddleware';
+import { requireAdmin } from '../middleware/adminMiddleware';
 
 const router = Router();
 
@@ -30,7 +33,11 @@ router.get('/categories', getDharmaCategories);
 router.get('/questions', getDharmaQuestions);
 
 // Get a specific question and its answers
-router.get('/questions/:id', getDharmaQuestionById);
+router.get(
+  '/questions/:id',
+  optionalAuthenticateToken,
+  getDharmaQuestionById
+);
 
 
 router.post(
@@ -58,18 +65,22 @@ router.post(
 );
 
 // ========================================
-// DHARMA REPORT MODERATION
+// DHARMA REPORT MODERATION (ADMIN ONLY)
 // ========================================
 
-// View reports
+// View reported questions and answers
 router.get(
   '/reports',
+  authenticateToken,
+  requireAdmin,
   getAdminDharmaReports
 );
 
 // Review, dismiss, or hide reported content
 router.patch(
   '/reports/:id/review',
+  authenticateToken,
+  requireAdmin,
   reviewDharmaReport
 );
 

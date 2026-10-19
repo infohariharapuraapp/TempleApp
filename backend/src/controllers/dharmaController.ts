@@ -228,6 +228,8 @@ export const getDharmaQuestionById = async (
         message: 'Question not found',
       });
     }
+    const authReq = req as AuthRequest;
+const userId = authReq.user?.userId ?? null;
 
     const answersResult = await pool.query(
       `
@@ -243,6 +245,12 @@ export const getDharmaQuestionById = async (
           FROM dharma_votes v
           WHERE v.answer_id = a.id
         ) AS helpful_count
+         EXISTS (
+  SELECT 1
+  FROM dharma_votes v
+  WHERE v.answer_id = a.id
+    AND v.user_id = $2
+) AS is_liked
 
       FROM dharma_answers a
       JOIN users u
@@ -259,7 +267,7 @@ export const getDharmaQuestionById = async (
         a.created_at ASC,
         a.id ASC
       `,
-      [questionId]
+      [questionId, userId]
     );
 
     const countResult = await pool.query(

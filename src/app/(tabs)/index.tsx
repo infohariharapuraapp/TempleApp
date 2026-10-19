@@ -76,8 +76,13 @@ const QUICK_ACTIONS = [
   { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
   { icon: '🖼️', titleKey: 'Gallery', route: '/gallery' },
+{ icon: '🪔', titleKey: 'home.quickSeva', route: '/seva-registration', comingSoon: true },
 
-  { icon: '🪔', titleKey: 'home.quickSeva', route: '/seva-registration' },
+ {
+    icon: '🛕',
+    titleKey: 'home.poojaServices',
+    route: '/pooja-services',
+  },
 ];
 
 type DarshanVideo = {
@@ -494,17 +499,29 @@ export default function HomeScreen() {
             subtitle={t('home.quickSubtitle')}
           />
 
-          <View style={styles.grid}>
-            {QUICK_ACTIONS.map((item, index) => (
-              <AnimatedQuickAction
-                key={item.titleKey}
-                icon={item.icon}
-                title={t(item.titleKey)}
-                index={index}
-                onPress={() => router.push(item.route as any)}
-              />
-            ))}
-          </View>
+         <View style={styles.grid}>
+  {QUICK_ACTIONS.map((item, index) => {
+    const comingSoon = 'comingSoon' in item && item.comingSoon;
+
+    return (
+      <AnimatedQuickAction
+        key={item.titleKey}
+        icon={item.icon}
+        title={
+          comingSoon
+            ? `${t(item.titleKey)} (Coming Soon)`
+            : t(item.titleKey)
+        }
+        index={index}
+        onPress={
+          comingSoon
+            ? () => {}
+            : () => router.push(item.route as any)
+        }
+      />
+    );
+  })}
+</View>
 
           {/* Dharma Sandeham */}
           <TouchableOpacity
@@ -845,19 +862,8 @@ export default function HomeScreen() {
           />
 
           <View style={styles.serviceCard}>
-            <ServiceRow
-              icon="🛕"
-              title={t('home.templeInformation')}
-              subtitle={t('home.knowBeforeVisit')}
-              onPress={() => router.push('/about')}
-            />
-
-            <ServiceRow
-              icon="🪔"
-              title={t('home.sevaRegistration')}
-              subtitle={t('home.participateSeva')}
-              onPress={() => router.push('/seva-registration')}
-            />
+          
+            
             {/* POOJA SERVICES */}
 
 <ServiceRow

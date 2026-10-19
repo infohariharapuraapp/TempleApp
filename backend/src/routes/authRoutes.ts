@@ -3,6 +3,7 @@ import {
   register,
   login,
   getMe,
+    updateProfile,
   forgotPassword,
    verifyResetOtp,
    resetPassword,
@@ -16,6 +17,11 @@ router.post('/login', login);
 router.post(
   '/forgot-password',
   forgotPassword
+);
+router.put(
+  '/profile',
+  authenticateToken,
+  updateProfile
 );
 router.post(
   '/verify-reset-otp',

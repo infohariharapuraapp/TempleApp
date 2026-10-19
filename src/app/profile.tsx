@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { apiRequest } from '@/services/api';
 import { getToken } from '@/services/authStorage';
@@ -62,9 +62,11 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
+  useFocusEffect(
+  useCallback(() => {
     loadProfile();
-  }, []);
+  }, [])
+);
 
   if (loading) {
     return (
@@ -133,19 +135,15 @@ export default function ProfileScreen() {
             ) : null}
           </View>
 
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() =>
-              Alert.alert(
-                'Coming Soon',
-                'Profile editing will be connected after the profile update API is added.'
-              )
-            }
-          >
-            <Text style={styles.editText}>
-              Edit
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+  style={styles.editButton}
+  onPress={() => router.push('/edit-profile')}
+  activeOpacity={0.7}
+>
+  <Text style={styles.editText}>
+    Edit
+  </Text>
+</TouchableOpacity>
         </View>
 
         {/* My Temple Activities */}

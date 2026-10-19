@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 
-
+import TempleContact from './pages/TempleContact';
 import { apiRequest, clearAdminSession } from './lib/api';
 
 import Publications from './pages/Publications';
@@ -151,6 +151,7 @@ const nav = [
 
   ['dharma-sandeham', 'Dharma Sandeham'],
     ['guru-parampara', 'Guru Parampara'],
+    ['temple-contact', 'Temple Contact'],
 
 ];
 
@@ -3930,6 +3931,13 @@ function App() {
 )}
 
 {page === 'announcements' && <Announcements />}
+{/* ========================================
+    TEMPLE CONTACT SETTINGS
+======================================== */}
+
+{page === 'temple-contact' && (
+  <TempleContact />
+)}
 
     </div>
 

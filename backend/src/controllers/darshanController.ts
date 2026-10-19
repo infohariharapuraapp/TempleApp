@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import { pool } from '../db';
 
 // ========================================
-// GET TODAY'S DARSHAN VIDEO
+// GET TODAY'S DARSHAN VIDEOS
 // GET /api/darshan/today
 // ========================================
 
@@ -25,14 +25,15 @@ export const getTodayDarshan = async (
       FROM today_darshan_videos
       WHERE darshan_date =
         (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-      LIMIT 1
+      ORDER BY published_at DESC, id DESC
       `
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      data: result.rows[0] ?? null,
+      data: result.rows,
     });
+
   } catch (error) {
     console.error(
       'Get today darshan error:',

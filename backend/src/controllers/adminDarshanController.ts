@@ -47,8 +47,8 @@ function extractYouTubeVideoId(
         'www.youtube.com',
         'm.youtube.com',
         'music.youtube.com',
-        'www.youtube-nocookie.com',
         'youtube-nocookie.com',
+        'www.youtube-nocookie.com',
       ].includes(host)
     ) {
       if (url.pathname === '/watch') {
@@ -78,7 +78,7 @@ function extractYouTubeVideoId(
 }
 
 // ========================================
-// GET TODAY'S DARSHAN
+// GET TODAY'S DARSHAN VIDEOS
 // GET /api/admin/darshan/today
 // ========================================
 
@@ -89,33 +89,41 @@ export const getAdminTodayDarshan = async (
   try {
     const result = await pool.query<TodayDarshan>(
       `
-      SELECT *
+      SELECT
+        id,
+        name,
+        youtube_url,
+        youtube_video_id,
+        darshan_date,
+        published_at,
+        updated_at,
+        notification_id
       FROM today_darshan_videos
       WHERE darshan_date =
         (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-      LIMIT 1
+      ORDER BY published_at DESC, id DESC
       `
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      data: result.rows[0] ?? null,
+      data: result.rows,
     });
   } catch (error) {
     console.error(
-      'Get today darshan error:',
+      'Get admin today darshan error:',
       error
     );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch today's Darshan",
+      message: "Failed to fetch today's Darshan.",
     });
   }
 };
 
 // ========================================
-// PUBLISH OR REPLACE TODAY'S DARSHAN
+// PUBLISH NEW TODAY'S DARSHAN VIDEO
 // POST /api/admin/darshan/today/publish
 // ========================================
 
@@ -124,6 +132,10 @@ export const publishTodayDarshan = async (
   res: Response
 ) => {
   const { name, youtube_url } = req.body || {};
+
+  // ----------------------------------------
+  // VALIDATE NAME
+  // ----------------------------------------
 
   if (
     typeof name !== 'string' ||
@@ -135,6 +147,10 @@ export const publishTodayDarshan = async (
       message: 'Enter a valid Darshan name.',
     });
   }
+
+  // ----------------------------------------
+  // VALIDATE YOUTUBE URL
+  // ----------------------------------------
 
   if (
     typeof youtube_url !== 'string' ||
@@ -158,15 +174,23 @@ export const publishTodayDarshan = async (
   }
 
   const cleanName = name.trim();
+
   const canonicalUrl =
     `https://www.youtube.com/watch?v=${videoId}`;
+
+  // ----------------------------------------
+  // DATABASE CONNECTION
+  // ----------------------------------------
 
   let client;
 
   try {
     client = await pool.connect();
   } catch (error) {
-    console.error('Database connection error:', error);
+    console.error(
+      'Database connection error:',
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -176,17 +200,21 @@ export const publishTodayDarshan = async (
 
   let darshan: TodayDarshan | null = null;
   let notificationId: number | null = null;
-  let replaced = false;
   let unchanged = false;
 
   try {
     await client.query('BEGIN');
 
-    // Serialize publishing requests.
+    // Prevent simultaneous publishing requests
+    // from inserting the same video twice.
     await client.query(
       'SELECT pg_advisory_xact_lock($1)',
       [20261013]
     );
+
+    // ----------------------------------------
+    // CHECK IF SAME VIDEO ALREADY EXISTS TODAY
+    // ----------------------------------------
 
     const existingResult =
       await client.query<TodayDarshan>(
@@ -195,22 +223,25 @@ export const publishTodayDarshan = async (
         FROM today_darshan_videos
         WHERE darshan_date =
           (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-        FOR UPDATE
-        `
+          AND youtube_video_id = $1
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [videoId]
       );
 
     const existing =
       existingResult.rows[0] ?? null;
 
-    if (
-      existing &&
-      existing.name === cleanName &&
-      existing.youtube_video_id === videoId
-    ) {
+    if (existing) {
+      // Prevent duplicate video publications.
       unchanged = true;
       darshan = existing;
     } else {
-      replaced = existing !== null;
+
+      // ----------------------------------------
+      // INSERT NEW DARSHAN VIDEO
+      // ----------------------------------------
 
       const saveResult =
         await client.query<TodayDarshan>(
@@ -231,15 +262,6 @@ export const publishTodayDarshan = async (
             NOW(),
             NOW()
           )
-          ON CONFLICT (darshan_date)
-          DO UPDATE SET
-            name = EXCLUDED.name,
-            youtube_url = EXCLUDED.youtube_url,
-            youtube_video_id =
-              EXCLUDED.youtube_video_id,
-            published_at = NOW(),
-            updated_at = NOW(),
-            notification_id = NULL
           RETURNING *
           `,
           [
@@ -251,8 +273,10 @@ export const publishTodayDarshan = async (
 
       darshan = saveResult.rows[0];
 
-      // Create notification in the same
-      // transaction as the Darshan update.
+      // ----------------------------------------
+      // CREATE PUSH NOTIFICATION
+      // ----------------------------------------
+
       const notificationResult =
         await client.query<{ id: number }>(
           `
@@ -275,12 +299,8 @@ export const publishTodayDarshan = async (
           RETURNING id
           `,
           [
-            replaced
-              ? "🛕 Today's Darshan Updated"
-              : "🛕 Today's Darshan",
-            replaced
-              ? `${cleanName} has been updated. Tap to watch.`
-              : `${cleanName} is now available. Tap to watch.`,
+            "🛕 New Today's Darshan",
+            `${cleanName} is now available. Tap to watch.`,
             JSON.stringify({
               type: 'today_darshan',
               screen: '/darshan',
@@ -292,6 +312,10 @@ export const publishTodayDarshan = async (
       notificationId =
         notificationResult.rows[0].id;
 
+      // ----------------------------------------
+      // LINK NOTIFICATION TO DARSHAN
+      // ----------------------------------------
+
       const updateResult =
         await client.query<TodayDarshan>(
           `
@@ -300,13 +324,17 @@ export const publishTodayDarshan = async (
           WHERE id = $2
           RETURNING *
           `,
-          [notificationId, darshan.id]
+          [
+            notificationId,
+            darshan.id,
+          ]
         );
 
       darshan = updateResult.rows[0];
     }
 
     await client.query('COMMIT');
+
   } catch (error) {
     try {
       await client.query('ROLLBACK');
@@ -330,8 +358,10 @@ export const publishTodayDarshan = async (
     client.release();
   }
 
-  // Send after successful DB commit.
-  // A push failure does not undo publication.
+  // ========================================
+  // SEND PUSH NOTIFICATION
+  // ========================================
+
   let pushResult: unknown = null;
 
   if (notificationId !== null) {
@@ -347,18 +377,20 @@ export const publishTodayDarshan = async (
     }
   }
 
+  // ========================================
+  // RESPONSE
+  // ========================================
+
   return res.status(
-    unchanged || replaced ? 200 : 201
+    unchanged ? 200 : 201
   ).json({
     success: true,
     message: unchanged
-      ? 'This Darshan is already published.'
-      : replaced
-        ? "Today's Darshan updated successfully."
-        : "Today's Darshan published successfully.",
+      ? 'This video is already published today.'
+      : 'New Darshan video published successfully.',
     data: darshan,
     unchanged,
-    replaced,
+    replaced: false,
     notification: {
       id: notificationId,
       result: pushResult,

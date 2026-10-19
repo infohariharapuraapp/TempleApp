@@ -446,6 +446,7 @@ export default function RootLayout() {
         {/* TEMPLE INFORMATION */}
 
         <Stack.Screen name="about" />
+        
 
         <Stack.Screen name="publications" />
 

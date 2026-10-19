@@ -1,193 +1,240 @@
-import React, { useState } from 'react';
+
+import React, { useCallback, useRef, useState } from 'react';
+
 import {
-  ScrollView,
+  ActivityIndicator,
+  BackHandler,
+  Linking,
+  Platform,
+  SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import WebView from 'react-native-webview';
+
+const DONATION_URL =
+  'https://www.divyakshetrahariharapura.com/web/bookingdonation';
+
+const COLORS = {
+  background: '#FFFDF8',
+  maroon: '#6B1720',
+  gold: '#C69A3A',
+  text: '#4A2C18',
+  muted: '#8E8175',
+  border: '#E8DCCB',
+};
 
 export default function DonationsScreen() {
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(500);
-  const [customAmount, setCustomAmount] = useState('');
+  const webViewRef = useRef<WebView>(null);
 
-  const amounts = [100, 500, 1000, 2500, 5000, 10000];
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const handleAmountSelect = (amount: number) => {
-    setSelectedAmount(amount);
-    setCustomAmount('');
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (canGoBack && !hasError) {
+          webViewRef.current?.goBack();
+          return true;
+        }
+
+        return false;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [canGoBack, hasError])
+  );
+
+  const retry = () => {
+    setLoading(true);
+    setHasError(false);
+    setCanGoBack(false);
+    setReloadKey((value) => value + 1);
+  };
+
+  const openInBrowser = async () => {
+    try {
+      await Linking.openURL(DONATION_URL);
+    } catch (error) {
+      console.warn('Unable to open donation website:', error);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.smallText}>Support Our Temple</Text>
-
-            <Text style={styles.title}>Donations 🙏</Text>
-
-            <Text style={styles.subtitle}>
-              Your contribution helps us serve devotees and maintain our temple.
-            </Text>
-          </View>
-
-          <View style={styles.iconButton}>
-            <Text style={styles.icon}>💰</Text>
-          </View>
-        </View>
-
-        {/* Donation Banner */}
-        <View style={styles.banner}>
-          <Text style={styles.om}>ॐ</Text>
-
-          <Text style={styles.bannerTitle}>
-            Give with Devotion
-          </Text>
-
-          <Text style={styles.bannerText}>
-            Every contribution makes a meaningful difference in our temple
-            community.
-          </Text>
-        </View>
-
-        {/* Select Amount */}
-        <Text style={styles.sectionTitle}>Select Donation Amount</Text>
-
-        <View style={styles.amountGrid}>
-          {amounts.map((amount) => (
-            <TouchableOpacity
-              key={amount}
-              style={[
-                styles.amountCard,
-                selectedAmount === amount && styles.amountCardSelected,
-              ]}
-              onPress={() => handleAmountSelect(amount)}
-            >
-              <Text
-                style={[
-                  styles.amountText,
-                  selectedAmount === amount && styles.amountTextSelected,
-                ]}
-              >
-                ₹{amount.toLocaleString('en-IN')}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Custom Amount */}
-        <Text style={styles.sectionTitle}>Custom Amount</Text>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.rupee}>₹</Text>
-
-          <TextInput
-            value={customAmount}
-            onChangeText={(value) => {
-              setCustomAmount(value);
-              setSelectedAmount(null);
-            }}
-            placeholder="Enter amount"
-            placeholderTextColor="#999"
-            keyboardType="numeric"
-            style={styles.input}
+      <View style={styles.header}>
+        <View style={styles.headerIcon}>
+          <Ionicons
+            name="heart-outline"
+            size={23}
+            color={COLORS.maroon}
           />
         </View>
 
-        {/* Donation Purpose */}
-        <Text style={styles.sectionTitle}>Donation Purpose</Text>
-
-        <View style={styles.purposeCard}>
-          <TouchableOpacity style={styles.purposeRow}>
-            <View style={styles.purposeIconBox}>
-              <Text style={styles.purposeIcon}>🛕</Text>
-            </View>
-
-            <View style={styles.purposeContent}>
-              <Text style={styles.purposeTitle}>Temple Maintenance</Text>
-              <Text style={styles.purposeText}>
-                Support the upkeep and maintenance of the temple.
-              </Text>
-            </View>
-
-            <Text style={styles.radioSelected}>●</Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity style={styles.purposeRow}>
-            <View style={styles.purposeIconBox}>
-              <Text style={styles.purposeIcon}>🍚</Text>
-            </View>
-
-            <View style={styles.purposeContent}>
-              <Text style={styles.purposeTitle}>Annadanam</Text>
-              <Text style={styles.purposeText}>
-                Help provide food to devotees and visitors.
-              </Text>
-            </View>
-
-            <Text style={styles.radio}>○</Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity style={styles.purposeRow}>
-            <View style={styles.purposeIconBox}>
-              <Text style={styles.purposeIcon}>🙏</Text>
-            </View>
-
-            <View style={styles.purposeContent}>
-              <Text style={styles.purposeTitle}>General Donation</Text>
-              <Text style={styles.purposeText}>
-                Contribute towards the temple's general activities.
-              </Text>
-            </View>
-
-            <Text style={styles.radio}>○</Text>
-          </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Donations</Text>
+          <Text style={styles.headerSubtitle}>
+            Support our temple with devotion
+          </Text>
         </View>
 
-        {/* Donation Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Donation Summary</Text>
+        <TouchableOpacity
+          style={styles.browserButton}
+          onPress={openInBrowser}
+          accessibilityLabel="Open donations in browser"
+        >
+          <Ionicons
+            name="open-outline"
+            size={22}
+            color={COLORS.maroon}
+          />
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Amount</Text>
+      <View style={styles.webContainer}>
+        {!hasError ? (
+          <WebView
+            key={reloadKey}
+            ref={webViewRef}
+            source={{ uri: DONATION_URL }}
+            style={styles.webview}
+            originWhitelist={['http://*', 'https://*']}
+            javaScriptEnabled
+            domStorageEnabled
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={false}
+            startInLoadingState
+            mixedContentMode="never"
+            allowsBackForwardNavigationGestures
+            onNavigationStateChange={(navState) => {
+              setCanGoBack(navState.canGoBack);
+            }}
+            onLoadStart={() => {
+              setLoading(true);
+            }}
+            onLoadEnd={() => {
+              setLoading(false);
+            }}
+            onError={(event) => {
+              console.warn(
+                'Donation WebView error:',
+                event.nativeEvent.description
+              );
+              setLoading(false);
+              setHasError(true);
+            }}
+            onHttpError={(event) => {
+              const status = event.nativeEvent.statusCode;
 
-            <Text style={styles.summaryValue}>
-              ₹
-              {customAmount
-                ? Number(customAmount || 0).toLocaleString('en-IN')
-                : (selectedAmount || 0).toLocaleString('en-IN')}
+              console.warn(
+                'Donation HTTP error:',
+                status
+              );
+
+              if (
+                status >= 400 &&
+                event.nativeEvent.url === DONATION_URL
+              ) {
+                setHasError(true);
+                setLoading(false);
+              }
+            }}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request.url;
+
+              if (
+                url.startsWith('http://') ||
+                url.startsWith('https://') ||
+                url === 'about:blank'
+              ) {
+                return true;
+              }
+
+              if (
+                Platform.OS === 'android' &&
+                url.startsWith('intent://')
+              ) {
+                // Intent links need dedicated Android handling.
+                // Avoid passing unsupported URLs to WebView.
+                console.warn('External payment intent:', url);
+                return false;
+              }
+
+              Linking.openURL(url).catch((error) => {
+                console.warn(
+                  'Unable to open external link:',
+                  error
+                );
+              });
+
+              return false;
+            }}
+          />
+        ) : (
+          <View style={styles.errorContainer}>
+            <Ionicons
+              name="cloud-offline-outline"
+              size={52}
+              color={COLORS.gold}
+            />
+
+            <Text style={styles.errorTitle}>
+              Unable to load Donations
+            </Text>
+
+            <Text style={styles.errorText}>
+              Please check your internet connection
+              and try again.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={retry}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={styles.retryText}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={openInBrowser}>
+              <Text style={styles.browserText}>
+                Open in Browser
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {loading && !hasError && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator
+              size="large"
+              color={COLORS.maroon}
+            />
+            <Text style={styles.loadingText}>
+              Loading donation services...
             </Text>
           </View>
-
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Purpose</Text>
-
-            <Text style={styles.summaryValue}>Temple Maintenance</Text>
-          </View>
-
-          <TouchableOpacity style={styles.donateButton}>
-            <Text style={styles.donateButtonText}>
-              Proceed to Donate
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Note */}
-        <Text style={styles.note}>
-          🔒 Your donation is processed securely.
-        </Text>
-      </ScrollView>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -195,262 +242,121 @@ export default function DonationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F0',
-  },
-
-  content: {
-    padding: 20,
-    paddingBottom: 40,
+    backgroundColor: COLORS.background,
   },
 
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 22,
-  },
-
-  smallText: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 4,
-  },
-
-  title: {
-    fontSize: 25,
-    fontWeight: '700',
-    color: '#4A2C18',
-    marginBottom: 5,
-  },
-
-  subtitle: {
-    fontSize: 12,
-    color: '#777',
-    maxWidth: 245,
-    lineHeight: 17,
-  },
-
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#F7EBD7',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
+    marginRight: 12,
   },
 
-  icon: {
-    fontSize: 21,
+  headerContent: {
+    flex: 1,
   },
 
-  banner: {
-    backgroundColor: '#8B4513',
-    borderRadius: 20,
-    padding: 20,
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: COLORS.maroon,
+  },
+
+  headerSubtitle: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginTop: 3,
+  },
+
+  browserButton: {
+    padding: 8,
+  },
+
+  webContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+
+  webview: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+
+loadingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: '#FFFFFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 10,
+},
+  loadingText: {
+    fontSize: 13,
+    color: COLORS.muted,
+    marginTop: 15,
+  },
+
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+  },
+
+  errorTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: COLORS.maroon,
+    marginTop: 18,
+    textAlign: 'center',
+  },
+
+  errorText: {
+    fontSize: 13,
+    color: COLORS.muted,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginTop: 10,
     marginBottom: 24,
   },
 
-  om: {
-    fontSize: 32,
-    color: '#FFD99A',
-    marginBottom: 6,
-  },
-
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-
-  bannerText: {
-    fontSize: 12,
-    color: '#F8E7D4',
-    lineHeight: 18,
-  },
-
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#4A2C18',
-    marginBottom: 11,
-    marginTop: 5,
-  },
-
-  amountGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-
-  amountCard: {
-    width: '31.5%',
-    height: 52,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#F0E5D8',
-  },
-
-  amountCardSelected: {
-    backgroundColor: '#8B4513',
-    borderColor: '#8B4513',
-  },
-
-  amountText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4A2C18',
-  },
-
-  amountTextSelected: {
-    color: '#FFFFFF',
-  },
-
-  inputContainer: {
+  retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    height: 52,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: '#F0E5D8',
-  },
-
-  rupee: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#8B4513',
-    marginRight: 8,
-  },
-
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: '#4A2C18',
-  },
-
-  purposeCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    marginBottom: 20,
-    elevation: 1,
-  },
-
-  purposeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-
-  purposeIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#F7E4C9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 11,
-  },
-
-  purposeIcon: {
-    fontSize: 20,
-  },
-
-  purposeContent: {
-    flex: 1,
-  },
-
-  purposeTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4A2C18',
-    marginBottom: 3,
-  },
-
-  purposeText: {
-    fontSize: 10,
-    color: '#999',
-    lineHeight: 15,
-  },
-
-  radioSelected: {
-    fontSize: 20,
-    color: '#8B4513',
-    marginLeft: 8,
-  },
-
-  radio: {
-    fontSize: 20,
-    color: '#BBB',
-    marginLeft: 8,
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: '#F0E9E0',
-  },
-
-  summaryCard: {
-    backgroundColor: '#F4E0C5',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
-  },
-
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4A2C18',
-    marginBottom: 14,
-  },
-
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 9,
-  },
-
-  summaryLabel: {
-    fontSize: 12,
-    color: '#806B58',
-  },
-
-  summaryValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4A2C18',
-    maxWidth: 150,
-    textAlign: 'right',
-  },
-
-  donateButton: {
-    backgroundColor: '#8B4513',
-    borderRadius: 22,
+    gap: 9,
+    backgroundColor: COLORS.maroon,
+    paddingHorizontal: 24,
     paddingVertical: 13,
-    alignItems: 'center',
-    marginTop: 8,
+    borderRadius: 12,
   },
 
-  donateButtonText: {
+  retryText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
-  note: {
-    textAlign: 'center',
-    fontSize: 10,
-    color: '#999',
-    marginTop: 4,
+  browserText: {
+    color: COLORS.maroon,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 22,
+    textDecorationLine: 'underline',
   },
 });

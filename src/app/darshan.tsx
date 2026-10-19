@@ -45,7 +45,7 @@ type TodayDarshan = {
 
 type ApiResponse = {
   success: boolean;
-  data: TodayDarshan | null;
+  data: TodayDarshan[];
   message?: string;
 };
 
@@ -72,9 +72,19 @@ const COLORS = {
 function formatDarshanDate(
   dateString: string
 ): string {
+  if (!dateString) {
+    return '';
+  }
+
+  const datePart = dateString.slice(0, 10);
+
   const date = new Date(
-    `${dateString}T12:00:00+05:30`
+    `${datePart}T12:00:00+05:30`
   );
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
 
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -85,23 +95,108 @@ function formatDarshanDate(
 }
 
 // ========================================
+// VIDEO CARD
+// ========================================
+
+function DarshanVideoCard({
+  darshan,
+}: {
+  darshan: TodayDarshan;
+}) {
+  const videoUrl =
+    `https://www.youtube.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`;
+
+  return (
+    <View style={styles.videoCard}>
+      <View style={styles.videoHeader}>
+        <Text style={styles.videoTitle}>
+          {darshan.name}
+        </Text>
+
+        <Text style={styles.videoDate}>
+          {formatDarshanDate(
+            darshan.darshan_date
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.videoContainer}>
+        <WebView
+          key={darshan.youtube_video_id}
+          source={{
+            uri: videoUrl,
+            headers: {
+              Referer:
+                'https://www.divyakshetrahariharapura.com/',
+            },
+          }}
+          originWhitelist={['https://*']}
+          style={styles.webview}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          allowsFullscreenVideo={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={true}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={styles.videoLoading}>
+              <ActivityIndicator
+                color={COLORS.gold}
+                size="large"
+              />
+            </View>
+          )}
+          onError={(event) => {
+            console.log(
+              'Darshan WebView Error:',
+              darshan.id,
+              event.nativeEvent
+            );
+          }}
+          onHttpError={(event) => {
+            console.log(
+              'Darshan HTTP Error:',
+              darshan.id,
+              event.nativeEvent.statusCode
+            );
+          }}
+        />
+      </View>
+
+      <View style={styles.videoFooter}>
+        <Ionicons
+          name="play-circle-outline"
+          size={19}
+          color={COLORS.maroon}
+        />
+
+        <Text style={styles.videoFooterText}>
+          Watch Darshan
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ========================================
 // SCREEN
 // ========================================
 
 export default function TodayDarshanScreen() {
   const { t } = useTranslation();
 
-  const [darshan, setDarshan] =
-    useState<TodayDarshan | null>(null);
+  const [videos, setVideos] =
+    useState<TodayDarshan[]>([]);
 
   const [loading, setLoading] = useState(true);
+
   const [refreshing, setRefreshing] =
     useState(false);
 
   const [error, setError] = useState('');
 
   // ========================================
-  // FETCH TODAY'S DARSHAN
+  // FETCH TODAY'S DARSHAN VIDEOS
   // ========================================
 
   const loadDarshan = useCallback(
@@ -127,7 +222,11 @@ export default function TodayDarshanScreen() {
           );
         }
 
-        setDarshan(response.data);
+        setVideos(
+          Array.isArray(response.data)
+            ? response.data
+            : []
+        );
       } catch (err) {
         setError(
           err instanceof Error
@@ -142,16 +241,12 @@ export default function TodayDarshanScreen() {
     []
   );
 
-  // Refresh whenever the screen receives focus.
+  // Refresh when screen receives focus.
   useFocusEffect(
     useCallback(() => {
       loadDarshan();
     }, [loadDarshan])
   );
-
-  const videoUrl = darshan
-    ? `https://www.youtube-nocookie.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`
-    : null;
 
   // ========================================
   // RENDER
@@ -162,6 +257,8 @@ export default function TodayDarshanScreen() {
       style={styles.container}
       edges={['top', 'bottom']}
     >
+      {/* HEADER */}
+
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -191,12 +288,14 @@ export default function TodayDarshanScreen() {
             size="large"
             color={COLORS.maroon}
           />
+
           <Text style={styles.statusText}>
             Loading today's Darshan...
           </Text>
         </View>
       ) : (
         <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
@@ -233,8 +332,10 @@ export default function TodayDarshanScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          ) : darshan && videoUrl ? (
+          ) : videos.length > 0 ? (
             <>
+              {/* INTRODUCTION */}
+
               <View style={styles.introCard}>
                 <View style={styles.iconCircle}>
                   <Ionicons
@@ -252,55 +353,26 @@ export default function TodayDarshanScreen() {
                   Experience today's sacred Darshan
                   from wherever you are.
                 </Text>
+
+                <Text style={styles.videoCount}>
+                  {videos.length}
+                  {' '}
+                  {videos.length === 1
+                    ? 'Darshan Video'
+                    : 'Darshan Videos'}
+                </Text>
               </View>
 
-              <View style={styles.videoCard}>
-                <View style={styles.videoHeader}>
-                  <Text style={styles.videoTitle}>
-                    {darshan.name}
-                  </Text>
+              {/* ALL VIDEOS */}
 
-                  <Text style={styles.videoDate}>
-                    {formatDarshanDate(
-                      darshan.darshan_date
-                    )}
-                  </Text>
-                </View>
+              {videos.map((darshan) => (
+                <DarshanVideoCard
+                  key={darshan.id}
+                  darshan={darshan}
+                />
+              ))}
 
-                <View style={styles.videoContainer}>
-                  <WebView
-                    key={darshan.youtube_video_id}
-                    source={{ uri: videoUrl }}
-                    style={styles.webview}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    allowsFullscreenVideo
-                    allowsInlineMediaPlayback
-                    mediaPlaybackRequiresUserAction
-                    startInLoadingState
-                    renderLoading={() => (
-                      <View style={styles.videoLoading}>
-                        <ActivityIndicator
-                          color={COLORS.gold}
-                          size="large"
-                        />
-                      </View>
-                    )}
-                  />
-                </View>
-
-                <View style={styles.videoFooter}>
-                  <Ionicons
-                    name="play-circle-outline"
-                    size={19}
-                    color={COLORS.maroon}
-                  />
-
-                  <Text style={styles.videoFooterText}>
-                    Watch today's Darshan
-                  </Text>
-                </View>
-              </View>
+              {/* NOTIFICATION INFO */}
 
               <View style={styles.infoCard}>
                 <Ionicons
@@ -311,8 +383,7 @@ export default function TodayDarshanScreen() {
 
                 <Text style={styles.infoText}>
                   Receive notifications whenever
-                  today's Darshan is published
-                  or updated.
+                  a new Darshan video is published.
                 </Text>
               </View>
             </>
@@ -329,7 +400,7 @@ export default function TodayDarshanScreen() {
               </Text>
 
               <Text style={styles.emptyDescription}>
-                Today's Darshan video has not
+                Today's Darshan videos have not
                 been published yet. Please
                 check again later.
               </Text>
@@ -421,6 +492,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: COLORS.maroon,
+    textAlign: 'center',
   },
 
   introDescription: {
@@ -429,6 +501,13 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     textAlign: 'center',
     marginTop: 8,
+  },
+
+  videoCount: {
+    marginTop: 12,
+    color: COLORS.maroon,
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   videoCard: {
@@ -448,6 +527,7 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '800',
     color: COLORS.maroonDark,
+    flexShrink: 1,
   },
 
   videoDate: {
@@ -518,6 +598,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.maroon,
     marginTop: 16,
+    textAlign: 'center',
   },
 
   emptyDescription: {

@@ -1,6 +1,10 @@
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { apiRequest } from '@/services/api';
+
 import {
+  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -10,39 +14,155 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-export default function ContactScreen() {
-  const phoneNumber = 'tel:+919019977466';
-  const guestHouseNumber = 'tel:+919448187559';
-  const bangaloreNumber = 'tel:08026426116';
-  const email = 'mailto:hhpuraoff@gmail.com';
+// ========================================
+// TYPES
+// ========================================
 
-  const mapsUrl =
-    'https://www.google.com/maps/search/?api=1&query=Hariharapura%2C+Chikmagalur+district%2C+Karnataka%2C+India+577120';
+type TempleContactSettings = {
+  main_phone: string;
+  guest_house_phone: string;
+  bangalore_phone: string;
+  email: string;
+  temple_name: string;
+  temple_address: string;
+  bangalore_address: string;
+  google_maps_url: string;
+};
+
+// ========================================
+// FALLBACK CONTACT SETTINGS
+// ========================================
+
+const DEFAULT_CONTACT: TempleContactSettings = {
+  main_phone: '+919019977466',
+  guest_house_phone: '+919448187559',
+  bangalore_phone: '08026426116',
+  email: 'hhpuraoff@gmail.com',
+  temple_name: 'Sreemath Hariharapura',
+  temple_address:
+    'Hariharapura, Chikmagalur District, Karnataka, India - 577120',
+  bangalore_address:
+    '1370/M, Nehru Road, 1st Phase Girinagar, Bengaluru, Karnataka 560085',
+  google_maps_url:
+    'https://www.google.com/maps/search/?api=1&query=Hariharapura%2C+Chikmagalur+district%2C+Karnataka%2C+India+577120',
+};
+
+// ========================================
+// CONTACT SCREEN
+// ========================================
+
+export default function ContactScreen() {
+  const [contact, setContact] =
+    useState<TempleContactSettings>(DEFAULT_CONTACT);
+
+  // ========================================
+  // LOAD CONTACT SETTINGS FROM API
+  // ========================================
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function loadContact() {
+        try {
+          const response = await apiRequest<{
+            success: boolean;
+            data: Partial<TempleContactSettings>;
+          }>('/temple-contact');
+
+          if (active && response.success && response.data) {
+            const updated: TempleContactSettings = {
+              ...DEFAULT_CONTACT,
+            };
+
+            for (
+              const key of Object.keys(
+                DEFAULT_CONTACT
+              ) as (keyof TempleContactSettings)[]
+            ) {
+              const value = response.data[key];
+
+              if (
+                typeof value === 'string' &&
+                value.trim().length > 0
+              ) {
+                updated[key] = value.trim();
+              }
+            }
+
+            setContact(updated);
+          }
+        } catch (error) {
+          console.warn(
+            'Unable to load temple contact settings:',
+            error
+          );
+        }
+      }
+
+      void loadContact();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  // ========================================
+  // DYNAMIC CONTACT LINKS
+  // ========================================
+
+  const phoneNumber = `tel:${contact.main_phone}`;
+  const guestHouseNumber = `tel:${contact.guest_house_phone}`;
+  const bangaloreNumber = `tel:${contact.bangalore_phone}`;
+  const email = `mailto:${contact.email}`;
+  const mapsUrl = contact.google_maps_url;
+
+  // ========================================
+  // OPEN CONTACT LINKS
+  // ========================================
+
+  const openContactLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Contact link error:', error);
+
+      Alert.alert(
+        'Unable to Open',
+        'No compatible application was found. Please check your device settings.'
+      );
+    }
+  };
 
   const openPhone = () => {
-    Linking.openURL(phoneNumber);
+    void openContactLink(phoneNumber);
   };
 
   const openGuestHouse = () => {
-    Linking.openURL(guestHouseNumber);
+    void openContactLink(guestHouseNumber);
   };
 
   const openBangalore = () => {
-    Linking.openURL(bangaloreNumber);
+    void openContactLink(bangaloreNumber);
   };
 
   const openEmail = () => {
-    Linking.openURL(email);
+    void openContactLink(email);
   };
 
   const openMaps = () => {
-    Linking.openURL(mapsUrl);
+    void openContactLink(mapsUrl);
   };
+
+  // ========================================
+  // CONTACT ROW COMPONENT
+  // ========================================
 
   const ContactRow = ({
     icon,
@@ -63,15 +183,27 @@ export default function ContactScreen() {
   }) => (
     <TouchableOpacity
       activeOpacity={0.82}
-      style={[styles.contactRow, last && styles.contactRowLast]}
+      style={[
+        styles.contactRow,
+        last && styles.contactRowLast,
+      ]}
       onPress={onPress}
     >
-      <View style={[styles.contactIcon, { backgroundColor: iconBg }]}>
-        <Text style={styles.contactIconText}>{icon}</Text>
+      <View
+        style={[
+          styles.contactIcon,
+          { backgroundColor: iconBg },
+        ]}
+      >
+        <Text style={styles.contactIconText}>
+          {icon}
+        </Text>
       </View>
 
       <View style={styles.contactInfo}>
-        <Text style={styles.contactTitle}>{title}</Text>
+        <Text style={styles.contactTitle}>
+          {title}
+        </Text>
 
         <Text
           style={styles.contactValue}
@@ -81,7 +213,9 @@ export default function ContactScreen() {
           {value}
         </Text>
 
-        <Text style={styles.contactDescription}>{description}</Text>
+        <Text style={styles.contactDescription}>
+          {description}
+        </Text>
       </View>
 
       <View style={styles.actionCircle}>
@@ -90,32 +224,44 @@ export default function ContactScreen() {
     </TouchableOpacity>
   );
 
+  // ========================================
+  // SCREEN UI
+  // ========================================
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top']}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         bounces
       >
-        {/* ---------------------------------------------------------
-            PREMIUM HEADER
-        --------------------------------------------------------- */}
+        {/* PREMIUM HEADER */}
+
         <View style={styles.heroCard}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
 
           <View style={styles.heroTopRow}>
             <View style={styles.templeBadge}>
-              <Text style={styles.templeBadgeIcon}>ॐ</Text>
+              <Text style={styles.templeBadgeIcon}>
+                ॐ
+              </Text>
             </View>
 
             <View style={styles.heroTag}>
               <View style={styles.statusDot} />
-              <Text style={styles.heroTagText}>OFFICIAL CONTACT</Text>
+              <Text style={styles.heroTagText}>
+                OFFICIAL CONTACT
+              </Text>
             </View>
           </View>
 
-          <Text style={styles.overline}>SRI MATHA HARIHARAPURA</Text>
+          <Text style={styles.overline}>
+            {contact.temple_name.toUpperCase()}
+          </Text>
 
           <Text style={styles.heroTitle}>
             Connect With
@@ -130,7 +276,10 @@ export default function ContactScreen() {
 
           <View style={styles.heroBottom}>
             <View>
-              <Text style={styles.heroLocationLabel}>MAIN LOCATION</Text>
+              <Text style={styles.heroLocationLabel}>
+                MAIN LOCATION
+              </Text>
+
               <Text style={styles.heroLocation}>
                 Hariharapura • Karnataka
               </Text>
@@ -141,25 +290,39 @@ export default function ContactScreen() {
               style={styles.heroMapButton}
               onPress={openMaps}
             >
-              <Text style={styles.heroMapIcon}>⌖</Text>
-              <Text style={styles.heroMapText}>MAP</Text>
+              <Text style={styles.heroMapIcon}>
+                ⌖
+              </Text>
+
+              <Text style={styles.heroMapText}>
+                MAP
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ---------------------------------------------------------
-            QUICK ACTIONS
-        --------------------------------------------------------- */}
+        {/* QUICK ACTIONS */}
+
         <View style={styles.quickActions}>
           <TouchableOpacity
             activeOpacity={0.8}
             style={styles.quickAction}
             onPress={openPhone}
           >
-            <View style={[styles.quickIcon, styles.callIcon]}>
-              <Text style={styles.quickIconText}>☎</Text>
+            <View
+              style={[
+                styles.quickIcon,
+                styles.callIcon,
+              ]}
+            >
+              <Text style={styles.quickIconText}>
+                ☎
+              </Text>
             </View>
-            <Text style={styles.quickText}>Call</Text>
+
+            <Text style={styles.quickText}>
+              Call
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -167,10 +330,20 @@ export default function ContactScreen() {
             style={styles.quickAction}
             onPress={openGuestHouse}
           >
-            <View style={[styles.quickIcon, styles.stayIcon]}>
-              <Text style={styles.quickIconText}>⌂</Text>
+            <View
+              style={[
+                styles.quickIcon,
+                styles.stayIcon,
+              ]}
+            >
+              <Text style={styles.quickIconText}>
+                ⌂
+              </Text>
             </View>
-            <Text style={styles.quickText}>Guest House</Text>
+
+            <Text style={styles.quickText}>
+              Guest House
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -178,10 +351,20 @@ export default function ContactScreen() {
             style={styles.quickAction}
             onPress={openEmail}
           >
-            <View style={[styles.quickIcon, styles.emailIcon]}>
-              <Text style={styles.quickIconText}>✉</Text>
+            <View
+              style={[
+                styles.quickIcon,
+                styles.emailIcon,
+              ]}
+            >
+              <Text style={styles.quickIconText}>
+                ✉
+              </Text>
             </View>
-            <Text style={styles.quickText}>Email</Text>
+
+            <Text style={styles.quickText}>
+              Email
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -189,20 +372,34 @@ export default function ContactScreen() {
             style={styles.quickAction}
             onPress={openMaps}
           >
-            <View style={[styles.quickIcon, styles.mapIcon]}>
-              <Text style={styles.quickIconText}>⌖</Text>
+            <View
+              style={[
+                styles.quickIcon,
+                styles.mapIcon,
+              ]}
+            >
+              <Text style={styles.quickIconText}>
+                ⌖
+              </Text>
             </View>
-            <Text style={styles.quickText}>Directions</Text>
+
+            <Text style={styles.quickText}>
+              Directions
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ---------------------------------------------------------
-            CONTACT SECTION
-        --------------------------------------------------------- */}
+        {/* CONTACT SECTION */}
+
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>GET IN TOUCH</Text>
-            <Text style={styles.sectionTitle}>Contact Sreemath</Text>
+            <Text style={styles.sectionEyebrow}>
+              GET IN TOUCH
+            </Text>
+
+            <Text style={styles.sectionTitle}>
+              Contact Sreemath
+            </Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -212,8 +409,8 @@ export default function ContactScreen() {
           <ContactRow
             icon="☎"
             iconBg="#F9E8D7"
-            title="Sreemath Hariharapura"
-            value="+91 901 997 7466"
+            title={contact.temple_name}
+            value={contact.main_phone}
             description="Tap to call the Sreemath office"
             onPress={openPhone}
           />
@@ -222,7 +419,7 @@ export default function ContactScreen() {
             icon="⌂"
             iconBg="#F4E6CE"
             title="Guest House"
-            value="+91 944 818 7559"
+            value={contact.guest_house_phone}
             description="For guest house enquiries"
             onPress={openGuestHouse}
           />
@@ -231,7 +428,7 @@ export default function ContactScreen() {
             icon="☎"
             iconBg="#EFE3D4"
             title="Sreemath Bangalore Branch"
-            value="080-26426116"
+            value={contact.bangalore_phone}
             description="Tap to call the Bengaluru branch"
             onPress={openBangalore}
           />
@@ -240,20 +437,24 @@ export default function ContactScreen() {
             icon="✉"
             iconBg="#F7E7E0"
             title="Email Address"
-            value="hhpuraoff@gmail.com"
+            value={contact.email}
             description="Send us your enquiry by email"
             onPress={openEmail}
             last
           />
         </View>
 
-        {/* ---------------------------------------------------------
-            HARIHARAPURA ADDRESS
-        --------------------------------------------------------- */}
+        {/* HARIHARAPURA ADDRESS */}
+
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>VISIT US</Text>
-            <Text style={styles.sectionTitle}>Sreemath Address</Text>
+            <Text style={styles.sectionEyebrow}>
+              VISIT US
+            </Text>
+
+            <Text style={styles.sectionTitle}>
+              Sreemath Address
+            </Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -265,11 +466,16 @@ export default function ContactScreen() {
 
           <View style={styles.addressTop}>
             <View style={styles.locationIcon}>
-              <Text style={styles.locationIconText}>⌖</Text>
+              <Text style={styles.locationIconText}>
+                ⌖
+              </Text>
             </View>
 
             <View style={styles.addressHeading}>
-              <Text style={styles.addressLabel}>HARIHARAPURA</Text>
+              <Text style={styles.addressLabel}>
+                HARIHARAPURA
+              </Text>
+
               <Text style={styles.addressSmall}>
                 Chikmagalur District
               </Text>
@@ -279,9 +485,7 @@ export default function ContactScreen() {
           <View style={styles.addressDivider} />
 
           <Text style={styles.addressText}>
-            Hariharapura, Chikmagalur district,
-            {'\n'}
-            Karnataka, India - 577120
+            {contact.temple_address}
           </Text>
 
           <TouchableOpacity
@@ -290,27 +494,38 @@ export default function ContactScreen() {
             onPress={openMaps}
           >
             <View style={styles.directionIcon}>
-              <Text style={styles.directionIconText}>⌖</Text>
+              <Text style={styles.directionIconText}>
+                ⌖
+              </Text>
             </View>
 
             <View style={styles.directionContent}>
-              <Text style={styles.directionTitle}>Get Directions</Text>
+              <Text style={styles.directionTitle}>
+                Get Directions
+              </Text>
+
               <Text style={styles.directionSubtitle}>
                 Open this location in Google Maps
               </Text>
             </View>
 
-            <Text style={styles.directionArrow}>→</Text>
+            <Text style={styles.directionArrow}>
+              →
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ---------------------------------------------------------
-            BANGALORE BRANCH
-        --------------------------------------------------------- */}
+        {/* BANGALORE BRANCH */}
+
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>CITY BRANCH</Text>
-            <Text style={styles.sectionTitle}>Bengaluru Office</Text>
+            <Text style={styles.sectionEyebrow}>
+              CITY BRANCH
+            </Text>
+
+            <Text style={styles.sectionTitle}>
+              Bengaluru Office
+            </Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -319,7 +534,9 @@ export default function ContactScreen() {
         <View style={styles.branchCard}>
           <View style={styles.branchHeader}>
             <View style={styles.branchIcon}>
-              <Text style={styles.branchIconText}>⌂</Text>
+              <Text style={styles.branchIconText}>
+                ⌂
+              </Text>
             </View>
 
             <View style={styles.branchHeading}>
@@ -329,6 +546,7 @@ export default function ContactScreen() {
 
               <View style={styles.branchStatus}>
                 <View style={styles.branchStatusDot} />
+
                 <Text style={styles.branchStatusText}>
                   BENGALURU
                 </Text>
@@ -337,11 +555,7 @@ export default function ContactScreen() {
           </View>
 
           <Text style={styles.branchAddress}>
-            1370/M, Nehru Road,
-            {'\n'}
-            1st phase Girinagar,
-            {'\n'}
-            Bengaluru, Karnataka 560085
+            {contact.bangalore_address}
           </Text>
 
           <TouchableOpacity
@@ -349,22 +563,29 @@ export default function ContactScreen() {
             style={styles.branchCallButton}
             onPress={openBangalore}
           >
-            <Text style={styles.branchCallIcon}>☎</Text>
-            <Text style={styles.branchCallText}>
-              080-26426116
+            <Text style={styles.branchCallIcon}>
+              ☎
             </Text>
-            <Text style={styles.branchCallArrow}>›</Text>
+
+            <Text style={styles.branchCallText}>
+              {contact.bangalore_phone}
+            </Text>
+
+            <Text style={styles.branchCallArrow}>
+              ›
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ---------------------------------------------------------
-            EMAIL FEATURE
-        --------------------------------------------------------- */}
+        {/* EMAIL FEATURE */}
+
         <View style={styles.emailFeature}>
           <View style={styles.emailFeatureGlow} />
 
           <View style={styles.emailFeatureIcon}>
-            <Text style={styles.emailFeatureIconText}>✉</Text>
+            <Text style={styles.emailFeatureIconText}>
+              ✉
+            </Text>
           </View>
 
           <View style={styles.emailFeatureContent}>
@@ -377,7 +598,7 @@ export default function ContactScreen() {
             </Text>
 
             <Text style={styles.emailFeatureAddress}>
-              hhpuraoff@gmail.com
+              {contact.email}
             </Text>
           </View>
 
@@ -386,20 +607,26 @@ export default function ContactScreen() {
             style={styles.emailSendButton}
             onPress={openEmail}
           >
-            <Text style={styles.emailSendText}>→</Text>
+            <Text style={styles.emailSendText}>
+              →
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ---------------------------------------------------------
-            DEVOTEE NOTE
-        --------------------------------------------------------- */}
+        {/* DEVOTEE NOTE */}
+
         <View style={styles.noteCard}>
           <View style={styles.noteIcon}>
-            <Text style={styles.noteIconText}>ॐ</Text>
+            <Text style={styles.noteIconText}>
+              ॐ
+            </Text>
           </View>
 
           <View style={styles.noteContent}>
-            <Text style={styles.noteTitle}>For Devotees</Text>
+            <Text style={styles.noteTitle}>
+              For Devotees
+            </Text>
+
             <Text style={styles.noteText}>
               For temple visits, accommodation and other
               enquiries, please contact the appropriate
@@ -408,27 +635,33 @@ export default function ContactScreen() {
           </View>
         </View>
 
-        {/* ---------------------------------------------------------
-            BACK HOME
-        --------------------------------------------------------- */}
+        {/* BACK HOME */}
+
         <TouchableOpacity
           activeOpacity={0.86}
           style={styles.homeButton}
           onPress={() => router.replace('/(tabs)')}
         >
-          <Text style={styles.homeButtonIcon}>‹</Text>
-          <Text style={styles.homeButtonText}>Back to Home</Text>
+          <Text style={styles.homeButtonIcon}>
+            ‹
+          </Text>
+
+          <Text style={styles.homeButtonText}>
+            Back to Home
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.footerText}>
-          Sreemath Hariharapura
+          {contact.temple_name}
           {'  •  '}
           Karnataka
         </Text>
 
         <View style={styles.bottomOrnament}>
           <View style={styles.ornamentLine} />
-          <Text style={styles.ornamentSymbol}>✦</Text>
+          <Text style={styles.ornamentSymbol}>
+            ✦
+          </Text>
           <View style={styles.ornamentLine} />
         </View>
       </ScrollView>
@@ -437,6 +670,11 @@ export default function ContactScreen() {
 }
 
 const styles = StyleSheet.create({
+
+  // ========================================
+  // MAIN CONTAINER
+  // ========================================
+
   container: {
     flex: 1,
     backgroundColor: '#FBF7F0',
@@ -448,9 +686,9 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
 
-  // ---------------------------------------------------------------
-  // HERO
-  // ---------------------------------------------------------------
+  // ========================================
+  // PREMIUM HEADER
+  // ========================================
 
   heroCard: {
     minHeight: 285,
@@ -611,9 +849,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // ---------------------------------------------------------------
+  // ========================================
   // QUICK ACTIONS
-  // ---------------------------------------------------------------
+  // ========================================
 
   quickActions: {
     flexDirection: 'row',
@@ -680,9 +918,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ---------------------------------------------------------------
-  // SECTION
-  // ---------------------------------------------------------------
+  // ========================================
+  // SECTION HEADINGS
+  // ========================================
 
   sectionHeader: {
     flexDirection: 'row',
@@ -714,9 +952,9 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
 
-  // ---------------------------------------------------------------
+  // ========================================
   // CONTACT CARD
-  // ---------------------------------------------------------------
+  // ========================================
 
   contactCard: {
     backgroundColor: '#FFFFFF',
@@ -808,9 +1046,9 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
-  // ---------------------------------------------------------------
-  // ADDRESS
-  // ---------------------------------------------------------------
+  // ========================================
+  // TEMPLE ADDRESS
+  // ========================================
 
   addressCard: {
     backgroundColor: '#F0DFC6',
@@ -940,9 +1178,11 @@ const styles = StyleSheet.create({
     marginRight: 7,
   },
 
-  // ---------------------------------------------------------------
+  // PART 3 CONTINUES HERE
+
+  // ========================================
   // BANGALORE BRANCH
-  // ---------------------------------------------------------------
+  // ========================================
 
   branchCard: {
     backgroundColor: '#FFFFFF',
@@ -1051,9 +1291,9 @@ const styles = StyleSheet.create({
     color: '#B27A42',
   },
 
-  // ---------------------------------------------------------------
+  // ========================================
   // EMAIL FEATURE
-  // ---------------------------------------------------------------
+  // ========================================
 
   emailFeature: {
     minHeight: 94,
@@ -1131,9 +1371,9 @@ const styles = StyleSheet.create({
     color: '#E2B16A',
   },
 
-  // ---------------------------------------------------------------
-  // NOTE
-  // ---------------------------------------------------------------
+  // ========================================
+  // DEVOTEE NOTE
+  // ========================================
 
   noteCard: {
     flexDirection: 'row',
@@ -1177,9 +1417,9 @@ const styles = StyleSheet.create({
     color: '#89786A',
   },
 
-  // ---------------------------------------------------------------
-  // HOME
-  // ---------------------------------------------------------------
+  // ========================================
+  // BACK HOME BUTTON
+  // ========================================
 
   homeButton: {
     height: 52,
@@ -1204,6 +1444,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#4E3021',
   },
+
+  // ========================================
+  // FOOTER
+  // ========================================
 
   footerText: {
     textAlign: 'center',
@@ -1232,4 +1476,5 @@ const styles = StyleSheet.create({
     color: '#B38A5A',
     marginHorizontal: 9,
   },
+
 });

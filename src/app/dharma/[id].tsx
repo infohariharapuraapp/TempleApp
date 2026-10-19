@@ -1,1393 +1,1403 @@
 
-import React, {
-  useCallback,
-  useRef,
-  useState,
-} from 'react';
+  import React, {
+    useCallback,
+    useRef,
+    useState,
+  } from 'react';
 
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+  import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+  } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+  import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  router,
-  useFocusEffect,
-  useLocalSearchParams,
-} from 'expo-router';
+  import {
+    router,
+    useFocusEffect,
+    useLocalSearchParams,
+  } from 'expo-router';
 
-import { Ionicons } from '@expo/vector-icons';
+  import { Ionicons } from '@expo/vector-icons';
 
-import ReportDialog from './ReportDialog';
+  import ReportDialog from './ReportDialog';
 
-import {
-  fetchDharmaQuestionById,
-  submitDharmaAnswer,
-  toggleDharmaHelpful,
-  type DharmaAnswer,
-  type DharmaQuestionDetails,
-} from '@/services/dharmaApi';
-
-// ========================================
-// COLORS
-// ========================================
-
-const COLORS = {
-  background: '#FFFDF8',
-  white: '#FFFFFF',
-  maroon: '#6B1720',
-  gold: '#C69A3A',
-  cream: '#F7EBD7',
-  text: '#30241F',
-  muted: '#8E8175',
-  border: '#E8DCCB',
-  green: '#347C52',
-};
-
-const DEFAULT_MAX_ANSWERS = 10;
-
-// ========================================
-// HELPERS
-// ========================================
-
-function formatDate(value?: string) {
-  if (!value) return '';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : 'Something went wrong. Please try again.';
-}
-
-type ReportTarget =
-  | { type: 'question'; id: number }
-  | { type: 'answer'; id: number };
-
-// ========================================
-// QUESTION DETAILS SCREEN
-// ========================================
-
-export default function DharmaQuestionDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const questionId = Number(id);
-
-  const [question, setQuestion] =
-    useState<DharmaQuestionDetails | null>(null);
-
-  const [answers, setAnswers] =
-    useState<DharmaAnswer[]>([]);
-
-  const [slotsUsed, setSlotsUsed] = useState(0);
-
-  const [maxAnswers, setMaxAnswers] =
-    useState(DEFAULT_MAX_ANSWERS);
-
-  const [answerText, setAnswerText] = useState('');
-
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const [error, setError] =
-    useState<string | null>(null);
-
-  const [votingIds, setVotingIds] =
-    useState<number[]>([]);
-
-  const [votedIds, setVotedIds] =
-    useState<number[]>([]);
+  import {
+    fetchDharmaQuestionById,
+    submitDharmaAnswer,
+    toggleDharmaHelpful,
+    type DharmaAnswer,
+    type DharmaQuestionDetails,
+  } from '@/services/dharmaApi';
 
   // ========================================
-  // REPORT STATE
+  // COLORS
   // ========================================
 
-  const [reportTarget, setReportTarget] =
-    useState<ReportTarget | null>(null);
+  const COLORS = {
+    background: '#FFFDF8',
+    white: '#FFFFFF',
+    maroon: '#6B1720',
+    gold: '#C69A3A',
+    cream: '#F7EBD7',
+    text: '#30241F',
+    muted: '#8E8175',
+    border: '#E8DCCB',
+    green: '#347C52',
+  };
 
-  const openQuestionReport = () => {
-    if (
-      !Number.isSafeInteger(questionId) ||
-      questionId <= 0
-    ) {
-      return;
+  const DEFAULT_MAX_ANSWERS = 10;
+
+  // ========================================
+  // HELPERS
+  // ========================================
+
+  function formatDate(value?: string) {
+    if (!value) return '';
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return '';
     }
 
-    setReportTarget({
-      type: 'question',
-      id: questionId,
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
     });
-  };
+  }
 
-  const openAnswerReport = (answerId: number) => {
-    setReportTarget({
-      type: 'answer',
-      id: answerId,
-    });
-  };
+  function getErrorMessage(error: unknown) {
+    return error instanceof Error
+      ? error.message
+      : 'Something went wrong. Please try again.';
+  }
 
-  const closeReport = () => {
-    setReportTarget(null);
-  };
-
-  // ========================================
-  // REFS
-  // ========================================
-
-  const submittingRef = useRef(false);
-  const votingRef = useRef<Set<number>>(new Set());
-  const requestRef = useRef(0);
+  type ReportTarget =
+    | { type: 'question'; id: number }
+    | { type: 'answer'; id: number };
 
   // ========================================
-  // ANSWER COUNTS
+  // QUESTION DETAILS SCREEN
   // ========================================
 
-  const remaining = Math.max(
-    0,
-    maxAnswers - slotsUsed
-  );
+  export default function DharmaQuestionDetailsScreen() {
+    const { id } = useLocalSearchParams<{ id: string }>();
+    const questionId = Number(id);
 
-  const isFull = remaining === 0;
+    const [question, setQuestion] =
+      useState<DharmaQuestionDetails | null>(null);
 
-  const officialAnswers = answers.filter(
-    (item) => item.answer_type === 'official'
-  );
+    const [answers, setAnswers] =
+      useState<DharmaAnswer[]>([]);
 
-  const communityAnswers = answers.filter(
-    (item) => item.answer_type === 'community'
-  );
+    const [slotsUsed, setSlotsUsed] = useState(0);
 
-  // ========================================
-  // LOAD QUESTION
-  // ========================================
+    const [maxAnswers, setMaxAnswers] =
+      useState(DEFAULT_MAX_ANSWERS);
 
-  const loadQuestion = useCallback(
-    async (isRefresh = false) => {
-      const requestId = ++requestRef.current;
+    const [answerText, setAnswerText] = useState('');
 
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const [error, setError] =
+      useState<string | null>(null);
+
+    const [votingIds, setVotingIds] =
+      useState<number[]>([]);
+
+    const [votedIds, setVotedIds] =
+      useState<number[]>([]);
+
+    // ========================================
+    // REPORT STATE
+    // ========================================
+
+    const [reportTarget, setReportTarget] =
+      useState<ReportTarget | null>(null);
+
+    const openQuestionReport = () => {
       if (
         !Number.isSafeInteger(questionId) ||
         questionId <= 0
       ) {
-        setQuestion(null);
-        setAnswers([]);
-        setError('Invalid question ID.');
-        setLoading(false);
-        setRefreshing(false);
         return;
       }
 
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      setReportTarget({
+        type: 'question',
+        id: questionId,
+      });
+    };
 
-      setError(null);
+    const openAnswerReport = (answerId: number) => {
+      setReportTarget({
+        type: 'answer',
+        id: answerId,
+      });
+    };
 
-      try {
-        const response =
-          await fetchDharmaQuestionById(questionId);
+    const closeReport = () => {
+      setReportTarget(null);
+    };
 
-        if (requestId !== requestRef.current) {
-          return;
-        }
+    // ========================================
+    // REFS
+    // ========================================
 
-        if (!response.success || !response.question) {
-          throw new Error('Question not found.');
-        }
+    const submittingRef = useRef(false);
+    const votingRef = useRef<Set<number>>(new Set());
+    const requestRef = useRef(0);
 
-        setQuestion(response.question);
-        setAnswers(response.answers ?? []);
+    // ========================================
+    // ANSWER COUNTS
+    // ========================================
 
-        setSlotsUsed(
-          Math.max(
-            0,
-            Number(
-              response.communityAnswerSlotsUsed ?? 0
-            )
-          )
-        );
+    const remaining = Math.max(
+      0,
+      maxAnswers - slotsUsed
+    );
 
-        setMaxAnswers(
-          Math.max(
-            1,
-            Number(
-              response.maxCommunityAnswers ??
-              DEFAULT_MAX_ANSWERS
-            )
-          )
-        );
-      } catch (err) {
-        if (requestId !== requestRef.current) {
-          return;
-        }
+    const isFull = remaining === 0;
 
-        console.error(
-          'Load Dharma question error:',
-          err
-        );
+    const officialAnswers = answers.filter(
+      (item) => item.answer_type === 'official'
+    );
 
-        setError(getErrorMessage(err));
+    const communityAnswers = answers.filter(
+      (item) => item.answer_type === 'community'
+    );
 
-        if (!isRefresh) {
+    // ========================================
+    // LOAD QUESTION
+    // ========================================
+
+    const loadQuestion = useCallback(
+      async (isRefresh = false) => {
+        const requestId = ++requestRef.current;
+
+        if (
+          !Number.isSafeInteger(questionId) ||
+          questionId <= 0
+        ) {
           setQuestion(null);
           setAnswers([]);
-        }
-      } finally {
-        if (requestId === requestRef.current) {
+          setError('Invalid question ID.');
           setLoading(false);
           setRefreshing(false);
+          return;
         }
+
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        setError(null);
+
+        try {
+          const response =
+            await fetchDharmaQuestionById(questionId);
+
+          if (requestId !== requestRef.current) {
+            return;
+          }
+
+          if (!response.success || !response.question) {
+            throw new Error('Question not found.');
+          }
+
+          setQuestion(response.question);
+
+const loadedAnswers = response.answers ?? [];
+
+setAnswers(loadedAnswers);
+
+// Restore the logged-in devotee's liked answers
+setVotedIds(
+  loadedAnswers
+    .filter((answer) => answer.is_liked === true)
+    .map((answer) => answer.id)
+);
+
+          setSlotsUsed(
+            Math.max(
+              0,
+              Number(
+                response.communityAnswerSlotsUsed ?? 0
+              )
+            )
+          );
+
+          setMaxAnswers(
+            Math.max(
+              1,
+              Number(
+                response.maxCommunityAnswers ??
+                DEFAULT_MAX_ANSWERS
+              )
+            )
+          );
+        } catch (err) {
+          if (requestId !== requestRef.current) {
+            return;
+          }
+
+          console.error(
+            'Load Dharma question error:',
+            err
+          );
+
+          setError(getErrorMessage(err));
+
+          if (!isRefresh) {
+            setQuestion(null);
+            setAnswers([]);
+          }
+        } finally {
+          if (requestId === requestRef.current) {
+            setLoading(false);
+            setRefreshing(false);
+          }
+        }
+      },
+      [questionId]
+    );
+
+    useFocusEffect(
+      useCallback(() => {
+        loadQuestion();
+
+        return () => {
+          requestRef.current += 1;
+        };
+      }, [loadQuestion])
+    );
+
+    // ========================================
+    // SUBMIT ANSWER
+    // ========================================
+
+    const handleSubmitAnswer = async () => {
+      if (submittingRef.current || !question) {
+        return;
       }
-    },
-    [questionId]
-  );
 
-  useFocusEffect(
-    useCallback(() => {
-      loadQuestion();
-
-      return () => {
-        requestRef.current += 1;
-      };
-    }, [loadQuestion])
-  );
-
-  // ========================================
-  // SUBMIT ANSWER
-  // ========================================
-
-  const handleSubmitAnswer = async () => {
-    if (submittingRef.current || !question) {
-      return;
-    }
-
-    if (isFull) {
-      Alert.alert(
-        'Answers Full',
-        'This question has reached the maximum number of community answer submissions.'
-      );
-      return;
-    }
-
-    const text = answerText.trim();
-
-    if (text.length < 10) {
-      Alert.alert(
-        'Invalid Answer',
-        'Please enter at least 10 characters.'
-      );
-      return;
-    }
-
-    if (text.length > 2000) {
-      Alert.alert(
-        'Answer Too Long',
-        'Your answer must not exceed 2000 characters.'
-      );
-      return;
-    }
-
-    submittingRef.current = true;
-    setSubmitting(true);
-
-    try {
-      const response = await submitDharmaAnswer(
-        questionId,
-        text
-      ) as {
-        success: boolean;
-        message?: string;
-      };
-
-      if (!response.success) {
-        throw new Error(
-          response.message ||
-          'Unable to submit answer.'
+      if (isFull) {
+        Alert.alert(
+          'Answers Full',
+          'This question has reached the maximum number of community answer submissions.'
         );
+        return;
       }
 
-      setAnswerText('');
+      const text = answerText.trim();
 
-      await loadQuestion(true);
+      if (text.length < 10) {
+        Alert.alert(
+          'Invalid Answer',
+          'Please enter at least 10 characters.'
+        );
+        return;
+      }
 
-      Alert.alert(
-        'Answer Submitted',
-        'Your answer has been submitted for temple admin review. It will appear publicly after approval.'
-      );
-    } catch (err) {
-      Alert.alert(
-        'Submission Failed',
-        getErrorMessage(err)
-      );
-    } finally {
-      submittingRef.current = false;
-      setSubmitting(false);
-    }
-  };
+      if (text.length > 2000) {
+        Alert.alert(
+          'Answer Too Long',
+          'Your answer must not exceed 2000 characters.'
+        );
+        return;
+      }
 
-  // ========================================
-  // HELPFUL VOTES
-  // ========================================
+      submittingRef.current = true;
+      setSubmitting(true);
 
-  const handleHelpful = async (answerId: number) => {
-    if (votingRef.current.has(answerId)) {
-      return;
-    }
-
-    votingRef.current.add(answerId);
-
-    setVotingIds((previous) => [
-      ...previous,
-      answerId,
-    ]);
-
-    try {
-      const response =
-        await toggleDharmaHelpful(answerId) as {
+      try {
+        const response = await submitDharmaAnswer(
+          questionId,
+          text
+        ) as {
           success: boolean;
-          helpfulCount?: number;
-          helpful_count?: number;
-          voted?: boolean;
-          isHelpful?: boolean;
           message?: string;
         };
 
-      if (!response.success) {
-        throw new Error(
-          response.message ||
-          'Unable to update helpful vote.'
-        );
-      }
+        if (!response.success) {
+          throw new Error(
+            response.message ||
+            'Unable to submit answer.'
+          );
+        }
 
-      const count =
-        response.helpfulCount ??
-        response.helpful_count;
+        setAnswerText('');
 
-      if (typeof count === 'number') {
-        setAnswers((previous) =>
-          previous.map((answer) =>
-            answer.id === answerId
-              ? {
-                  ...answer,
-                  helpful_count: count,
-                }
-              : answer
-          )
-        );
-      } else {
         await loadQuestion(true);
+
+        Alert.alert(
+          'Answer Submitted',
+          'Your answer has been submitted for temple admin review. It will appear publicly after approval.'
+        );
+      } catch (err) {
+        Alert.alert(
+          'Submission Failed',
+          getErrorMessage(err)
+        );
+      } finally {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
+    };
+
+    // ========================================
+    // HELPFUL VOTES
+    // ========================================
+
+    const handleHelpful = async (answerId: number) => {
+      if (votingRef.current.has(answerId)) {
+        return;
       }
 
-      const voted =
-        response.voted ?? response.isHelpful;
+      votingRef.current.add(answerId);
 
-      if (typeof voted === 'boolean') {
-        setVotedIds((previous) =>
-          voted
-            ? [
-                ...previous.filter(
+      setVotingIds((previous) => [
+        ...previous,
+        answerId,
+      ]);
+
+      try {
+        const response =
+          await toggleDharmaHelpful(answerId) as {
+            success: boolean;
+            helpfulCount?: number;
+            helpful_count?: number;
+            voted?: boolean;
+            isHelpful?: boolean;
+            message?: string;
+          };
+
+        if (!response.success) {
+          throw new Error(
+            response.message ||
+            'Unable to update helpful vote.'
+          );
+        }
+
+        const count =
+          response.helpfulCount ??
+          response.helpful_count;
+
+        if (typeof count === 'number') {
+          setAnswers((previous) =>
+            previous.map((answer) =>
+              answer.id === answerId
+                ? {
+                    ...answer,
+                    helpful_count: count,
+                  }
+                : answer
+            )
+          );
+        } else {
+          await loadQuestion(true);
+        }
+
+        const voted =
+          response.voted ?? response.isHelpful;
+
+        if (typeof voted === 'boolean') {
+          setVotedIds((previous) =>
+            voted
+              ? [
+                  ...previous.filter(
+                    (id) => id !== answerId
+                  ),
+                  answerId,
+                ]
+              : previous.filter(
                   (id) => id !== answerId
-                ),
-                answerId,
-              ]
-            : previous.filter(
-                (id) => id !== answerId
-              )
+                )
+          );
+        }
+      } catch (err) {
+        Alert.alert(
+          'Unable to Vote',
+          getErrorMessage(err)
+        );
+      } finally {
+        votingRef.current.delete(answerId);
+
+        setVotingIds((previous) =>
+          previous.filter((id) => id !== answerId)
         );
       }
-    } catch (err) {
-      Alert.alert(
-        'Unable to Vote',
-        getErrorMessage(err)
-      );
-    } finally {
-      votingRef.current.delete(answerId);
+    };
 
-      setVotingIds((previous) =>
-        previous.filter((id) => id !== answerId)
-      );
-    }
-  };
+    // PART 2 CONTINUES HERE
 
-  // PART 2 CONTINUES HERE
+    // ========================================
+    // RENDER ANSWER CARD
+    // ========================================
 
-  // ========================================
-  // RENDER ANSWER CARD
-  // ========================================
+    const renderAnswer = (
+      item: DharmaAnswer,
+      index: number
+    ) => {
+      const official =
+        item.answer_type === 'official';
 
-  const renderAnswer = (
-    item: DharmaAnswer,
-    index: number
-  ) => {
-    const official =
-      item.answer_type === 'official';
+      const voted = votedIds.includes(item.id);
+      const voting = votingIds.includes(item.id);
 
-    const voted = votedIds.includes(item.id);
-    const voting = votingIds.includes(item.id);
+      return (
+        <View
+          key={item.id}
+          style={[
+            styles.answerCard,
+            official && styles.officialCard,
+          ]}
+        >
+          {/* ANSWER AUTHOR */}
 
-    return (
-      <View
-        key={item.id}
-        style={[
-          styles.answerCard,
-          official && styles.officialCard,
-        ]}
-      >
-        {/* ANSWER AUTHOR */}
+          <View style={styles.answerTopRow}>
+            <View style={styles.avatar}>
+              <Ionicons
+                name={
+                  official
+                    ? 'shield-checkmark'
+                    : 'person'
+                }
+                size={20}
+                color={
+                  official
+                    ? COLORS.green
+                    : COLORS.maroon
+                }
+              />
+            </View>
 
-        <View style={styles.answerTopRow}>
-          <View style={styles.avatar}>
-            <Ionicons
-              name={
-                official
-                  ? 'shield-checkmark'
-                  : 'person'
-              }
-              size={20}
-              color={
-                official
-                  ? COLORS.green
-                  : COLORS.maroon
-              }
-            />
+            <View style={styles.answerAuthorInfo}>
+              <Text style={styles.answerAuthor}>
+                {official
+                  ? 'Temple Administration'
+                  : item.devotee_name || 'Devotee'}
+              </Text>
+
+              <Text style={styles.answerDate}>
+                {formatDate(item.created_at)}
+              </Text>
+            </View>
+
+            {!official && (
+              <View style={styles.answerNumber}>
+                <Text style={styles.answerNumberText}>
+                  #{index + 1}
+                </Text>
+              </View>
+            )}
           </View>
 
-          <View style={styles.answerAuthorInfo}>
-            <Text style={styles.answerAuthor}>
-              {official
-                ? 'Temple Administration'
-                : item.devotee_name || 'Devotee'}
-            </Text>
+          {/* OFFICIAL VERIFICATION */}
 
-            <Text style={styles.answerDate}>
-              {formatDate(item.created_at)}
-            </Text>
-          </View>
+          {official && (
+            <View style={styles.verifiedRow}>
+              <Ionicons
+                name="shield-checkmark"
+                size={16}
+                color={COLORS.green}
+              />
 
-          {!official && (
-            <View style={styles.answerNumber}>
-              <Text style={styles.answerNumberText}>
-                #{index + 1}
+              <Text style={styles.verifiedText}>
+                Official Temple Answer — Verified
               </Text>
             </View>
           )}
+
+          {/* ANSWER CONTENT */}
+
+          <Text style={styles.answerBody}>
+            {item.answer}
+          </Text>
+
+          {/* HELPFUL VOTE */}
+
+          <TouchableOpacity
+            style={styles.helpfulButton}
+            onPress={() => handleHelpful(item.id)}
+            disabled={voting}
+            accessibilityLabel="Mark answer as helpful"
+          >
+            {voting ? (
+              <ActivityIndicator
+                size="small"
+                color={COLORS.maroon}
+              />
+            ) : (
+              <Ionicons
+                name={
+                  voted
+                    ? 'thumbs-up'
+                    : 'thumbs-up-outline'
+                }
+                size={17}
+                color={
+                  voted
+                    ? COLORS.maroon
+                    : COLORS.muted
+                }
+              />
+            )}
+
+            <Text
+              style={[
+                styles.helpfulText,
+                voted && {
+                  color: COLORS.maroon,
+                },
+              ]}
+            >
+              Helpful (
+              {Number(item.helpful_count ?? 0)})
+            </Text>
+          </TouchableOpacity>
+
+          {/* REPORT ANSWER */}
+
+          <TouchableOpacity
+            style={styles.reportAnswerButton}
+            onPress={() => openAnswerReport(item.id)}
+            accessibilityLabel="Report answer"
+          >
+            <Ionicons
+              name="flag-outline"
+              size={15}
+              color={COLORS.muted}
+            />
+
+            <Text style={styles.reportButtonText}>
+              Report Answer
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    };
+
+    // ========================================
+    // MAIN SCREEN UI
+    // ========================================
+
+    return (
+      <SafeAreaView style={styles.container}>
+
+        {/* HEADER */}
+
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityLabel="Go back"
+          >
+            <Ionicons
+              name="arrow-back"
+              size={23}
+              color={COLORS.maroon}
+            />
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>
+            Dharma Sandeham
+          </Text>
+
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* OFFICIAL VERIFICATION */}
-
-        {official && (
-          <View style={styles.verifiedRow}>
-            <Ionicons
-              name="shield-checkmark"
-              size={16}
-              color={COLORS.green}
-            />
-
-            <Text style={styles.verifiedText}>
-              Official Temple Answer — Verified
-            </Text>
-          </View>
-        )}
-
-        {/* ANSWER CONTENT */}
-
-        <Text style={styles.answerBody}>
-          {item.answer}
-        </Text>
-
-        {/* HELPFUL VOTE */}
-
-        <TouchableOpacity
-          style={styles.helpfulButton}
-          onPress={() => handleHelpful(item.id)}
-          disabled={voting}
-          accessibilityLabel="Mark answer as helpful"
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : undefined
+          }
         >
-          {voting ? (
-            <ActivityIndicator
-              size="small"
-              color={COLORS.maroon}
-            />
-          ) : (
-            <Ionicons
-              name={
-                voted
-                  ? 'thumbs-up'
-                  : 'thumbs-up-outline'
-              }
-              size={17}
-              color={
-                voted
-                  ? COLORS.maroon
-                  : COLORS.muted
-              }
-            />
-          )}
 
-          <Text
-            style={[
-              styles.helpfulText,
-              voted && {
-                color: COLORS.maroon,
-              },
-            ]}
-          >
-            Helpful (
-            {Number(item.helpful_count ?? 0)})
-          </Text>
-        </TouchableOpacity>
+          {/* LOADING */}
 
-        {/* REPORT ANSWER */}
-
-        <TouchableOpacity
-          style={styles.reportAnswerButton}
-          onPress={() => openAnswerReport(item.id)}
-          accessibilityLabel="Report answer"
-        >
-          <Ionicons
-            name="flag-outline"
-            size={15}
-            color={COLORS.muted}
-          />
-
-          <Text style={styles.reportButtonText}>
-            Report Answer
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  // ========================================
-  // MAIN SCREEN UI
-  // ========================================
-
-  return (
-    <SafeAreaView style={styles.container}>
-
-      {/* HEADER */}
-
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-        >
-          <Ionicons
-            name="arrow-back"
-            size={23}
-            color={COLORS.maroon}
-          />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>
-          Dharma Sandeham
-        </Text>
-
-        <View style={{ width: 40 }} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : undefined
-        }
-      >
-
-        {/* LOADING */}
-
-        {loading && !question ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator
-              size="large"
-              color={COLORS.maroon}
-            />
-
-            <Text style={styles.stateText}>
-              Loading question...
-            </Text>
-          </View>
-
-        ) : error && !question ? (
-
-          /* ERROR STATE */
-
-          <View style={styles.centerState}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={38}
-              color={COLORS.gold}
-            />
-
-            <Text style={styles.stateText}>
-              {error}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => loadQuestion()}
-            >
-              <Text style={styles.retryText}>
-                Try Again
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-        ) : (
-
-          /* MAIN CONTENT */
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.content}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() =>
-                  loadQuestion(true)
-                }
-                colors={[COLORS.maroon]}
-                tintColor={COLORS.maroon}
+          {loading && !question ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator
+                size="large"
+                color={COLORS.maroon}
               />
-            }
-          >
 
-            {question && (
-              <>
+              <Text style={styles.stateText}>
+                Loading question...
+              </Text>
+            </View>
 
-                {/* QUESTION CARD */}
+          ) : error && !question ? (
 
-                <View style={styles.questionCard}>
+            /* ERROR STATE */
 
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryText}>
-                      {question.category_name ||
-                        'General Questions'}
-                    </Text>
-                  </View>
+            <View style={styles.centerState}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={38}
+                color={COLORS.gold}
+              />
 
-                  <Text style={styles.questionTitle}>
-                    {question.title}
-                  </Text>
+              <Text style={styles.stateText}>
+                {error}
+              </Text>
 
-                  {!!question.description && (
-                    <Text
-                      style={styles.questionDescription}
-                    >
-                      {question.description}
-                    </Text>
-                  )}
-
-                  {/* REPORT QUESTION BUTTON */}
-
-                  <TouchableOpacity
-                    style={styles.reportQuestionButton}
-                    onPress={openQuestionReport}
-                    accessibilityLabel="Report question"
-                  >
-                    <Ionicons
-                      name="flag-outline"
-                      size={16}
-                      color={COLORS.muted}
-                    />
-
-                    <Text style={styles.reportButtonText}>
-                      Report Question
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* QUESTION AUTHOR */}
-
-                  <View style={styles.authorRow}>
-                    <Ionicons
-                      name="person-circle-outline"
-                      size={22}
-                      color={COLORS.gold}
-                    />
-
-                    <Text style={styles.authorText}>
-                      Asked by{' '}
-                      {question.devotee_name ||
-                        'Devotee'}
-                    </Text>
-
-                    <Text style={styles.dateText}>
-                      {formatDate(question.created_at)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* OFFICIAL TEMPLE ANSWERS */}
-
-                {officialAnswers.length > 0 && (
-                  <View style={styles.officialSection}>
-
-                    <Text style={styles.sectionTitle}>
-                      Official Temple Guidance
-                    </Text>
-
-                    <Text style={styles.sectionSubtitle}>
-                      Verified answers from temple
-                      administration
-                    </Text>
-
-                    <View style={{ marginTop: 16 }}>
-                      {officialAnswers.map(
-                        (item, index) =>
-                          renderAnswer(item, index)
-                      )}
-                    </View>
-                  </View>
-                )}
-
-                {/* COMMUNITY ANSWERS HEADER */}
-
-                <View style={styles.answersHeader}>
-                  <View>
-                    <Text style={styles.sectionTitle}>
-                      Community Answers
-                    </Text>
-
-                    <Text style={styles.sectionSubtitle}>
-                      Shared by fellow devotees
-                    </Text>
-                  </View>
-
-                  <View style={styles.answerCountBadge}>
-                    <Text style={styles.answerCountText}>
-                      {slotsUsed}/{maxAnswers}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* ANSWER PROGRESS */}
-
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${
-                          Math.min(
-                            100,
-                            (slotsUsed / maxAnswers) *
-                              100
-                          )
-                        }%`,
-                      },
-                    ]}
-                  />
-                </View>
-
-                <Text style={styles.remainingText}>
-                  {isFull
-                    ? 'All community answer submission slots are occupied.'
-                    : `${remaining} community answer submission slots remain.`}
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => loadQuestion()}
+              >
+                <Text style={styles.retryText}>
+                  Try Again
                 </Text>
+              </TouchableOpacity>
+            </View>
 
-                {/* COMMUNITY ANSWER CARDS */}
+          ) : (
 
-                {communityAnswers.length === 0 ? (
-                  <View style={styles.noAnswers}>
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={29}
-                      color={COLORS.gold}
-                    />
+            /* MAIN CONTENT */
 
-                    <Text style={styles.noAnswersText}>
-                      No approved community answers yet.
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.content}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() =>
+                    loadQuestion(true)
+                  }
+                  colors={[COLORS.maroon]}
+                  tintColor={COLORS.maroon}
+                />
+              }
+            >
+
+              {question && (
+                <>
+
+                  {/* QUESTION CARD */}
+
+                  <View style={styles.questionCard}>
+
+                    <View style={styles.categoryBadge}>
+                      <Text style={styles.categoryText}>
+                        {question.category_name ||
+                          'General Questions'}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.questionTitle}>
+                      {question.title}
                     </Text>
 
-                    <Text style={styles.sectionSubtitle}>
-                      Be the first to share your
-                      knowledge.
-                    </Text>
-                  </View>
-                ) : (
-                  communityAnswers.map(
-                    (item, index) =>
-                      renderAnswer(item, index)
-                  )
-                )}
+                    {!!question.description && (
+                      <Text
+                        style={styles.questionDescription}
+                      >
+                        {question.description}
+                      </Text>
+                    )}
 
-                {/* PART 3 CONTINUES HERE */}
+                    {/* REPORT QUESTION BUTTON */}
 
-                {/* ========================================
-                    SHARE YOUR ANSWER
-                ======================================== */}
-
-                <View style={styles.submitSection}>
-                  <Text style={styles.sectionTitle}>
-                    Share Your Answer
-                  </Text>
-
-                  <Text style={styles.sectionSubtitle}>
-                    Help another devotee by sharing
-                    your knowledge.
-                  </Text>
-
-                  {isFull ? (
-                    <View style={styles.fullNotice}>
+                    <TouchableOpacity
+                      style={styles.reportQuestionButton}
+                      onPress={openQuestionReport}
+                      accessibilityLabel="Report question"
+                    >
                       <Ionicons
-                        name="lock-closed-outline"
-                        size={20}
-                        color={COLORS.maroon}
+                        name="flag-outline"
+                        size={16}
+                        color={COLORS.muted}
                       />
 
-                      <Text style={styles.fullNoticeText}>
-                        This question has reached the
-                        maximum of {maxAnswers} community
-                        answer submissions.
+                      <Text style={styles.reportButtonText}>
+                        Report Question
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* QUESTION AUTHOR */}
+
+                    <View style={styles.authorRow}>
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={22}
+                        color={COLORS.gold}
+                      />
+
+                      <Text style={styles.authorText}>
+                        Asked by{' '}
+                        {question.devotee_name ||
+                          'Devotee'}
+                      </Text>
+
+                      <Text style={styles.dateText}>
+                        {formatDate(question.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* OFFICIAL TEMPLE ANSWERS */}
+
+                  {officialAnswers.length > 0 && (
+                    <View style={styles.officialSection}>
+
+                      <Text style={styles.sectionTitle}>
+                        Official Temple Guidance
+                      </Text>
+
+                      <Text style={styles.sectionSubtitle}>
+                        Verified answers from temple
+                        administration
+                      </Text>
+
+                      <View style={{ marginTop: 16 }}>
+                        {officialAnswers.map(
+                          (item, index) =>
+                            renderAnswer(item, index)
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* COMMUNITY ANSWERS HEADER */}
+
+                  <View style={styles.answersHeader}>
+                    <View>
+                      <Text style={styles.sectionTitle}>
+                        Community Answers
+                      </Text>
+
+                      <Text style={styles.sectionSubtitle}>
+                        Shared by fellow devotees
+                      </Text>
+                    </View>
+
+                    <View style={styles.answerCountBadge}>
+                      <Text style={styles.answerCountText}>
+                        {slotsUsed}/{maxAnswers}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* ANSWER PROGRESS */}
+
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${
+                            Math.min(
+                              100,
+                              (slotsUsed / maxAnswers) *
+                                100
+                            )
+                          }%`,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  <Text style={styles.remainingText}>
+                    {isFull
+                      ? 'All community answer submission slots are occupied.'
+                      : `${remaining} community answer submission slots remain.`}
+                  </Text>
+
+                  {/* COMMUNITY ANSWER CARDS */}
+
+                  {communityAnswers.length === 0 ? (
+                    <View style={styles.noAnswers}>
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={29}
+                        color={COLORS.gold}
+                      />
+
+                      <Text style={styles.noAnswersText}>
+                        No approved community answers yet.
+                      </Text>
+
+                      <Text style={styles.sectionSubtitle}>
+                        Be the first to share your
+                        knowledge.
                       </Text>
                     </View>
                   ) : (
-                    <>
-                      <TextInput
-                        style={styles.answerInput}
-                        multiline
-                        textAlignVertical="top"
-                        placeholder="Write your answer here..."
-                        placeholderTextColor={COLORS.muted}
-                        value={answerText}
-                        onChangeText={setAnswerText}
-                        maxLength={2000}
-                        editable={!submitting}
-                      />
-
-                      <Text style={styles.characterCount}>
-                        {answerText.length}/2000
-                      </Text>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.submitButton,
-                          submitting &&
-                            styles.disabledButton,
-                        ]}
-                        onPress={handleSubmitAnswer}
-                        disabled={submitting}
-                        activeOpacity={0.85}
-                      >
-                        {submitting ? (
-                          <ActivityIndicator
-                            color={COLORS.white}
-                          />
-                        ) : (
-                          <Ionicons
-                            name="send-outline"
-                            size={19}
-                            color={COLORS.white}
-                          />
-                        )}
-
-                        <Text
-                          style={styles.submitButtonText}
-                        >
-                          {submitting
-                            ? 'Submitting...'
-                            : 'Submit Answer'}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
+                    communityAnswers.map(
+                      (item, index) =>
+                        renderAnswer(item, index)
+                    )
                   )}
-                </View>
 
-                {/* ========================================
-                    DISCLAIMER
-                ======================================== */}
+                  {/* PART 3 CONTINUES HERE */}
 
-                <View style={styles.disclaimer}>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={19}
-                    color={COLORS.maroon}
-                  />
+                  {/* ========================================
+                      SHARE YOUR ANSWER
+                  ======================================== */}
 
-                  <Text style={styles.disclaimerText}>
-                    Community answers represent
-                    individual devotees' knowledge.
-                    For official temple procedures,
-                    please follow temple authority
-                    guidance. All community answers
-                    require admin approval.
-                  </Text>
-                </View>
+                  <View style={styles.submitSection}>
+                    <Text style={styles.sectionTitle}>
+                      Share Your Answer
+                    </Text>
 
-              </>
-            )}
-          </ScrollView>
-        )}
-      </KeyboardAvoidingView>
+                    <Text style={styles.sectionSubtitle}>
+                      Help another devotee by sharing
+                      your knowledge.
+                    </Text>
 
-      {/* ========================================
-          REPORT DIALOG
-      ======================================== */}
+                    {isFull ? (
+                      <View style={styles.fullNotice}>
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={20}
+                          color={COLORS.maroon}
+                        />
 
-      <ReportDialog
-        visible={reportTarget !== null}
-        target={reportTarget}
-        onClose={closeReport}
-      />
+                        <Text style={styles.fullNoticeText}>
+                          This question has reached the
+                          maximum of {maxAnswers} community
+                          answer submissions.
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <TextInput
+                          style={styles.answerInput}
+                          multiline
+                          textAlignVertical="top"
+                          placeholder="Write your answer here..."
+                          placeholderTextColor={COLORS.muted}
+                          value={answerText}
+                          onChangeText={setAnswerText}
+                          maxLength={2000}
+                          editable={!submitting}
+                        />
 
-    </SafeAreaView>
-  );
-}
+                        <Text style={styles.characterCount}>
+                          {answerText.length}/2000
+                        </Text>
 
-// ========================================
-// COMPLETE STYLES
-// ========================================
+                        <TouchableOpacity
+                          style={[
+                            styles.submitButton,
+                            submitting &&
+                              styles.disabledButton,
+                          ]}
+                          onPress={handleSubmitAnswer}
+                          disabled={submitting}
+                          activeOpacity={0.85}
+                        >
+                          {submitting ? (
+                            <ActivityIndicator
+                              color={COLORS.white}
+                            />
+                          ) : (
+                            <Ionicons
+                              name="send-outline"
+                              size={19}
+                              color={COLORS.white}
+                            />
+                          )}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+                          <Text
+                            style={styles.submitButtonText}
+                          >
+                            {submitting
+                              ? 'Submitting...'
+                              : 'Submit Answer'}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
+                  {/* ========================================
+                      DISCLAIMER
+                  ======================================== */}
 
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+                  <View style={styles.disclaimer}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={19}
+                      color={COLORS.maroon}
+                    />
 
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.maroon,
-  },
+                    <Text style={styles.disclaimerText}>
+                      Community answers represent
+                      individual devotees' knowledge.
+                      For official temple procedures,
+                      please follow temple authority
+                      guidance. All community answers
+                      require admin approval.
+                    </Text>
+                  </View>
 
-  content: {
-    padding: 18,
-    paddingBottom: 60,
-  },
+                </>
+              )}
+            </ScrollView>
+          )}
+        </KeyboardAvoidingView>
 
-  questionCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 20,
-    marginBottom: 25,
-  },
+        {/* ========================================
+            REPORT DIALOG
+        ======================================== */}
 
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.cream,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-    marginBottom: 15,
-  },
+        <ReportDialog
+          visible={reportTarget !== null}
+          target={reportTarget}
+          onClose={closeReport}
+        />
 
-  categoryText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.maroon,
-  },
-
-  questionTitle: {
-    fontSize: 21,
-    lineHeight: 31,
-    fontWeight: '800',
-    color: COLORS.text,
-    marginBottom: 12,
-  },
-
-  questionDescription: {
-    fontSize: 14,
-    lineHeight: 23,
-    color: COLORS.muted,
-    marginBottom: 20,
-  },
-
-  // ========================================
-  // REPORT QUESTION BUTTON
-  // ========================================
-
-  reportQuestionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 7,
-    marginBottom: 15,
-    paddingVertical: 7,
-  },
-
-  reportButtonText: {
-    color: COLORS.muted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 14,
-  },
-
-  authorText: {
-    flex: 1,
-    fontSize: 12,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-
-  dateText: {
-    fontSize: 11,
-    color: COLORS.muted,
-  },
+      </SafeAreaView>
+    );
+  }
 
   // ========================================
-  // SECTION HEADINGS
+  // COMPLETE STYLES
   // ========================================
 
-  answersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.background,
+    },
 
-  sectionTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: COLORS.maroon,
-  },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
 
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 5,
-  },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
 
-  answerCountBadge: {
-    backgroundColor: COLORS.cream,
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
-  },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: COLORS.maroon,
+    },
 
-  answerCountText: {
-    color: COLORS.maroon,
-    fontWeight: '800',
-    fontSize: 14,
-  },
+    content: {
+      padding: 18,
+      paddingBottom: 60,
+    },
 
-  progressTrack: {
-    height: 8,
-    backgroundColor: '#EDE4D8',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
+    questionCard: {
+      backgroundColor: COLORS.white,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: 20,
+      marginBottom: 25,
+    },
 
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.gold,
-    borderRadius: 10,
-  },
+    categoryBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: COLORS.cream,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 12,
+      marginBottom: 15,
+    },
 
-  remainingText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 9,
-    marginBottom: 20,
-  },
+    categoryText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: COLORS.maroon,
+    },
 
-  // ========================================
-  // ANSWER CARDS
-  // ========================================
+    questionTitle: {
+      fontSize: 21,
+      lineHeight: 31,
+      fontWeight: '800',
+      color: COLORS.text,
+      marginBottom: 12,
+    },
 
-  answerCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 13,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+    questionDescription: {
+      fontSize: 14,
+      lineHeight: 23,
+      color: COLORS.muted,
+      marginBottom: 20,
+    },
 
-  officialCard: {
-    borderColor: COLORS.green,
-    borderWidth: 1.5,
-  },
+    // ========================================
+    // REPORT QUESTION BUTTON
+    // ========================================
 
-  officialSection: {
-    marginBottom: 25,
-  },
+    reportQuestionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 7,
+      marginBottom: 15,
+      paddingVertical: 7,
+    },
 
-  answerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
+    reportButtonText: {
+      color: COLORS.muted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
 
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: COLORS.cream,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 11,
-  },
+    authorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 14,
+    },
 
-  answerAuthorInfo: {
-    flex: 1,
-  },
+    authorText: {
+      flex: 1,
+      fontSize: 12,
+      color: COLORS.text,
+      fontWeight: '600',
+    },
 
-  answerAuthor: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
+    dateText: {
+      fontSize: 11,
+      color: COLORS.muted,
+    },
 
-  answerDate: {
-    fontSize: 11,
-    color: COLORS.muted,
-    marginTop: 4,
-  },
+    // ========================================
+    // SECTION HEADINGS
+    // ========================================
 
-  answerNumber: {
-    backgroundColor: COLORS.cream,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
+    answersHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 15,
+    },
 
-  answerNumberText: {
-    color: COLORS.maroon,
-    fontSize: 12,
-    fontWeight: '800',
-  },
+    sectionTitle: {
+      fontSize: 19,
+      fontWeight: '800',
+      color: COLORS.maroon,
+    },
 
-  answerBody: {
-    fontSize: 14,
-    lineHeight: 23,
-    color: COLORS.text,
-    marginBottom: 15,
-  },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 5,
+    },
 
-  verifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
+    answerCountBadge: {
+      backgroundColor: COLORS.cream,
+      borderRadius: 15,
+      paddingHorizontal: 15,
+      paddingVertical: 9,
+    },
 
-  verifiedText: {
-    fontSize: 12,
-    color: COLORS.green,
-    fontWeight: '700',
-  },
+    answerCountText: {
+      color: COLORS.maroon,
+      fontWeight: '800',
+      fontSize: 14,
+    },
 
-  // ========================================
-  // HELPFUL VOTES
-  // ========================================
+    progressTrack: {
+      height: 8,
+      backgroundColor: '#EDE4D8',
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
 
-  helpfulButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 13,
-  },
+    progressFill: {
+      height: '100%',
+      backgroundColor: COLORS.gold,
+      borderRadius: 10,
+    },
 
-  helpfulText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    fontWeight: '600',
-  },
+    remainingText: {
+      fontSize: 12,
+      color: COLORS.muted,
+      marginTop: 9,
+      marginBottom: 20,
+    },
 
-  // ========================================
-  // REPORT ANSWER BUTTON
-  // ========================================
+    // ========================================
+    // ANSWER CARDS
+    // ========================================
 
-  reportAnswerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 7,
-    marginTop: 12,
-    paddingVertical: 5,
-  },
+    answerCard: {
+      backgroundColor: COLORS.white,
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 13,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
 
-  // ========================================
-  // ANSWER SUBMISSION
-  // ========================================
+    officialCard: {
+      borderColor: COLORS.green,
+      borderWidth: 1.5,
+    },
 
-  submitSection: {
-    marginTop: 20,
-    marginBottom: 25,
-  },
+    officialSection: {
+      marginBottom: 25,
+    },
 
-  answerInput: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 15,
-    height: 150,
-    padding: 15,
-    marginTop: 18,
-    color: COLORS.text,
-    fontSize: 14,
-  },
+    answerTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+    },
 
-  characterCount: {
-    textAlign: 'right',
-    color: COLORS.muted,
-    fontSize: 11,
-    marginTop: 7,
-    marginBottom: 15,
-  },
+    avatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: COLORS.cream,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 11,
+    },
 
-  submitButton: {
-    backgroundColor: COLORS.maroon,
-    borderRadius: 15,
-    paddingVertical: 17,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
+    answerAuthorInfo: {
+      flex: 1,
+    },
 
-  disabledButton: {
-    opacity: 0.6,
-  },
+    answerAuthor: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: COLORS.text,
+    },
 
-  submitButtonText: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 15,
-  },
+    answerDate: {
+      fontSize: 11,
+      color: COLORS.muted,
+      marginTop: 4,
+    },
 
-  fullNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.cream,
-    padding: 17,
-    borderRadius: 15,
-    marginTop: 18,
-  },
+    answerNumber: {
+      backgroundColor: COLORS.cream,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+    },
 
-  fullNoticeText: {
-    flex: 1,
-    color: COLORS.maroon,
-    fontSize: 13,
-    lineHeight: 21,
-  },
+    answerNumberText: {
+      color: COLORS.maroon,
+      fontSize: 12,
+      fontWeight: '800',
+    },
 
-  // ========================================
-  // DISCLAIMER
-  // ========================================
+    answerBody: {
+      fontSize: 14,
+      lineHeight: 23,
+      color: COLORS.text,
+      marginBottom: 15,
+    },
 
-  disclaimer: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: COLORS.cream,
-    borderRadius: 14,
-    padding: 15,
-  },
+    verifiedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 12,
+    },
 
-  disclaimerText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 19,
-    color: COLORS.maroon,
-  },
+    verifiedText: {
+      fontSize: 12,
+      color: COLORS.green,
+      fontWeight: '700',
+    },
 
-  // ========================================
-  // LOADING / ERROR STATES
-  // ========================================
+    // ========================================
+    // HELPFUL VOTES
+    // ========================================
 
-  centerState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 25,
-    gap: 14,
-  },
+    helpfulButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+      paddingTop: 13,
+    },
 
-  stateText: {
-    color: COLORS.muted,
-    fontSize: 14,
-    textAlign: 'center',
-  },
+    helpfulText: {
+      fontSize: 12,
+      color: COLORS.muted,
+      fontWeight: '600',
+    },
 
-  retryButton: {
-    backgroundColor: COLORS.maroon,
-    borderRadius: 12,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-  },
+    // ========================================
+    // REPORT ANSWER BUTTON
+    // ========================================
 
-  retryText: {
-    color: COLORS.white,
-    fontWeight: '700',
-  },
+    reportAnswerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 7,
+      marginTop: 12,
+      paddingVertical: 5,
+    },
 
-  // ========================================
-  // EMPTY ANSWERS
-  // ========================================
+    // ========================================
+    // ANSWER SUBMISSION
+    // ========================================
 
-  noAnswers: {
-    alignItems: 'center',
-    padding: 24,
-    marginBottom: 15,
-    gap: 7,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+    submitSection: {
+      marginTop: 20,
+      marginBottom: 25,
+    },
 
-  noAnswersText: {
-    color: COLORS.maroon,
-    fontWeight: '700',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-});
+    answerInput: {
+      backgroundColor: COLORS.white,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: 15,
+      height: 150,
+      padding: 15,
+      marginTop: 18,
+      color: COLORS.text,
+      fontSize: 14,
+    },
+
+    characterCount: {
+      textAlign: 'right',
+      color: COLORS.muted,
+      fontSize: 11,
+      marginTop: 7,
+      marginBottom: 15,
+    },
+
+    submitButton: {
+      backgroundColor: COLORS.maroon,
+      borderRadius: 15,
+      paddingVertical: 17,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+
+    disabledButton: {
+      opacity: 0.6,
+    },
+
+    submitButtonText: {
+      color: COLORS.white,
+      fontWeight: '800',
+      fontSize: 15,
+    },
+
+    fullNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: COLORS.cream,
+      padding: 17,
+      borderRadius: 15,
+      marginTop: 18,
+    },
+
+    fullNoticeText: {
+      flex: 1,
+      color: COLORS.maroon,
+      fontSize: 13,
+      lineHeight: 21,
+    },
+
+    // ========================================
+    // DISCLAIMER
+    // ========================================
+
+    disclaimer: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: COLORS.cream,
+      borderRadius: 14,
+      padding: 15,
+    },
+
+    disclaimerText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 19,
+      color: COLORS.maroon,
+    },
+
+    // ========================================
+    // LOADING / ERROR STATES
+    // ========================================
+
+    centerState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 25,
+      gap: 14,
+    },
+
+    stateText: {
+      color: COLORS.muted,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+
+    retryButton: {
+      backgroundColor: COLORS.maroon,
+      borderRadius: 12,
+      paddingHorizontal: 22,
+      paddingVertical: 12,
+    },
+
+    retryText: {
+      color: COLORS.white,
+      fontWeight: '700',
+    },
+
+    // ========================================
+    // EMPTY ANSWERS
+    // ========================================
+
+    noAnswers: {
+      alignItems: 'center',
+      padding: 24,
+      marginBottom: 15,
+      gap: 7,
+      backgroundColor: COLORS.white,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+
+    noAnswersText: {
+      color: COLORS.maroon,
+      fontWeight: '700',
+      fontSize: 13,
+      textAlign: 'center',
+    },
+  });

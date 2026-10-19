@@ -22,10 +22,12 @@ import nearbyRoutes from './routes/nearbyRoutes';
 import adminNearbyRoutes from './routes/adminNearbyRoutes';
 import poojaRoutes from './routes/poojaRoutes';
 import adminPoojaRoutes from './routes/adminPoojaRoutes';
+import { Router } from 'express';
+import { getTempleContact } from './controllers/templeContactController';
 
 
 
-
+import adminTempleContactRoutes from './routes/adminTempleContactRoutes';
 
 
 import adminDarshanRoutes from './routes/adminDarshanRoutes';
@@ -134,7 +136,30 @@ app.use('/api/publications', publicationRoutes);
 
 app.use('/api/buildings', buildingRoutes);
 
+// ========================================
+// ADMIN TEMPLE CONTACT SETTINGS
+// ========================================
+
+app.use(
+  '/api/admin/temple-contact',
+  adminTempleContactRoutes
+);
 app.use('/api/auth', authRoutes);
+// ========================================
+// PUBLIC TEMPLE CONTACT API
+// ========================================
+
+const templeContactRouter = Router();
+
+templeContactRouter.get(
+  '/',
+  getTempleContact
+);
+
+app.use(
+  '/api/temple-contact',
+  templeContactRouter
+);
 // ========================================
 // DHARMA SANDEHAM ROUTES
 // ========================================

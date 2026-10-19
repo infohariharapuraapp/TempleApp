@@ -22,7 +22,6 @@ export type DharmaQuestion = {
   devotee_name: string;
   answer_count: number;
 };
-
 export type DharmaAnswer = {
   id: number;
   answer: string;
@@ -30,6 +29,9 @@ export type DharmaAnswer = {
   created_at: string;
   devotee_name: string;
   helpful_count: number;
+
+  // Whether the logged-in devotee liked this answer
+  is_liked?: boolean;
 };
 
 export type DharmaQuestionDetails = Omit<
@@ -103,13 +105,20 @@ export async function fetchDharmaQuestions(options?: {
   ) as Promise<DharmaQuestionListResponse>;
 }
 
+
 export async function fetchDharmaQuestionById(
   questionId: number
 ) {
+  const token = await getToken();
+
   return apiRequest(
-    `/dharma/questions/${questionId}`
+    `/dharma/questions/${questionId}`,
+    token
+      ? { token }
+      : {}
   ) as Promise<DharmaQuestionDetailsResponse>;
 }
+
 
 // ========================================
 // AUTHENTICATED API HELPER

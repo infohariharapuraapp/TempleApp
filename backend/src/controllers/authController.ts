@@ -234,6 +234,110 @@ export const getMe = async (
     });
   }
 };
+
+ // ========================================
+ // UPDATE CURRENT USER PROFILE
+ // PUT /api/auth/profile
+ // ========================================
+
+export const updateProfile = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const { full_name, phone } = req.body || {};
+
+    // Validate full name
+    if (
+      typeof full_name !== 'string' ||
+      full_name.trim().length < 2 ||
+      full_name.trim().length > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Name must contain between 2 and 100 characters.',
+      });
+    }
+
+    // Validate Indian mobile number
+    const cleanPhone =
+      typeof phone === 'string'
+        ? phone.trim()
+        : '';
+
+    if (
+      cleanPhone !== '' &&
+      !/^[6-9]\d{9}$/.test(cleanPhone)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Enter a valid 10-digit Indian mobile number.',
+      });
+    }
+
+    const result = await pool.query(
+  `
+  UPDATE users
+  SET full_name = $1
+  WHERE id = $2
+  RETURNING
+    id,
+    full_name,
+    email,
+    phone,
+    role,
+    created_at
+  `,
+  [
+    full_name.trim(),
+    userId,
+  ]
+);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully.',
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    console.error(
+      'Update profile error:',
+      error
+    );
+
+    if (error?.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        message:
+          'This mobile number is already registered.',
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update profile.',
+    });
+  }
+};
+
 // =========================
 // FORGOT PASSWORD
 // =========================
