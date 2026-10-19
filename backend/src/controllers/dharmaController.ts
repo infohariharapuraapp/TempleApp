@@ -231,44 +231,45 @@ export const getDharmaQuestionById = async (
     const authReq = req as AuthRequest;
 const userId = authReq.user?.userId ?? null;
 
-    const answersResult = await pool.query(
-      `
-      SELECT
-        a.id,
-        a.answer,
-        a.answer_type,
-        a.created_at,
-        u.full_name AS devotee_name,
+  const answersResult = await pool.query(
+  `
+  SELECT
+    a.id,
+    a.answer,
+    a.answer_type,
+    a.created_at,
+    u.full_name AS devotee_name,
 
-        (
-          SELECT COUNT(*)::INTEGER
-          FROM dharma_votes v
-          WHERE v.answer_id = a.id
-        ) AS helpful_count
-         EXISTS (
-  SELECT 1
-  FROM dharma_votes v
-  WHERE v.answer_id = a.id
-    AND v.user_id = $2
-) AS is_liked
+    (
+      SELECT COUNT(*)::INTEGER
+      FROM dharma_votes v
+      WHERE v.answer_id = a.id
+    ) AS helpful_count,
 
-      FROM dharma_answers a
-      JOIN users u
-        ON u.id = a.user_id
+    EXISTS (
+      SELECT 1
+      FROM dharma_votes v
+      WHERE v.answer_id = a.id
+        AND v.user_id = $2
+    ) AS is_liked
 
-      WHERE a.question_id = $1
-        AND a.status = 'approved'
+  FROM dharma_answers a
+  JOIN users u
+    ON u.id = a.user_id
 
-      ORDER BY
-        CASE
-          WHEN a.answer_type = 'official' THEN 0
-          ELSE 1
-        END,
-        a.created_at ASC,
-        a.id ASC
-      `,
-      [questionId, userId]
-    );
+  WHERE a.question_id = $1
+    AND a.status = 'approved'
+
+  ORDER BY
+    CASE
+      WHEN a.answer_type = 'official' THEN 0
+      ELSE 1
+    END,
+    a.created_at ASC,
+    a.id ASC
+  `,
+  [questionId, userId]
+);
 
     const countResult = await pool.query(
       `
