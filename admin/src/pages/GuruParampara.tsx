@@ -206,7 +206,7 @@ export default function GuruParampara() {
     );
 
   return (
-    <div className="guru-parampara-page">
+  <main className="content guru-parampara-page">
       <div className="page-head">
         <div>
           <h1>Guru Parampara</h1>
@@ -521,6 +521,6 @@ export default function GuruParampara() {
           </table>
         </div>
       )}
-    </div>
+     </main>
   );
 }
