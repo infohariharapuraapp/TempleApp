@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
+const API_BASE_URL = 'https://hariharapura-temple-api.onrender.com/api';
 
 export function getAdminToken() {
   return localStorage.getItem('temple_admin_token');
