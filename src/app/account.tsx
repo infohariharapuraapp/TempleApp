@@ -1,5 +1,8 @@
+
 import React, { useCallback, useState } from 'react';
+
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -7,11 +10,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/services/api';
-import { removeToken } from '@/services/authStorage';
+
+import {
+  getToken,
+  removeToken,
+} from '@/services/authStorage';
+
+// ========================================
+// TYPES
+// ========================================
 
 type User = {
   id: number;
@@ -21,15 +33,33 @@ type User = {
   role?: string;
 };
 
+// ========================================
+// ACCOUNT SCREEN
+// ========================================
+
 export default function AccountScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ========================================
+  // LOAD LOGGED-IN USER
+  // ========================================
 
   const loadUser = async () => {
     try {
       setLoading(true);
 
-      const response = await apiRequest('/auth/me');
+      const token = await getToken();
+
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+
+      const response = await apiRequest('/auth/me', {
+        method: 'GET',
+        token,
+      });
 
       if (response.success && response.data) {
         setUser(response.data);
@@ -42,28 +72,25 @@ export default function AccountScreen() {
     } catch (error: any) {
       console.error('Failed to load account:', error);
 
-      await removeToken();
-
       Alert.alert(
-        'Session Expired',
-        'Please login again to continue.',
-        [
-          {
-            text: 'Login',
-            onPress: () => router.replace('/login'),
-          },
-        ]
+        'Account Error',
+        error?.message || 'Unable to load your account details.'
       );
     } finally {
       setLoading(false);
     }
   };
 
+  // Reload profile when returning from Edit Profile
   useFocusEffect(
     useCallback(() => {
       loadUser();
     }, [])
   );
+
+  // ========================================
+  // LOGOUT
+  // ========================================
 
   const handleLogout = () => {
     Alert.alert(
@@ -80,7 +107,6 @@ export default function AccountScreen() {
           onPress: async () => {
             try {
               await removeToken();
-
               router.replace('/login');
             } catch (error) {
               console.error('Logout error:', error);
@@ -96,50 +122,120 @@ export default function AccountScreen() {
     );
   };
 
+  const displayName = user?.full_name || 'Devotee';
+  const firstLetter = displayName.charAt(0).toUpperCase();
+
+  // ========================================
+  // SCREEN
+  // ========================================
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <Text style={styles.label}>DEVOTEE</Text>
+        {/* HEADER */}
 
-        <Text style={styles.title}>
-          My Account
-        </Text>
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.label}>
+              TEMPLE ACCOUNT
+            </Text>
 
-        <Text style={styles.subtitle}>
-          Manage your devotee profile and temple activities.
-        </Text>
+            <Text style={styles.title}>
+              My Account
+            </Text>
 
-        {/* Profile */}
+            <Text style={styles.subtitle}>
+              Your personal information and temple services
+            </Text>
+          </View>
+
+          <View style={styles.headerIcon}>
+            <Text style={styles.headerEmoji}>
+              🙏
+            </Text>
+          </View>
+        </View>
+
+        {/* PROFILE CARD */}
+
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>🙏</Text>
+            <Text style={styles.avatarText}>
+              {loading ? '🙏' : firstLetter}
+            </Text>
           </View>
 
           <View style={styles.profileInfo}>
             <Text style={styles.name}>
-              {loading
-                ? 'Loading...'
-                : user?.full_name || 'Devotee'}
+              {loading ? 'Loading...' : displayName}
             </Text>
 
-            <Text style={styles.email}>
-              {loading
-                ? 'Loading account details...'
-                : user?.email || ''}
+            <Text style={styles.profileSubtitle}>
+              Temple Devotee
             </Text>
-
-            {!!user?.phone && (
-              <Text style={styles.phone}>
-                {user.phone}
-              </Text>
-            )}
           </View>
+
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/edit-profile')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.editButtonText}>
+              Edit
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Account options */}
+        {/* PROFILE DETAILS */}
+
+        <Text style={styles.sectionTitle}>
+          Profile Details
+        </Text>
+
+        <View style={styles.detailsCard}>
+          {loading ? (
+            <View style={styles.loadingDetails}>
+              <ActivityIndicator
+                size="small"
+                color="#6B1720"
+              />
+
+              <Text style={styles.loadingText}>
+                Loading your details...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <DetailRow
+                icon="👤"
+                label="Full Name"
+                value={user?.full_name || 'Not available'}
+              />
+
+              <View style={styles.divider} />
+
+              <DetailRow
+                icon="✉️"
+                label="Email Address"
+                value={user?.email || 'Not available'}
+              />
+
+              <View style={styles.divider} />
+
+              <DetailRow
+                icon="📱"
+                label="Phone Number"
+                value={user?.phone || 'Not available'}
+              />
+            </>
+          )}
+        </View>
+
+        {/* ACCOUNT OPTIONS */}
+
         <Text style={styles.sectionTitle}>
           Account
         </Text>
@@ -147,52 +243,28 @@ export default function AccountScreen() {
         <View style={styles.card}>
           <AccountItem
             icon="👤"
-            title="Profile Details"
-            description="View and update your personal information"
+            title="Edit Profile"
+            description="Update your personal information"
+            onPress={() => router.push('/edit-profile')}
           />
 
+          {/* KEEP EXISTING MY BOOKINGS WEBVIEW */}
+
           <AccountItem
-            icon="📋"
+            icon="🎫"
             title="My Bookings"
             description="View your room and seva bookings"
-          onPress={() => router.push('/website-bookings')}
-          />
-
-          <AccountItem
-            icon="🙏"
-            title="My Seva History"
-            description="View your previous seva bookings"
-          />
-
-          <AccountItem
-            icon="❤️"
-            title="Saved Preferences"
-            description="Manage your temple preferences"
+            onPress={() => router.push('/website-bookings')}
+            last
           />
         </View>
 
-        {/* Support */}
-        <Text style={styles.sectionTitle}>
-          Support
-        </Text>
+        {/* SPIRITUAL JOURNEY */}
 
-        <View style={styles.card}>
-          <AccountItem
-            icon="📞"
-            title="Contact Temple"
-            description="Get in touch with the temple"
-          />
-
-          <AccountItem
-            icon="🔒"
-            title="Privacy & Security"
-            description="Manage privacy and security settings"
-          />
-        </View>
-
-        {/* Spiritual Journey */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoIcon}>🙏</Text>
+          <Text style={styles.infoIcon}>
+            🙏
+          </Text>
 
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>
@@ -200,53 +272,106 @@ export default function AccountScreen() {
             </Text>
 
             <Text style={styles.infoText}>
-              Your profile, bookings and devotional
-              activities will be connected after the
-              backend and authentication system are added.
+              Stay connected with the temple through
+              your bookings, prayers and devotional
+              activities.
             </Text>
           </View>
         </View>
 
-        {/* Logout */}
+        {/* LOGOUT */}
+
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
+          activeOpacity={0.8}
         >
-          <Text style={styles.logoutIcon}>↪</Text>
+          <Text style={styles.logoutIcon}>
+            ↪
+          </Text>
 
           <Text style={styles.logoutButtonText}>
             Logout
           </Text>
         </TouchableOpacity>
 
-        {/* Back to Home */}
+        {/* BACK TO HOME */}
+
         <TouchableOpacity
           style={styles.homeButton}
           onPress={() => router.replace('/(tabs)')}
+          activeOpacity={0.8}
         >
           <Text style={styles.homeButtonText}>
             Back to Home
           </Text>
         </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ========================================
+// DETAIL ROW
+// ========================================
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <View style={styles.detailIcon}>
+        <Text style={styles.detailIconText}>
+          {icon}
+        </Text>
+      </View>
+
+      <View style={styles.detailContent}>
+        <Text style={styles.detailLabel}>
+          {label}
+        </Text>
+
+        <Text
+          style={styles.detailValue}
+          selectable
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ========================================
+// ACCOUNT ITEM
+// ========================================
 
 function AccountItem({
   icon,
   title,
   description,
   onPress,
+  last = false,
 }: {
   icon: string;
   title: string;
   description: string;
-  onPress?: () => void;
+  onPress: () => void;
+  last?: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={styles.item}
+      style={[
+        styles.item,
+        !last && styles.itemBorder,
+      ]}
       onPress={onPress}
       activeOpacity={0.8}
     >
@@ -266,64 +391,99 @@ function AccountItem({
         </Text>
       </View>
 
-      <Text style={styles.arrow}>›</Text>
+      <Text style={styles.arrow}>
+        ›
+      </Text>
     </TouchableOpacity>
   );
 }
 
+// ========================================
+// STYLES
+// ========================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F0',
+    backgroundColor: '#FFFDF8',
   },
 
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 45,
+  },
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+
+  headerText: {
+    flex: 1,
+    paddingRight: 12,
   },
 
   label: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.1,
-    color: '#B66A2C',
+    letterSpacing: 1.2,
+    color: '#C69A3A',
     marginBottom: 5,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
   },
 
   subtitle: {
-    fontSize: 11,
-    color: '#777',
+    fontSize: 12,
+    color: '#8E8175',
     marginTop: 5,
-    marginBottom: 20,
+    lineHeight: 18,
+  },
+
+  headerIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F7EBD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  headerEmoji: {
+    fontSize: 24,
   },
 
   profileCard: {
-    backgroundColor: '#F3DEC5',
-    borderRadius: 18,
-    padding: 17,
+    backgroundColor: '#F7EBD7',
+    borderRadius: 20,
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
   },
 
   avatar: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#6B1720',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
 
   avatarText: {
-    fontSize: 27,
+    fontSize: 23,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   profileInfo: {
@@ -333,33 +493,108 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
     marginBottom: 4,
   },
 
-  email: {
-    fontSize: 10,
-    color: '#777',
+  profileSubtitle: {
+    fontSize: 12,
+    color: '#8E8175',
   },
 
-  phone: {
-    fontSize: 10,
-    color: '#777',
-    marginTop: 3,
+  editButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
+  },
+
+  editButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B1720',
   },
 
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
     marginBottom: 12,
+  },
+
+  detailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
+  },
+
+  loadingDetails: {
+    paddingVertical: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingText: {
+    marginLeft: 10,
+    fontSize: 12,
+    color: '#8E8175',
+  },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+  },
+
+  detailIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#F7EBD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  detailIconText: {
+    fontSize: 19,
+  },
+
+  detailContent: {
+    flex: 1,
+    marginLeft: 13,
+  },
+
+  detailLabel: {
+    fontSize: 11,
+    color: '#8E8175',
+    marginBottom: 5,
+  },
+
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A2C18',
+    lineHeight: 20,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#F0E7DD',
   },
 
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    paddingHorizontal: 14,
-    elevation: 2,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
     marginBottom: 23,
   },
 
@@ -367,15 +602,19 @@ const styles = StyleSheet.create({
     minHeight: 70,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 10,
+  },
+
+  itemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#EEE3D8',
+    borderBottomColor: '#F0E7DD',
   },
 
   itemIcon: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#F8EBDD',
+    backgroundColor: '#F7EBD7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -390,21 +629,21 @@ const styles = StyleSheet.create({
   },
 
   itemTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#4A2C18',
     marginBottom: 3,
   },
 
   itemDescription: {
-    fontSize: 9,
-    lineHeight: 14,
-    color: '#777',
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#8E8175',
   },
 
   arrow: {
-    fontSize: 22,
-    color: '#B66A2C',
+    fontSize: 24,
+    color: '#C69A3A',
     marginLeft: 8,
   },
 
@@ -414,7 +653,8 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
     marginBottom: 20,
   },
 
@@ -430,20 +670,20 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
     marginBottom: 4,
   },
 
   infoText: {
-    fontSize: 10,
-    lineHeight: 15,
-    color: '#777',
+    fontSize: 11,
+    lineHeight: 17,
+    color: '#8E8175',
   },
 
   logoutButton: {
     height: 48,
     borderRadius: 15,
-    backgroundColor: '#F4E0C5',
+    backgroundColor: '#F7EBD7',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -452,12 +692,12 @@ const styles = StyleSheet.create({
 
   logoutIcon: {
     fontSize: 20,
-    color: '#8B4513',
+    color: '#6B1720',
     marginRight: 8,
   },
 
   logoutButtonText: {
-    color: '#8B4513',
+    color: '#6B1720',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -465,7 +705,7 @@ const styles = StyleSheet.create({
   homeButton: {
     height: 48,
     borderRadius: 15,
-    backgroundColor: '#B66A2C',
+    backgroundColor: '#6B1720',
     alignItems: 'center',
     justifyContent: 'center',
   },

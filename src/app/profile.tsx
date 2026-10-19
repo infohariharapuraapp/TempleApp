@@ -1,4 +1,6 @@
+
 import React, { useCallback, useState } from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -8,11 +10,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
 import { apiRequest } from '@/services/api';
 import { getToken } from '@/services/authStorage';
+
+// ========================================
+// TYPES
+// ========================================
 
 type User = {
   id: number;
@@ -23,9 +30,17 @@ type User = {
   created_at?: string;
 };
 
+// ========================================
+// PROFILE SCREEN
+// ========================================
+
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ========================================
+  // LOAD PROFILE
+  // ========================================
 
   const loadProfile = async () => {
     try {
@@ -62,17 +77,26 @@ export default function ProfileScreen() {
     }
   };
 
+  // Refresh profile when returning from Edit Profile
   useFocusEffect(
-  useCallback(() => {
-    loadProfile();
-  }, [])
-);
+    useCallback(() => {
+      loadProfile();
+    }, [])
+  );
+
+  // ========================================
+  // LOADING
+  // ========================================
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#B66A2C" />
+          <ActivityIndicator
+            size="large"
+            color="#6B1720"
+          />
+
           <Text style={styles.loadingText}>
             Loading your profile...
           </Text>
@@ -84,17 +108,22 @@ export default function ProfileScreen() {
   const displayName = user?.full_name || 'Devotee';
   const firstLetter = displayName.charAt(0).toUpperCase();
 
+  // ========================================
+  // SCREEN
+  // ========================================
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* Header */}
+        {/* HEADER */}
+
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerText}>
             <Text style={styles.smallText}>
-              Temple Account
+              TEMPLE ACCOUNT
             </Text>
 
             <Text style={styles.title}>
@@ -102,16 +131,19 @@ export default function ProfileScreen() {
             </Text>
 
             <Text style={styles.subtitle}>
-              Manage your temple activities and account
+              Your personal information and temple services
             </Text>
           </View>
 
           <View style={styles.profileCircle}>
-            <Text style={styles.profileIcon}>🙏</Text>
+            <Text style={styles.profileIcon}>
+              🙏
+            </Text>
           </View>
         </View>
 
-        {/* Devotee Card */}
+        {/* DEVOTEE CARD */}
+
         <View style={styles.devoteeCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -125,64 +157,100 @@ export default function ProfileScreen() {
             </Text>
 
             <Text style={styles.devoteeText}>
-              {user?.email || 'No email available'}
+              Temple Devotee
             </Text>
-
-            {user?.phone ? (
-              <Text style={styles.devoteeText}>
-                {user.phone}
-              </Text>
-            ) : null}
           </View>
 
-        <TouchableOpacity
-  style={styles.editButton}
-  onPress={() => router.push('/edit-profile')}
-  activeOpacity={0.7}
->
-  <Text style={styles.editText}>
-    Edit
-  </Text>
-</TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/edit-profile')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.editText}>
+              Edit
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* My Temple Activities */}
+        {/* PROFILE DETAILS */}
+
+        <Text style={styles.sectionTitle}>
+          Profile Details
+        </Text>
+
+        <View style={styles.detailsCard}>
+          <DetailRow
+            icon="👤"
+            label="Full Name"
+            value={user?.full_name || 'Not available'}
+          />
+
+          <View style={styles.detailDivider} />
+
+          <DetailRow
+            icon="✉️"
+            label="Email Address"
+            value={user?.email || 'Not available'}
+          />
+
+          <View style={styles.detailDivider} />
+
+          <DetailRow
+            icon="📱"
+            label="Phone Number"
+            value={user?.phone || 'Not available'}
+          />
+        </View>
+
+        {/* MY TEMPLE ACTIVITIES */}
+
         <Text style={styles.sectionTitle}>
           My Temple Activities
         </Text>
 
         <View style={styles.menuCard}>
+          {/* MY BOOKINGS - EXISTING WEBVIEW */}
+
           <ProfileRow
             icon="🎫"
             title="My Bookings"
             subtitle="View your temple bookings"
-            onPress={() => router.push('/website-bookings')}
+            onPress={() =>
+              router.push('/website-bookings')
+            }
           />
 
           <ProfileRow
             icon="💰"
             title="My Donations"
             subtitle="View your donation history"
-            onPress={() => router.push('/donations')}
+            onPress={() =>
+              router.push('/donations')
+            }
           />
 
           <ProfileRow
             icon="🛕"
             title="Deities"
             subtitle="Explore temple deities"
-            onPress={() => router.push('/deities')}
+            onPress={() =>
+              router.push('/deities')
+            }
           />
 
           <ProfileRow
             icon="📅"
             title="Temple Events"
             subtitle="View upcoming events"
-            onPress={() => router.push('/events')}
+            onPress={() =>
+              router.push('/events')
+            }
             last
           />
         </View>
 
-        {/* Temple Information */}
+        {/* TEMPLE INFORMATION */}
+
         <Text style={styles.sectionTitle}>
           Temple Information
         </Text>
@@ -192,26 +260,24 @@ export default function ProfileScreen() {
             icon="🛕"
             title="About Temple"
             subtitle="Learn about our temple"
-            onPress={() => router.push('/about')}
+            onPress={() =>
+              router.push('/about')
+            }
           />
 
           <ProfileRow
             icon="📍"
             title="Temple Location"
             subtitle="Find the temple and directions"
-            onPress={() => router.push('/nearby')}
-          />
-
-          <ProfileRow
-            icon="☎️"
-            title="Contact Temple"
-            subtitle="Get in touch with the temple"
-            onPress={() => router.push('/contact')}
+            onPress={() =>
+              router.push('/nearby')
+            }
             last
           />
         </View>
 
-        {/* Settings */}
+        {/* SETTINGS */}
+
         <Text style={styles.sectionTitle}>
           Settings
         </Text>
@@ -240,7 +306,8 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Footer */}
+        {/* FOOTER */}
+
         <Text style={styles.footerText}>
           May the divine blessings be with you always.
         </Text>
@@ -248,6 +315,47 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
+// ========================================
+// PROFILE DETAIL ROW
+// ========================================
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <View style={styles.detailIcon}>
+        <Text style={styles.detailIconText}>
+          {icon}
+        </Text>
+      </View>
+
+      <View style={styles.detailContent}>
+        <Text style={styles.detailLabel}>
+          {label}
+        </Text>
+
+        <Text
+          style={styles.detailValue}
+          selectable
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ========================================
+// PROFILE MENU ROW
+// ========================================
 
 function ProfileRow({
   icon,
@@ -294,15 +402,19 @@ function ProfileRow({
   );
 }
 
+// ========================================
+// STYLES
+// ========================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F0',
+    backgroundColor: '#FFFDF8',
   },
 
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 45,
   },
 
   loadingContainer: {
@@ -313,8 +425,8 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 12,
-    fontSize: 12,
-    color: '#777',
+    fontSize: 13,
+    color: '#8E8175',
   },
 
   header: {
@@ -324,52 +436,61 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
+  headerText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
   smallText: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    color: '#C69A3A',
+    marginBottom: 5,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
     marginBottom: 5,
   },
 
   subtitle: {
     fontSize: 12,
-    color: '#777',
+    color: '#8E8175',
+    lineHeight: 18,
   },
 
   profileCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F7EBD7',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
   },
 
   profileIcon: {
-    fontSize: 24,
+    fontSize: 25,
   },
 
   devoteeCard: {
-    backgroundColor: '#F3DEC5',
+    backgroundColor: '#F7EBD7',
     borderRadius: 20,
     padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
   },
 
   avatar: {
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#B66A2C',
+    backgroundColor: '#6B1720',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -388,35 +509,88 @@ const styles = StyleSheet.create({
   devoteeName: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#4A2C18',
-    marginBottom: 4,
+    color: '#6B1720',
+    marginBottom: 5,
   },
 
   devoteeText: {
-    fontSize: 11,
-    color: '#6D5140',
-    marginBottom: 2,
+    fontSize: 12,
+    color: '#8E8175',
   },
 
   editButton: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
   },
 
   editText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B66A2C',
+    color: '#6B1720',
   },
 
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#4A2C18',
+    color: '#6B1720',
     marginBottom: 12,
     marginTop: 4,
+  },
+
+  detailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
+  },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+  },
+
+  detailIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: '#F7EBD7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  detailIconText: {
+    fontSize: 19,
+  },
+
+  detailContent: {
+    flex: 1,
+    marginLeft: 13,
+  },
+
+  detailLabel: {
+    fontSize: 11,
+    color: '#8E8175',
+    marginBottom: 5,
+  },
+
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A2C18',
+    lineHeight: 20,
+  },
+
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#F0E7DD',
   },
 
   menuCard: {
@@ -424,13 +598,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 22,
     paddingHorizontal: 15,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E8DCCB',
   },
 
   profileRow: {
     minHeight: 70,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 10,
   },
 
   profileRowBorder: {
@@ -442,7 +618,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#F8EBDD',
+    backgroundColor: '#F7EBD7',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -465,19 +641,19 @@ const styles = StyleSheet.create({
 
   rowSubtitle: {
     fontSize: 11,
-    color: '#888',
+    color: '#8E8175',
   },
 
   arrow: {
     fontSize: 25,
-    color: '#B66A2C',
+    color: '#C69A3A',
     marginLeft: 8,
   },
 
   footerText: {
     textAlign: 'center',
     fontSize: 11,
-    color: '#999',
+    color: '#8E8175',
     fontStyle: 'italic',
     marginTop: 18,
   },

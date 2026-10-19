@@ -141,43 +141,81 @@ const handleNotificationPress = async (
     // NOTIFICATION NAVIGATION
     // ------------------------------------
 
-    const data = item.data || {};
 
-    switch (data.type) {
-      case 'event':
-        router.push('/events');
-        break;
 
-      case 'deity':
-        if (data.deityId) {
-          router.push(`/deity/${data.deityId}` as any);
-        } else {
-          router.push('/(tabs)/deities');
-        }
-        break;
 
-      case 'gallery':
-        router.push('/gallery');
-        break;
+const data =
+  typeof item.data === 'string'
+    ? JSON.parse(item.data)
+    : item.data || {};
 
-      case 'darshan':
-      case 'darshan_video':
-        router.push('/darshan-videos');
-        break;
+const notificationType =
+  data.type || item.notification_type;
 
-      case 'publication':
-        router.push('/publications');
-        break;
+switch (notificationType) {
+  case 'event':
+    router.push('/events');
+    break;
 
-      case 'announcement':
-        // No redirect.
-        // User remains on Notification Center.
-        break;
-
-      default:
-        // General/system notifications remain here.
-        break;
+  case 'deity':
+    if (data.deityId) {
+      router.push(`/deity/${data.deityId}` as any);
+    } else {
+      router.push('/(tabs)/deities');
     }
+    break;
+
+  case 'gallery':
+    router.push('/gallery');
+    break;
+
+  case 'darshan':
+  case 'today_darshan':
+    router.push('/darshan');
+    break;
+
+  case 'darshan_video':
+    router.push('/darshan-videos');
+    break;
+
+  case 'publication':
+    router.push('/publications');
+    break;
+
+  case 'announcement': {
+    const announcementId =
+      data.announcementId ??
+      data.announcement_id;
+
+    if (announcementId) {
+      router.push({
+        pathname: '/announcements' as any,
+        params: {
+          id: String(announcementId),
+        },
+      });
+    } else {
+      console.warn(
+        'Announcement notification missing announcement ID:',
+        item
+      );
+
+      Alert.alert(
+        'Announcement Unavailable',
+        'This notification does not contain an announcement ID.'
+      );
+    }
+    break;
+  }
+
+  default:
+    console.log(
+      'No navigation configured for notification:',
+      notificationType
+    );
+    break;
+}
+
   } catch (error: any) {
     console.error(
       'Notification press error:',

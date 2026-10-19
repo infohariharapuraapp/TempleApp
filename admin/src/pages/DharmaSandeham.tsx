@@ -156,6 +156,8 @@ const [selectedQuestionId, setSelectedQuestionId] =
 
 const [officialAnswerText, setOfficialAnswerText] =
   useState('');
+  const [existingOfficialAnswers, setExistingOfficialAnswers] =
+  useState<Record<number, DharmaAnswer>>({});
 
 const [officialQuestionsLoading, setOfficialQuestionsLoading] =
   useState(false);
@@ -425,6 +427,30 @@ const loadOfficialQuestions = useCallback(async () => {
     }
 
     setOfficialQuestions(response.questions);
+    const answerResponse = await apiRequest<AnswersResponse>(
+  '/admin/dharma/answers?status=approved'
+);
+
+if (!answerResponse.success || !Array.isArray(answerResponse.answers)) {
+  throw new Error(
+    answerResponse.message || 'Failed to load official answers.'
+  );
+}
+
+const officialMap: Record<number, DharmaAnswer> = {};
+
+answerResponse.answers
+  .filter((item) => item.answer_type === 'official')
+  .forEach((item) => {
+    if (
+      !officialMap[item.question_id] ||
+      item.id < officialMap[item.question_id].id
+    ) {
+      officialMap[item.question_id] = item;
+    }
+  });
+
+setExistingOfficialAnswers(officialMap);
   } catch (error) {
     setOfficialQuestions([]);
     setOfficialError(errorMessage(error));
@@ -480,12 +506,19 @@ const publishOfficialAnswer = async () => {
       );
     }
 
-    setOfficialAnswerText('');
-    setSelectedQuestionId('');
+ const wasUpdating = Boolean(
+  existingOfficialAnswers[questionId]
+);
 
-    setOfficialSuccess(
-      'Official temple answer published successfully.'
-    );
+// Reload saved answers from the backend
+await loadOfficialQuestions();
+
+// Keep the selected question and answer visible
+setOfficialSuccess(
+  wasUpdating
+    ? 'Official temple answer updated successfully.'
+    : 'Official temple answer published successfully.'
+);
   } catch (error) {
     setOfficialError(errorMessage(error));
   } finally {
@@ -1084,11 +1117,18 @@ useEffect(() => {
       <select
         id="official-question"
         value={selectedQuestionId}
-        onChange={(event) => {
-          setSelectedQuestionId(event.target.value);
-          setOfficialError('');
-          setOfficialSuccess('');
-        }}
+       onChange={(event) => {
+  const questionId = event.target.value;
+
+  setSelectedQuestionId(questionId);
+
+  const existing = existingOfficialAnswers[Number(questionId)];
+
+  setOfficialAnswerText(existing?.answer ?? '');
+  setOfficialError('');
+  setOfficialSuccess('');
+}}
+
         disabled={officialQuestionsLoading}
         style={{
           width: '100%',
@@ -1263,8 +1303,10 @@ useEffect(() => {
         }}
       >
         {publishingOfficial
-          ? 'Publishing...'
-          : 'Publish Official Answer'}
+  ? 'Saving...'
+  : existingOfficialAnswers[Number(selectedQuestionId)]
+    ? 'Update Official Answer'
+    : 'Publish Official Answer'}
       </button>
     </div>
   </div>

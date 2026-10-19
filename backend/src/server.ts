@@ -25,6 +25,10 @@ import adminPoojaRoutes from './routes/adminPoojaRoutes';
 import { Router } from 'express';
 import { getTempleContact } from './controllers/templeContactController';
 
+import welcomeSlokamRoutes from './routes/welcomeSlokamRoutes';
+
+import adminWelcomeSlokamRoutes from './routes/adminWelcomeSlokamRoutes';
+
 
 
 import adminTempleContactRoutes from './routes/adminTempleContactRoutes';
@@ -105,6 +109,21 @@ app.use(
 app.use(
   '/api/admin/guru-vani',
   adminGuruVaniRoutes
+);
+// ========================================
+// WELCOME SLOKAM LIBRARY
+// ========================================
+
+// Public - Devotee App
+app.use(
+  '/api/welcome-slokams',
+  welcomeSlokamRoutes
+);
+
+// Admin - Slokam Library Management
+app.use(
+  '/api/admin/welcome-slokams',
+  adminWelcomeSlokamRoutes
 );
 
 app.use('/api/events', eventRoutes);

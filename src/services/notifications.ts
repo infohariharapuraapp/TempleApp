@@ -32,6 +32,11 @@ const API_BASE_URL =
 // PRODUCTION: Switch before building
 // const API_BASE_URL =
    //'https://templeapp-s96e.onrender.com/api';
+   // Local backend testing through USB
+//const API_BASE_URL = 'http://127.0.0.1:5000/api';
+
+// Production backend
+// const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
 
 // ========================================
 // NOTIFICATION INITIALIZATION
@@ -299,10 +304,10 @@ export function handleNotificationResponse(
       }
     }
 
-    console.log(
-      'Notification tapped:',
-      data.type
-    );
+   console.log(
+  'FULL NOTIFICATION DATA:',
+  JSON.stringify(data, null, 2)
+);
 
     // ====================================
     // ANNOUNCEMENT

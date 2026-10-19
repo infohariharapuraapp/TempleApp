@@ -3,8 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 
-import TempleContact from './pages/TempleContact';
 import { apiRequest, clearAdminSession } from './lib/api';
+import TempleContact from './pages/TempleContact';
 
 import Publications from './pages/Publications';
 
@@ -32,8 +32,10 @@ import GuruParampara from './pages/GuruParampara';
 import NearbyPlaces from './pages/NearbyPlaces';
 
 import GuruVani from './pages/GuruVani';
+import WelcomeSlokams from './pages/WelcomeSlokams';
 
 import PoojaServices from './pages/PoojaServices';
+
 
 import './styles.css';
 
@@ -139,19 +141,19 @@ const nav = [
 
   ['users', 'Users'],
   ['guru-vani', 'Guru Vani'],
-
+  ['welcome-slokams', 'Welcome Slokam Library'],
 
 
   ['publications', 'Publications'],
 
   ['announcements', 'Announcements'],
 
-['nearby-places', 'Nearby Places'],
-['pooja-services', 'Pooja Services'],
+  ['nearby-places', 'Nearby Places'],
+  ['pooja-services', 'Pooja Services'],
 
   ['dharma-sandeham', 'Dharma Sandeham'],
-    ['guru-parampara', 'Guru Parampara'],
-    ['temple-contact', 'Temple Contact'],
+  ['guru-parampara', 'Guru Parampara'],
+  ['temple-contact', 'Temple Contact'],
 
 ];
 
@@ -2714,7 +2716,7 @@ function Gallery() {
 
                         {deletingAlbumId ===
 
-                        album.id
+                          album.id
 
                           ? 'Deleting…'
 
@@ -2802,11 +2804,11 @@ function Gallery() {
 
                       ? Number(
 
-                          e.target
+                        e.target
 
-                            .value
+                          .value
 
-                        )
+                      )
 
                       : null,
 
@@ -2836,7 +2838,7 @@ function Gallery() {
 
                     album.id ===
 
-                      editing.album_id
+                    editing.album_id
 
                 )
 
@@ -2940,7 +2942,7 @@ function Gallery() {
 
                 imageMode ===
 
-                'upload'
+                  'upload'
 
                   ? 'primary'
 
@@ -3026,53 +3028,53 @@ function Gallery() {
 
             'upload' && (
 
-            <label>
+              <label>
 
-              Upload Image
-
-
-
-              <input
-
-                type="file"
-
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-
-                onChange={
-
-                  handleFileChange
-
-                }
-
-              />
+                Upload Image
 
 
 
-              <small
+                <input
 
-                style={{
+                  type="file"
 
-                  display:
+                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
-                    'block',
+                  onChange={
 
-                  marginTop:
+                    handleFileChange
 
-                    '6px',
+                  }
 
-                }}
+                />
 
-              >
 
-                JPG, JPEG, PNG or
 
-                WEBP · Maximum 5 MB
+                <small
 
-              </small>
+                  style={{
 
-            </label>
+                    display:
 
-          )}
+                      'block',
+
+                    marginTop:
+
+                      '6px',
+
+                  }}
+
+                >
+
+                  JPG, JPEG, PNG or
+
+                  WEBP · Maximum 5 MB
+
+                </small>
+
+              </label>
+
+            )}
 
 
 
@@ -3576,7 +3578,7 @@ function Gallery() {
 
                   {deletingId ===
 
-                  x.id
+                    x.id
 
                     ? 'Deleting…'
 
@@ -3852,30 +3854,34 @@ function App() {
 
       )}
 
-{page === 'guru-parampara' && (
-  <GuruParampara />
-)}
-{page === 'guru-vani' && (
-  <GuruVani />
+      {page === 'guru-parampara' && (
+        <GuruParampara />
+      )}
+      {page === 'guru-vani' && (
+        <GuruVani />
+      )}
+
+      {page === 'welcome-slokams' && (
+  <WelcomeSlokams />
 )}
 
-{page === 'pooja-services' && (
-  <PoojaServices />
-)}
+      {page === 'pooja-services' && (
+        <PoojaServices />
+      )}
 
-{page === 'nearby-places' && (
-  <NearbyPlaces />
-)}
+      {page === 'nearby-places' && (
+        <NearbyPlaces />
+      )}
 
 
-{page === 'publications' && (
-  <Page
-    title="Publications"
-    subtitle="Manage publication categories and publications"
-  >
-    <Publications />
-  </Page>
-)}
+      {page === 'publications' && (
+        <Page
+          title="Publications"
+          subtitle="Manage publication categories and publications"
+        >
+          <Publications />
+        </Page>
+      )}
 
 
       {page === 'activities' && (
@@ -3912,9 +3918,9 @@ function App() {
 
       {page === 'dharma-sandeham' && (
 
-  <DharmaSandeham />
+        <DharmaSandeham />
 
-)}
+      )}
 
 
 
@@ -3926,18 +3932,18 @@ function App() {
 
       {page === 'darshan-videos' && (
 
-  <DarshanVideos />
+        <DarshanVideos />
 
-)}
+      )}
 
-{page === 'announcements' && <Announcements />}
-{/* ========================================
+      {page === 'announcements' && <Announcements />}
+      {/* ========================================
     TEMPLE CONTACT SETTINGS
 ======================================== */}
 
-{page === 'temple-contact' && (
-  <TempleContact />
-)}
+      {page === 'temple-contact' && (
+        <TempleContact />
+      )}
 
     </div>
 

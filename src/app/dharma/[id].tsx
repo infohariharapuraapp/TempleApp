@@ -1,6 +1,7 @@
 
   import React, {
     useCallback,
+    useEffect,
     useRef,
     useState,
   } from 'react';
@@ -8,6 +9,7 @@
   import {
     ActivityIndicator,
     Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     RefreshControl,
@@ -110,6 +112,28 @@
       useState(DEFAULT_MAX_ANSWERS);
 
     const [answerText, setAnswerText] = useState('');
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const scrollRef = useRef<ScrollView>(null);
+    const answerSectionY = useRef(0);
+
+    useEffect(() => {
+      const show = Keyboard.addListener('keyboardDidShow', () => {
+        setKeyboardVisible(true);
+      });
+      const hide = Keyboard.addListener('keyboardDidHide', () => {
+        setKeyboardVisible(false);
+      });
+      return () => { show.remove(); hide.remove(); };
+    }, []);
+
+    const scrollToAnswer = () => {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, answerSectionY.current - 15),
+          animated: true,
+        });
+      }, 300);
+    };
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -222,23 +246,34 @@
           if (!response.success || !response.question) {
             throw new Error('Question not found.');
           }
-
-          try {
+try {
   const profile = await apiRequest<{
     success: boolean;
-    user: { id: number };
+    data?: { id: number };
+    user?: { id: number };
   }>('/auth/me');
 
   if (requestId !== requestRef.current) {
     return;
   }
 
+  const loggedInUser = profile.data ?? profile.user;
+
+  const userId =
+    profile.success && loggedInUser
+      ? Number(loggedInUser.id)
+      : null;
+
   setCurrentUserId(
-    profile.success && profile.user
-      ? Number(profile.user.id)
+    userId !== null &&
+    Number.isSafeInteger(userId) &&
+    userId > 0
+      ? userId
       : null
   );
-} catch {
+} catch (error) {
+  console.error('Unable to load logged-in user:', error);
+
   if (requestId !== requestRef.current) {
     return;
   }
@@ -317,6 +352,7 @@ setVotedIds(
     // ========================================
 
     const handleSubmitAnswer = async () => {
+      Keyboard.dismiss();
       if (submittingRef.current || !question) {
         return;
       }
@@ -652,8 +688,9 @@ setVotedIds(
           behavior={
             Platform.OS === 'ios'
               ? 'padding'
-              : undefined
+              : 'height'
           }
+          keyboardVerticalOffset={0}
         >
 
           {/* LOADING */}
@@ -700,9 +737,15 @@ setVotedIds(
             /* MAIN CONTENT */
 
             <ScrollView
+              ref={scrollRef}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.content}
+              keyboardDismissMode="on-drag"
+              automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+              contentContainerStyle={[
+                styles.content,
+                { paddingBottom: keyboardVisible ? 180 : 80 },
+              ]}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -882,7 +925,12 @@ setVotedIds(
 
                  {currentUserId !== null &&
   Number(question.user_id) !== currentUserId && (
-    <View style={styles.submitSection}>
+    <View
+      style={styles.submitSection}
+      onLayout={(event) => {
+        answerSectionY.current = event.nativeEvent.layout.y;
+      }}
+    >
                     <Text style={styles.sectionTitle}>
                       Share Your Answer
                     </Text>
@@ -910,6 +958,8 @@ setVotedIds(
                       <>
                         <TextInput
                           style={styles.answerInput}
+                          onFocus={scrollToAnswer}
+                          scrollEnabled
                           multiline
                           textAlignVertical="top"
                           placeholder="Write your answer here..."
@@ -919,6 +969,23 @@ setVotedIds(
                           maxLength={2000}
                           editable={!submitting}
                         />
+
+                        {keyboardVisible && (
+                          <TouchableOpacity
+                            style={styles.doneTypingButton}
+                            onPress={() => Keyboard.dismiss()}
+                            activeOpacity={0.85}
+                          >
+                            <Ionicons
+                              name="checkmark-circle-outline"
+                              size={19}
+                              color={COLORS.white}
+                            />
+                            <Text style={styles.doneTypingText}>
+                              Done Typing
+                            </Text>
+                          </TouchableOpacity>
+                        )}
 
                         <Text style={styles.characterCount}>
                           {answerText.length}/2000
@@ -1320,6 +1387,26 @@ setVotedIds(
       marginTop: 7,
       marginBottom: 15,
     },
+
+    doneTypingButton: {
+      backgroundColor: COLORS.gold,
+      borderRadius: 12,
+      paddingVertical: 12,
+      marginTop: 12,
+
+
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    doneTypingText: {
+      color: COLORS.white,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+
+
 
     submitButton: {
       backgroundColor: COLORS.maroon,

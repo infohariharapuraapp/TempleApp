@@ -370,29 +370,48 @@ export const createOfficialDharmaAnswer = async (
     }
 
     // Insert an official answer separately from community answers.
-    const result = await client.query(
-      `
-      INSERT INTO dharma_answers
-        (
-          question_id,
-          user_id,
-          answer,
-          answer_type,
-          status
-        )
-      VALUES
-        ($1, $2, $3, 'official', 'approved')
-      RETURNING
-        id,
-        question_id,
-        user_id,
-        answer,
-        answer_type,
-        status,
-        created_at
-      `,
-      [questionId, adminId, answer.trim()]
-    );
+  // Check whether an official answer already exists.
+const existing = await client.query(
+  `
+  SELECT id
+  FROM dharma_answers
+  WHERE question_id = $1
+    AND answer_type = 'official'
+  ORDER BY id ASC
+  LIMIT 1
+  `,
+  [questionId]
+);
+
+let result;
+
+if (existing.rows.length > 0) {
+  // Update the existing official answer.
+  result = await client.query(
+    `
+    UPDATE dharma_answers
+    SET
+      answer = $1,
+      status = 'approved',
+      updated_at = NOW()
+    WHERE id = $2
+    RETURNING *
+    `,
+    [answer.trim(), existing.rows[0].id]
+  );
+} else {
+  // Create the first official answer.
+  result = await client.query(
+    `
+    INSERT INTO dharma_answers
+      (question_id, user_id, answer, answer_type, status)
+    VALUES
+      ($1, $2, $3, 'official', 'approved')
+    RETURNING *
+    `,
+    [questionId, adminId, answer.trim()]
+  );
+}
 
     await client.query('COMMIT');
 

@@ -111,11 +111,54 @@ export default function HomeScreen() {
   const [darshanVideos, setDarshanVideos] = useState<DarshanVideo[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  const player = useAudioPlayer(require('@/assets/audio/home-welcome.mp3'), {
-    downloadFirst: true,
-  });
-
+  // Keep the player stable; fetch and load the admin audio only once.
+  const player = useAudioPlayer(
+    require('@/assets/audio/home-welcome.mp3'),
+    { downloadFirst: true }
+  );
   const playerStatus = useAudioPlayerStatus(player);
+  const [welcomeAudioReady, setWelcomeAudioReady] = useState(false);
+  const welcomeFocusedRef = useRef(false);
+  const [welcomeVisit, setWelcomeVisit] = useState(0);
+  const welcomeStartedRef = useRef(false);
+  const welcomePlaybackTokenRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadWelcomeSlokam = async () => {
+      try {
+        const response = await apiRequest<{
+          success: boolean;
+          data: {
+            id: number;
+            title: string;
+            audio_url: string;
+          } | null;
+        }>('/welcome-slokams/active');
+
+        if (cancelled) return;
+
+        if (
+          response.success &&
+          response.data?.audio_url?.startsWith('https://')
+        ) {
+          // Replace only when the admin URL is fetched, not on every focus.
+          player.replace({ uri: response.data.audio_url });
+          console.log('Active Welcome Slokam:', response.data.title);
+        }
+      } catch (error) {
+        console.warn('Welcome Slokam API unavailable. Using bundled audio.', error);
+      } finally {
+        if (!cancelled) setWelcomeAudioReady(true);
+      }
+    };
+
+    void loadWelcomeSlokam();
+    return () => {
+      cancelled = true;
+    };
+  }, [player]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const pageFade = useRef(new Animated.Value(0)).current;
@@ -185,44 +228,71 @@ export default function HomeScreen() {
     };
   }, [heroPulse, omRotate]);
 
-  useEffect(() => {
-    const startWelcomeAudio = async () => {
-      try {
-        console.log('🔊 Home audio status:', playerStatus);
+  // A new Home visit permits exactly one playback start.
+  useFocusEffect(
+    useCallback(() => {
+      welcomeFocusedRef.current = true;
+      welcomeStartedRef.current = false;
+      welcomePlaybackTokenRef.current += 1;
+      setWelcomeVisit(visit => visit + 1);
 
+      return () => {
+        welcomeFocusedRef.current = false;
+        welcomeStartedRef.current = false;
+        welcomePlaybackTokenRef.current += 1;
+        try {
+          player.pause();
+        } catch (error) {
+          console.warn('Welcome Slokam pause error:', error);
+        }
+      };
+    }, [player])
+  );
+
+  // Wait until the selected audio is loaded before starting playback.
+  // Player status updates must not restart audio while it is already playing.
+  useEffect(() => {
+    if (
+      !welcomeFocusedRef.current ||
+      welcomeStartedRef.current ||
+      !welcomeAudioReady ||
+      !playerStatus.isLoaded
+    ) {
+      return;
+    }
+
+    welcomeStartedRef.current = true;
+    const token = welcomePlaybackTokenRef.current;
+
+    const playWelcomeSlokam = async () => {
+      try {
         await setAudioModeAsync({
           playsInSilentMode: true,
           interruptionMode: 'doNotMix',
         });
 
-        console.log('🎵 Audio mode configured successfully');
-
-        if (!playerStatus.isLoaded) {
-          console.log('⏳ Welcome audio is still loading...');
-          console.log('📁 Audio file: home-welcome.mp3');
-          return;
-        }
-
-        console.log('✅ Welcome audio loaded successfully');
-        console.log('📁 Audio file: home-welcome.mp3');
-        console.log('▶️ Playing temple welcome audio');
+        if (
+          !welcomeFocusedRef.current ||
+          welcomePlaybackTokenRef.current !== token
+        ) return;
 
         player.volume = 1;
-        player.seekTo(0);
-        player.play();
+        await player.seekTo(0);
 
-        console.log('🔊 Temple welcome audio play() called');
+        if (
+          !welcomeFocusedRef.current ||
+          welcomePlaybackTokenRef.current !== token
+        ) return;
+
+        player.play();
+        console.log('Welcome Slokam started for this Home visit');
       } catch (error) {
-        console.error('❌ Welcome audio error:', error);
+        console.error('Welcome Slokam playback error:', error);
       }
     };
 
-    startWelcomeAudio();
-
-    return () => {
-      console.log('🛑 Home audio effect cleanup');
-    };
-  }, [playerStatus.isLoaded]);
+    void playWelcomeSlokam();
+  }, [player, playerStatus.isLoaded, welcomeAudioReady, welcomeVisit]);
 
   useEffect(() => {
     loadEvents();

@@ -8,6 +8,7 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -60,17 +61,64 @@ function getErrorMessage(error: unknown): string {
 // ========================================
 
 export default function AskQuestionScreen() {
-  const [categories, setCategories] = useState<DharmaCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categories, setCategories] =
+    useState<DharmaCategory[]>([]);
+
+  const [categoryId, setCategoryId] =
+    useState<number | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [loadingCategories, setLoadingCategories] =
+    useState(true);
+
+  const [categoryError, setCategoryError] =
+    useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
 
   const submittingRef = useRef(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const descriptionRef = useRef<TextInput>(null);
+
+  const [keyboardVisible, setKeyboardVisible] =
+    useState(false);
+
+  // ========================================
+  // KEYBOARD LISTENERS
+  // ========================================
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+
+    const hideSubscription = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  // ========================================
+  // SCROLL TO INPUT
+  // ========================================
+
+  const scrollToInput = (position: number) => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: position,
+        animated: true,
+      });
+    }, 300);
+  };
 
   // ========================================
   // LOAD CATEGORIES FROM BACKEND
@@ -109,7 +157,10 @@ export default function AskQuestionScreen() {
             : null;
         });
       } catch (error) {
-        console.error('Dharma categories error:', error);
+        console.error(
+          'Dharma categories error:',
+          error
+        );
 
         if (active) {
           setCategoryError(getErrorMessage(error));
@@ -136,6 +187,8 @@ export default function AskQuestionScreen() {
     if (submittingRef.current) {
       return;
     }
+
+    Keyboard.dismiss();
 
     const question = title.trim();
     const details = description.trim();
@@ -202,7 +255,10 @@ export default function AskQuestionScreen() {
         ]
       );
     } catch (error) {
-      console.error('Submit Dharma question error:', error);
+      console.error(
+        'Submit Dharma question error:',
+        error
+      );
 
       Alert.alert(
         'Submission Failed',
@@ -220,9 +276,14 @@ export default function AskQuestionScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* HEADER */}
+
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            Keyboard.dismiss();
+            router.back();
+          }}
           style={styles.backButton}
           accessibilityLabel="Go back"
           disabled={submitting}
@@ -241,17 +302,34 @@ export default function AskQuestionScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {/* KEYBOARD RESPONSIVE FORM */}
+
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : 'height'
+        }
+        keyboardVerticalOffset={0}
       >
         <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={
+            Platform.OS === 'ios'
+          }
           contentContainerStyle={styles.content}
         >
+          {/* INTRO */}
+
           <View style={styles.introCard}>
-            <Text style={styles.introSymbol}>ॐ</Text>
+            <Text style={styles.introSymbol}>
+              ॐ
+            </Text>
 
             <Text style={styles.introTitle}>
               Dharma Sandeham
@@ -275,6 +353,7 @@ export default function AskQuestionScreen() {
               <ActivityIndicator
                 color={COLORS.maroon}
               />
+
               <Text style={styles.loadingText}>
                 Loading categories...
               </Text>
@@ -300,12 +379,15 @@ export default function AskQuestionScreen() {
           ) : (
             <View style={styles.categories}>
               {categories.map((item) => {
-                const selected = categoryId === item.id;
+                const selected =
+                  categoryId === item.id;
 
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    onPress={() => setCategoryId(item.id)}
+                    onPress={() =>
+                      setCategoryId(item.id)
+                    }
                     disabled={submitting}
                     style={[
                       styles.categoryChip,
@@ -315,7 +397,8 @@ export default function AskQuestionScreen() {
                     <Text
                       style={[
                         styles.categoryText,
-                        selected && styles.selectedChipText,
+                        selected &&
+                          styles.selectedChipText,
                       ]}
                     >
                       {item.name}
@@ -338,8 +421,14 @@ export default function AskQuestionScreen() {
             placeholderTextColor={COLORS.muted}
             value={title}
             onChangeText={setTitle}
+            onFocus={() => scrollToInput(220)}
             maxLength={200}
             editable={!submitting}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => {
+              descriptionRef.current?.focus();
+            }}
           />
 
           <Text style={styles.counter}>
@@ -353,20 +442,43 @@ export default function AskQuestionScreen() {
           </Text>
 
           <TextInput
+            ref={descriptionRef}
             style={styles.descriptionInput}
             placeholder="Explain your doubt in more detail..."
             placeholderTextColor={COLORS.muted}
             value={description}
             onChangeText={setDescription}
+            onFocus={() => scrollToInput(420)}
             multiline
             textAlignVertical="top"
             maxLength={2000}
             editable={!submitting}
+            scrollEnabled
           />
 
           <Text style={styles.counter}>
             {description.length}/2000
           </Text>
+
+          {/* DONE TYPING */}
+
+          {keyboardVisible && (
+            <TouchableOpacity
+              style={styles.keyboardDoneButton}
+              onPress={() => Keyboard.dismiss()}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={19}
+                color={COLORS.maroon}
+              />
+
+              <Text style={styles.keyboardDoneText}>
+                Done Typing
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* INFORMATION */}
 
@@ -390,10 +502,11 @@ export default function AskQuestionScreen() {
           <TouchableOpacity
             style={[
               styles.submitButton,
-              (submitting ||
+              (
+                submitting ||
                 loadingCategories ||
-                categoryId === null) &&
-                styles.submitButtonDisabled,
+                categoryId === null
+              ) && styles.submitButtonDisabled,
             ]}
             onPress={handleSubmit}
             activeOpacity={0.85}
@@ -405,7 +518,9 @@ export default function AskQuestionScreen() {
           >
             {submitting ? (
               <>
-                <ActivityIndicator color={COLORS.white} />
+                <ActivityIndicator
+                  color={COLORS.white}
+                />
 
                 <Text style={styles.submitText}>
                   Submitting...
@@ -444,6 +559,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,22 +568,36 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.background,
   },
+
   backButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: COLORS.maroon,
   },
+
+  keyboardContainer: {
+    flex: 1,
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
   content: {
     padding: 20,
-    paddingBottom: 50,
+    paddingBottom: 80,
+    flexGrow: 1,
   },
+
   introCard: {
     backgroundColor: COLORS.maroon,
     borderRadius: 22,
@@ -475,16 +605,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 28,
   },
+
   introSymbol: {
     fontSize: 42,
     color: COLORS.gold,
     marginBottom: 10,
   },
+
   introTitle: {
     fontSize: 24,
     fontWeight: '800',
     color: COLORS.white,
   },
+
   introDescription: {
     fontSize: 13,
     lineHeight: 21,
@@ -492,18 +625,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
+
   label: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.text,
     marginBottom: 12,
   },
+
   categories: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 9,
     marginBottom: 25,
   },
+
   categoryChip: {
     paddingHorizontal: 13,
     paddingVertical: 10,
@@ -512,18 +648,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+
   selectedChip: {
     backgroundColor: COLORS.maroon,
     borderColor: COLORS.maroon,
   },
+
   categoryText: {
     fontSize: 12,
     color: COLORS.text,
     fontWeight: '600',
   },
+
   selectedChipText: {
     color: COLORS.white,
   },
+
   questionInput: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
@@ -532,17 +672,21 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 14,
     color: COLORS.text,
+    minHeight: 55,
   },
+
   descriptionInput: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,
     padding: 15,
-    height: 145,
+    minHeight: 145,
+    maxHeight: 240,
     fontSize: 14,
     color: COLORS.text,
   },
+
   counter: {
     textAlign: 'right',
     fontSize: 11,
@@ -550,6 +694,25 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 20,
   },
+
+  keyboardDoneButton: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.cream,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+
+  keyboardDoneText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.maroon,
+  },
+
   infoCard: {
     flexDirection: 'row',
     gap: 12,
@@ -559,12 +722,14 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 25,
   },
+
   infoText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 19,
     color: COLORS.maroon,
   },
+
   submitButton: {
     backgroundColor: COLORS.maroon,
     borderRadius: 16,
@@ -573,21 +738,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
+    minHeight: 55,
   },
+
   submitButtonDisabled: {
     opacity: 0.55,
   },
+
   submitText: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.white,
   },
+
   footerNote: {
     fontSize: 11,
     color: COLORS.muted,
     textAlign: 'center',
     marginTop: 18,
   },
+
   categoryLoading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -595,10 +765,12 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     paddingVertical: 12,
   },
+
   loadingText: {
     fontSize: 12,
     color: COLORS.muted,
   },
+
   categoryMessage: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,6 +780,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cream,
     marginBottom: 25,
   },
+
   categoryMessageText: {
     flex: 1,
     fontSize: 12,
