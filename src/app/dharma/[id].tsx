@@ -30,6 +30,7 @@
   import { Ionicons } from '@expo/vector-icons';
 
   import ReportDialog from './ReportDialog';
+  import { apiRequest } from '@/services/api';
 
   import {
     fetchDharmaQuestionById,
@@ -97,6 +98,8 @@
 
     const [question, setQuestion] =
       useState<DharmaQuestionDetails | null>(null);
+      const [currentUserId, setCurrentUserId] =
+  useState<number | null>(null);
 
     const [answers, setAnswers] =
       useState<DharmaAnswer[]>([]);
@@ -220,6 +223,28 @@
             throw new Error('Question not found.');
           }
 
+          try {
+  const profile = await apiRequest<{
+    success: boolean;
+    user: { id: number };
+  }>('/auth/me');
+
+  if (requestId !== requestRef.current) {
+    return;
+  }
+
+  setCurrentUserId(
+    profile.success && profile.user
+      ? Number(profile.user.id)
+      : null
+  );
+} catch {
+  if (requestId !== requestRef.current) {
+    return;
+  }
+
+  setCurrentUserId(null);
+}
           setQuestion(response.question);
 
 const loadedAnswers = response.answers ?? [];
@@ -855,7 +880,9 @@ setVotedIds(
                       SHARE YOUR ANSWER
                   ======================================== */}
 
-                  <View style={styles.submitSection}>
+                 {currentUserId !== null &&
+  Number(question.user_id) !== currentUserId && (
+    <View style={styles.submitSection}>
                     <Text style={styles.sectionTitle}>
                       Share Your Answer
                     </Text>
@@ -930,6 +957,7 @@ setVotedIds(
                       </>
                     )}
                   </View>
+                   )}
 
                   {/* ========================================
                       DISCLAIMER

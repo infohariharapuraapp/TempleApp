@@ -37,8 +37,9 @@ export type DharmaAnswer = {
 export type DharmaQuestionDetails = Omit<
   DharmaQuestion,
   'answer_count'
->;
-
+> & {
+  user_id: number;
+};
 export type DharmaQuestionListResponse = {
   success: boolean;
   questions: DharmaQuestion[];
