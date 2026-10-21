@@ -6,6 +6,10 @@ import {
 } from 'expo-router';
 
 import '@/localization/i18n';
+import {
+  View,
+  StyleSheet,
+} from 'react-native';
 
 import {
   loadSavedLanguage,
@@ -24,7 +28,7 @@ import Constants from 'expo-constants';
 import {
   AnimatedSplashOverlay,
 } from '@/components/animated-icon';
-
+import DynamicWelcomeScreen from '@/components/DynamicWelcomeScreen';
 import {
   getToken,
   removeToken,
@@ -61,6 +65,9 @@ export default function RootLayout() {
 
   const [authenticated, setAuthenticated] =
     useState(false);
+
+const [welcomeFinished, setWelcomeFinished] =
+  useState(false);
 
   const notificationRegistrationStarted =
     useRef(false);
@@ -355,23 +362,22 @@ export default function RootLayout() {
   // LOADING
   // ========================================
 
-  if (authChecking || languageChecking) {
-    return <AnimatedSplashOverlay />;
-  }
+ if (authChecking || languageChecking) {
+  return <AnimatedSplashOverlay />;
+}
 
   // ========================================
   // APPLICATION
   // ========================================
 
-  return (
-    <>
-      <AnimatedSplashOverlay />
+return (
+  <View style={styles.root}>
+    <Stack
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
         {/* AUTHENTICATION */}
 
         <Stack.Screen name="login" />
@@ -475,7 +481,28 @@ export default function RootLayout() {
         {/* LANGUAGE SETTINGS */}
 
         <Stack.Screen name="language-settings" />
-      </Stack>
-    </>
+           </Stack>
+
+      {!welcomeFinished && (
+        <View style={styles.welcomeOverlay}>
+          <DynamicWelcomeScreen
+            onFinish={() => setWelcomeFinished(true)}
+          />
+        </View>
+      )}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+
+ welcomeOverlay: {
+  ...StyleSheet.absoluteFill,
+  zIndex: 9999,
+  elevation: 9999,
+  backgroundColor: '#FFFDF8',
+},
+});

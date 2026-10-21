@@ -36,6 +36,7 @@
 
   import PoojaServices from './pages/PoojaServices';
 
+  import WelcomeScreen from './pages/WelcomeScreen';
 
   import './styles.css';
 
@@ -142,7 +143,7 @@
     ['users', 'Users'],
     ['guru-vani', 'Guru Vani'],
     ['welcome-slokams', 'Welcome Slokam Library'],
-
+['welcome-screen', 'Welcome Screen Settings'],
 
     ['publications', 'Publications'],
 
@@ -3864,6 +3865,9 @@
         {page === 'welcome-slokams' && (
     <WelcomeSlokams />
   )}
+  {page === 'welcome-screen' && (
+  <WelcomeScreen />
+)}
 
         {page === 'pooja-services' && (
           <PoojaServices />

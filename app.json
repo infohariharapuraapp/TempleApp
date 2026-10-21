@@ -34,11 +34,12 @@
       "expo-router",
       [
         "expo-splash-screen",
-        {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
-        }
+         {
+    "backgroundColor": "#FFFDF8",
+    "image": "./assets/images/splash-icon.png",
+    "imageWidth": 220,
+    "resizeMode": "contain"
+  }
       ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",

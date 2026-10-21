@@ -48,6 +48,13 @@ import {
   checkPushReceipts,
 } from './services/notificationService';
 
+
+import {
+  welcomeScreenRouter,
+  adminWelcomeScreenRouter,
+} from './routes/welcomeScreenRoutes';
+
+
 import adminGuruVaniRoutes from './routes/adminGuruVaniRoutes';
 import {
   processScheduledNotifications,
@@ -84,6 +91,25 @@ app.use(
   '/api/guru-parampara',
   guruParamparaRoutes
 );
+
+
+// ========================================
+// DYNAMIC WELCOME SCREEN
+// ========================================
+
+// Public — mobile app
+app.use(
+  '/api/welcome-screen',
+  welcomeScreenRouter
+);
+
+// Protected — admin dashboard
+app.use(
+  '/api/admin/welcome-screen',
+  adminWelcomeScreenRouter
+);
+
+
 
 app.use(
   '/api/admin/guru-parampara',
