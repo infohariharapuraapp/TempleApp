@@ -11,6 +11,10 @@ import { randomInt } from 'node:crypto';
 // REGISTER
 // =========================
 
+// ========================================
+// REGISTER - EMAIL OPTIONAL
+// ========================================
+
 export const register = async (
   req: Request,
   res: Response
@@ -21,30 +25,86 @@ export const register = async (
       email,
       phone,
       password,
-    } = req.body;
+    } = req.body || {};
 
-    if (!full_name || !email || !password) {
+    const cleanName =
+      typeof full_name === 'string'
+        ? full_name.trim()
+        : '';
+
+    const cleanEmail =
+      typeof email === 'string'
+        ? email.trim().toLowerCase()
+        : '';
+
+    const cleanPhone =
+      typeof phone === 'string'
+        ? phone.trim()
+        : '';
+
+    if (
+      cleanName.length < 2 ||
+      cleanName.length > 100
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Full name, email and password are required',
+        message:
+          'Full name must contain between 2 and 100 characters.',
+      });
+    }
+
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Enter a valid 10-digit Indian mobile number.',
+      });
+    }
+
+    if (
+      cleanEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid email address.',
+      });
+    }
+
+    if (
+      typeof password !== 'string' ||
+      password.length < 8 ||
+      Buffer.byteLength(password, 'utf8') > 72
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Password must be at least 8 characters and no more than 72 UTF-8 bytes.',
       });
     }
 
     const existingUser = await pool.query(
       `SELECT id
        FROM users
-       WHERE email = $1`,
-      [email]
+       WHERE phone = $1
+          OR ($2::text IS NOT NULL AND LOWER(email) = $2)
+       LIMIT 1`,
+      [
+        cleanPhone,
+        cleanEmail || null,
+      ]
     );
 
     if (existingUser.rows.length > 0) {
       return res.status(409).json({
         success: false,
-        message: 'Email already registered',
+        message:
+          'Mobile number or email is already registered.',
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash =
+      await bcrypt.hash(password, 10);
 
     const result = await pool.query(
       `INSERT INTO users (
@@ -59,33 +119,37 @@ export const register = async (
         full_name,
         email,
         phone,
+        role,
         created_at`,
       [
-        full_name,
-        email,
-        phone || null,
+        cleanName,
+        cleanEmail || null,
+        cleanPhone,
         passwordHash,
       ]
     );
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message:
+        'Registration successful. Please login.',
       data: result.rows[0],
     });
+
   } catch (error: any) {
     console.error('Registration error:', error);
 
-    if (error.code === '23505') {
+    if (error?.code === '23505') {
       return res.status(409).json({
         success: false,
-        message: 'Email or phone already registered',
+        message:
+          'Mobile number or email is already registered.',
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: 'Registration failed',
+      message: 'Registration failed.',
     });
   }
 };
@@ -94,37 +158,61 @@ export const register = async (
 // LOGIN
 // =========================
 
+// ========================================
+// LOGIN - MOBILE OR EMAIL
+// ========================================
+
 export const login = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
-    if (!email || !password) {
+    // Keep "email" as the request key for
+    // compatibility with the existing app.
+    const identifier =
+      typeof email === 'string'
+        ? email.trim()
+        : '';
+
+    if (
+      !identifier ||
+      typeof password !== 'string' ||
+      !password
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required',
+        message:
+          'Mobile number or email and password are required.',
       });
     }
 
+    const isPhone = /^[6-9]\d{9}$/.test(identifier);
+
     const result = await pool.query(
       `SELECT
-         id,
-         full_name,
-         email,
-         phone,
-         password_hash,
-         role
+        id,
+        full_name,
+        email,
+        phone,
+        password_hash,
+        role
        FROM users
-       WHERE email = $1`,
-      [email]
+       WHERE ${
+         isPhone
+           ? 'phone = $1'
+           : 'LOWER(email) = LOWER($1)'
+       }
+       LIMIT 1`,
+      [identifier]
     );
 
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message:
+          'Invalid login credentials.',
       });
     }
 
@@ -133,20 +221,29 @@ export const login = async (
     if (!user.password_hash) {
       return res.status(401).json({
         success: false,
-        message: 'Password login is not available for this account',
+        message:
+          'Password login is unavailable for this account.',
       });
     }
 
-    const passwordMatches = await bcrypt.compare(
-      password,
-      user.password_hash
-    );
+    const passwordMatches =
+      await bcrypt.compare(
+        password,
+        user.password_hash
+      );
 
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message:
+          'Invalid login credentials.',
       });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error(
+        'JWT_SECRET is not configured'
+      );
     }
 
     const token = jwt.sign(
@@ -155,7 +252,7 @@ export const login = async (
         email: user.email,
         role: user.role,
       },
-      process.env.JWT_SECRET as string,
+      process.env.JWT_SECRET,
       {
         expiresIn: '7d',
       }
@@ -175,16 +272,16 @@ export const login = async (
         },
       },
     });
+
   } catch (error) {
     console.error('Login error:', error);
 
     return res.status(500).json({
       success: false,
-      message: 'Login failed',
+      message: 'Login failed.',
     });
   }
 };
-
 // =========================
 // GET CURRENT USER
 // =========================

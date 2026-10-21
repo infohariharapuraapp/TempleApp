@@ -56,3 +56,10 @@ src.zip
 
 # Firebase Android configuration
 /google-services.json
+
+# Android build files
+*.apk
+*.aab
+# Android build outputs
+*.apk
+*.aab

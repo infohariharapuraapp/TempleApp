@@ -1,35 +1,45 @@
+
 import React, { useState } from 'react';
+import { notifyAuthChanged } from '@/services/authSession';
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/services/api';
 import { saveToken } from '@/services/authStorage';
 import { registerForPushNotificationsAsync } from '@/services/notifications';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // =========================
-  // REAL LOGIN
-  // =========================
-
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
+    const loginId = identifier.trim();
+
+    if (!loginId || !password) {
       Alert.alert(
         'Login Required',
-        'Please enter your email and password.'
+        'Please enter your mobile number or email and password.'
       );
       return;
     }
+
+    Keyboard.dismiss();
 
     try {
       setLoading(true);
@@ -37,291 +47,279 @@ export default function LoginScreen() {
       const response = await apiRequest('/auth/login', {
         method: 'POST',
         body: {
-          email: email.trim(),
+          email: loginId,
           password,
         },
       });
 
-      if (response.success && response.data?.token) {
-        // Save JWT first
-        await saveToken(response.data.token);
+     if (response.success && response.data?.token) {
 
-        // Register this device for push notifications
-        await registerForPushNotificationsAsync();
+  // Save JWT token
+  await saveToken(response.data.token);
 
-        // Go to home
-        router.replace('/(tabs)');
+  // Notify root layout that user is logged in
+  notifyAuthChanged(true);
 
-        return;
-      }
+  // Register push notifications
+  try {
+    await registerForPushNotificationsAsync();
+  } catch (pushError) {
+    console.warn('Push registration:', pushError);
+  }
+
+  // Navigate to Home
+  router.replace('/(tabs)');
+
+  return;
+}
 
       Alert.alert(
         'Login Failed',
-        response.message || 'Unable to login.'
+        response.message || 'Invalid login credentials.'
       );
     } catch (error: any) {
       Alert.alert(
         'Login Failed',
-        error?.message ||
-          'Unable to connect to the server.'
+        error?.message || 'Unable to connect to the server.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================
-  // OPEN REGISTER SCREEN
-  // =========================
-
-  const handleRegister = () => {
-    router.push('/register');
-  };
-
-  // =========================
-  // OPEN FORGOT PASSWORD
-  // =========================
-
-  const handleForgotPassword = () => {
-    router.push('/forgot-password');
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>
-        TEMPLE
-      </Text>
-
-      <Text style={styles.title}>
-        Welcome Back
-      </Text>
-
-      <Text style={styles.subtitle}>
-        Login to manage your bookings and temple activities.
-      </Text>
-
-      {/* =========================
-          EMAIL
-      ========================= */}
-
-      <Text style={styles.inputLabel}>
-        Email
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Enter your email"
-        placeholderTextColor="#999"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoCorrect={false}
-      />
-
-      {/* =========================
-          PASSWORD
-      ========================= */}
-
-      <Text style={styles.inputLabel}>
-        Password
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Enter your password"
-        placeholderTextColor="#999"
-        secureTextEntry
-        autoCapitalize="none"
-      />
-
-      {/* =========================
-          FORGOT PASSWORD
-      ========================= */}
-
-      <TouchableOpacity
-        style={styles.forgotPasswordButton}
-        onPress={handleForgotPassword}
-        disabled={loading}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.forgotPasswordText}>
-          Forgot Password?
-        </Text>
-      </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.form}>
+              <Text style={styles.label}>HARIHARIPURA TEMPLE</Text>
 
-      {/* =========================
-          LOGIN BUTTON
-      ========================= */}
+              <Text style={styles.title}>Welcome Back</Text>
 
-      <TouchableOpacity
-        style={[
-          styles.loginButton,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.loginButtonText}>
-          {loading
-            ? 'Logging in...'
-            : 'Login'}
-        </Text>
-      </TouchableOpacity>
+              <Text style={styles.subtitle}>
+                Login to access temple services, bookings and activities.
+              </Text>
 
-      {/* =========================
-          REGISTER BUTTON
-      ========================= */}
+              <Text style={styles.inputLabel}>
+                Mobile Number or Email
+              </Text>
 
-      <TouchableOpacity
-        style={styles.registerButton}
-        onPress={handleRegister}
-        disabled={loading}
-      >
-        <Text style={styles.registerButtonText}>
-          Create Account
-        </Text>
-      </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                value={identifier}
+                onChangeText={setIdentifier}
+                placeholder="Enter mobile number or email"
+                placeholderTextColor="#999"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username"
+                returnKeyType="next"
+                editable={!loading}
+              />
 
-      {/* =========================
-          BACK
-      ========================= */}
+              <Text style={styles.inputLabel}>Password</Text>
 
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.back()}
-        disabled={loading}
-      >
-        <Text style={styles.backButtonText}>
-          Back
-        </Text>
-      </TouchableOpacity>
-    </View>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#999"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  editable={!loading}
+                />
+
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.showButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Text style={styles.showText}>
+                    {showPassword ? 'Hide' : 'Show'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.forgotButton}
+                onPress={() => router.push('/forgot-password')}
+                disabled={loading}
+              >
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.loginButton,
+                  loading && styles.disabledButton,
+                ]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.registerRow}>
+                <Text style={styles.secondaryText}>
+                  New devotee?
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => router.push('/register')}
+                  disabled={loading}
+                >
+                  <Text style={styles.linkText}> Create Account</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
-    padding: 24,
+  },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     justifyContent: 'center',
   },
-
-  label: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: '#B66A2C',
-    marginBottom: 6,
+  form: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
-
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    color: '#B66A2C',
+    marginBottom: 10,
+  },
   title: {
     fontSize: 30,
     fontWeight: '700',
     color: '#4A2C18',
   },
-
   subtitle: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 21,
     color: '#777',
-    marginTop: 6,
-    marginBottom: 30,
+    marginTop: 8,
+    marginBottom: 28,
   },
-
   inputLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#4A2C18',
-    marginBottom: 7,
+    marginBottom: 8,
   },
-
   input: {
-    height: 50,
+    height: 52,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 15,
-    fontSize: 13,
+    fontSize: 15,
     color: '#333',
-    marginBottom: 18,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#EEE3D8',
   },
-
-  // =========================
-  // FORGOT PASSWORD
-  // =========================
-
-  forgotPasswordButton: {
-    alignSelf: 'flex-end',
-    marginTop: -8,
-    marginBottom: 18,
+  passwordContainer: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EEE3D8',
   },
-
-  forgotPasswordText: {
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 15,
+    fontSize: 15,
+    color: '#333',
+  },
+  showButton: {
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    height: '100%',
+  },
+  showText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#B66A2C',
-    fontSize: 12,
+  },
+  forgotButton: {
+    alignSelf: 'flex-end',
+    marginTop: 12,
+    marginBottom: 24,
+    paddingVertical: 6,
+  },
+  forgotText: {
+    color: '#B66A2C',
+    fontSize: 13,
     fontWeight: '700',
   },
-
-  // =========================
-  // LOGIN
-  // =========================
-
   loginButton: {
-    height: 50,
+    height: 54,
     borderRadius: 15,
     backgroundColor: '#B66A2C',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 5,
   },
-
   disabledButton: {
     opacity: 0.6,
   },
-
   loginButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  registerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  secondaryText: {
+    color: '#777',
+    fontSize: 14,
+  },
+  linkText: {
+    color: '#B66A2C',
     fontSize: 14,
     fontWeight: '700',
-  },
-
-  // =========================
-  // REGISTER
-  // =========================
-
-  registerButton: {
-    height: 45,
-    borderRadius: 15,
-    backgroundColor: '#F4E0C5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-
-  registerButtonText: {
-    color: '#8B4513',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  // =========================
-  // BACK
-  // =========================
-
-  backButton: {
-    height: 45,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-
-  backButtonText: {
-    color: '#B66A2C',
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

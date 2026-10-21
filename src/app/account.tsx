@@ -1,5 +1,6 @@
 
 import React, { useCallback, useState } from 'react';
+import { notifyAuthChanged } from '@/services/authSession';
 
 import {
   ActivityIndicator,
@@ -93,35 +94,40 @@ export default function AccountScreen() {
   // ========================================
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeToken();
-              router.replace('/login');
-            } catch (error) {
-              console.error('Logout error:', error);
+  Alert.alert(
+    'Logout',
+    'Are you sure you want to logout?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // Remove saved JWT
+            await removeToken();
 
-              Alert.alert(
-                'Logout Failed',
-                'Unable to logout. Please try again.'
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
+            // Update authentication state
+            notifyAuthChanged(false);
 
+            // Navigate to Login
+            router.replace('/login');
+          } catch (error) {
+            console.error('Logout error:', error);
+
+            Alert.alert(
+              'Logout Failed',
+              'Unable to logout. Please try again.'
+            );
+          }
+        },
+      },
+    ]
+  );
+};
   const displayName = user?.full_name || 'Devotee';
   const firstLetter = displayName.charAt(0).toUpperCase();
 

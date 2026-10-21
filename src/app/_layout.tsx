@@ -1,3 +1,4 @@
+
 import {
   Stack,
   router,
@@ -6,6 +7,7 @@ import {
 } from 'expo-router';
 
 import '@/localization/i18n';
+
 import {
   View,
   StyleSheet,
@@ -28,7 +30,9 @@ import Constants from 'expo-constants';
 import {
   AnimatedSplashOverlay,
 } from '@/components/animated-icon';
+
 import DynamicWelcomeScreen from '@/components/DynamicWelcomeScreen';
+
 import {
   getToken,
   removeToken,
@@ -39,13 +43,19 @@ import {
 } from '@/services/api';
 
 import {
+  subscribeAuth,
+} from '@/services/authSession';
+
+import {
   registerForPushNotificationsAsync,
   initializeNotificationHandler,
   initializeNotificationListener,
   handleInitialNotification,
 } from '@/services/notifications';
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
+type AuthStatus = 'checking' | 'authenticated' | 'guest';
 
 // ========================================
 // ROOT LAYOUT
@@ -53,27 +63,38 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const segments = useSegments();
+  const rootNavigationState = useRootNavigationState();
 
-  const rootNavigationState =
-    useRootNavigationState();
-
-  const [authChecking, setAuthChecking] =
-    useState(true);
+  const [authStatus, setAuthStatus] =
+    useState<AuthStatus>('checking');
 
   const [languageChecking, setLanguageChecking] =
     useState(true);
 
-  const [authenticated, setAuthenticated] =
+  const [welcomeFinished, setWelcomeFinished] =
     useState(false);
 
-const [welcomeFinished, setWelcomeFinished] =
-  useState(false);
+  const [authVersion, setAuthVersion] =
+    useState(0);
 
   const notificationRegistrationStarted =
     useRef(false);
 
   const initialNotificationHandled =
     useRef(false);
+
+  const authStatusRef = useRef<AuthStatus>('checking');
+
+  const setSessionStatus = (status: AuthStatus) => {
+    authStatusRef.current = status;
+    setAuthStatus(status);
+  };
+
+  const authenticated = authStatus === 'authenticated';
+
+  const appReady =
+    authStatus !== 'checking' &&
+    !languageChecking;
 
   // ========================================
   // LANGUAGE INITIALIZATION
@@ -86,9 +107,7 @@ const [welcomeFinished, setWelcomeFinished] =
       try {
         await loadSavedLanguage();
 
-        console.log(
-          'App language initialized successfully.'
-        );
+        console.log('App language initialized.');
       } catch (error) {
         console.error(
           'Language initialization failed:',
@@ -101,7 +120,7 @@ const [welcomeFinished, setWelcomeFinished] =
       }
     };
 
-    initializeLanguage();
+    void initializeLanguage();
 
     return () => {
       mounted = false;
@@ -109,159 +128,126 @@ const [welcomeFinished, setWelcomeFinished] =
   }, []);
 
   // ========================================
-  // AUTHENTICATION CHECK
+  // AUTHENTICATION SESSION LISTENER
   // ========================================
 
   useEffect(() => {
-    if (!rootNavigationState?.key) {
-      return;
-    }
+    return subscribeAuth((isAuthenticated) => {
+      setSessionStatus(
+        isAuthenticated ? 'authenticated' : 'guest'
+      );
 
+      if (!isAuthenticated) {
+        notificationRegistrationStarted.current = false;
+        initialNotificationHandled.current = false;
+      }
+
+      setAuthVersion((version) => version + 1);
+    });
+  }, []);
+
+  // ========================================
+  // VALIDATE SAVED SESSION
+  // ========================================
+
+  useEffect(() => {
     let cancelled = false;
 
-    const checkAuthentication = async () => {
+    const validateSession = async () => {
       try {
         const token = await getToken();
 
-        if (cancelled) {
-          return;
-        }
-
-        const firstSegment = segments[0];
-
-        const isAuthScreen =
-          firstSegment === 'login' ||
-          firstSegment === 'register' ||
-          firstSegment === 'forgot-password';
+        if (cancelled) return;
 
         if (!token) {
-          setAuthenticated(false);
-
-          if (!isAuthScreen) {
-            router.replace('/login');
-          }
-
+          setSessionStatus('guest');
           return;
         }
 
-        try {
-          const response =
-            await apiRequest('/auth/me');
+        const response = await apiRequest('/auth/me', {
+          method: 'GET',
+          token,
+        });
 
-          if (cancelled) {
-            return;
-          }
+        if (cancelled) return;
 
-          if (!response.success) {
-            throw new Error(
-              'Invalid session'
-            );
-          }
-
-          setAuthenticated(true);
-
-          if (isAuthScreen) {
-            router.replace('/(tabs)');
-          }
-        } catch (error) {
-          if (cancelled) {
-            return;
-          }
-
-          console.log(
-            'Session validation failed:',
-            error
-          );
-
-          // Existing authentication behavior is
-          // preserved for now. We will separately
-          // improve network-error handling.
-          await removeToken();
-
-          setAuthenticated(false);
-
-          notificationRegistrationStarted.current =
-            false;
-
-          router.replace('/login');
+        if (response.success && response.data) {
+          setSessionStatus('authenticated');
+          return;
         }
+
+        // An explicit unsuccessful authentication response
+        // means the saved session is not accepted.
+        await removeToken();
+
+        if (cancelled) return;
+
+        setSessionStatus('guest');
       } catch (error) {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         console.error(
-          'Authentication check failed:',
+          'Session validation error:',
           error
         );
 
-        setAuthenticated(false);
-
-        router.replace('/login');
-      } finally {
-        if (!cancelled) {
-          setAuthChecking(false);
-        }
+        // Preserve the token on an uncertain network error.
+        // The app remains locked until validation succeeds.
+        setSessionStatus('checking');
       }
     };
 
-    checkAuthentication();
+    void validateSession();
 
     return () => {
       cancelled = true;
     };
-  }, [rootNavigationState?.key]);
+  }, [authVersion]);
 
   // ========================================
   // INITIALIZE NOTIFICATION HANDLER
-  // AND RESPONSE LISTENER
   // ========================================
 
   useEffect(() => {
     const isExpoGo =
-      Constants.executionEnvironment ===
-      'storeClient';
+      Constants.executionEnvironment === 'storeClient';
 
     if (isExpoGo) {
       console.log(
-        'Expo Go detected. Remote push notifications disabled.'
+        'Expo Go: remote push notifications disabled.'
       );
-
       return;
     }
 
     let cancelled = false;
+    let cleanup: (() => void) | undefined;
 
-    let cleanup:
-      (() => void) | undefined;
+    const initializeNotifications = async () => {
+      try {
+        await initializeNotificationHandler();
 
-    const initializeNotifications =
-      async () => {
-        try {
-          await initializeNotificationHandler();
+        const cleanupFunction =
+          await initializeNotificationListener();
 
-          const cleanupFunction =
-            await initializeNotificationListener();
-
-          if (cancelled) {
-            cleanupFunction();
-            return;
-          }
-
-          cleanup = cleanupFunction;
-
-          console.log(
-            'Notification listener initialized.'
-          );
-        } catch (error) {
-          console.error(
-            'Notification initialization failed:',
-            error
-          );
+        if (cancelled) {
+          cleanupFunction();
+          return;
         }
-      };
 
-    initializeNotifications();
+        cleanup = cleanupFunction;
+
+        console.log(
+          'Notification listener initialized.'
+        );
+      } catch (error) {
+        console.error(
+          'Notification initialization failed:',
+          error
+        );
+      }
+    };
+
+    void initializeNotifications();
 
     return () => {
       cancelled = true;
@@ -270,15 +256,11 @@ const [welcomeFinished, setWelcomeFinished] =
   }, []);
 
   // ========================================
-  // REGISTER DEVICE FOR RETURNING USERS
+  // REGISTER PUSH TOKEN
   // ========================================
 
   useEffect(() => {
-    if (
-      !authenticated ||
-      authChecking ||
-      languageChecking
-    ) {
+    if (!authenticated || languageChecking) {
       return;
     }
 
@@ -297,10 +279,6 @@ const [welcomeFinished, setWelcomeFinished] =
           console.log(
             'Push token registration attempted.'
           );
-        } else {
-          console.warn(
-            'Push token registration unavailable.'
-          );
         }
       } catch (error) {
         console.error(
@@ -310,23 +288,18 @@ const [welcomeFinished, setWelcomeFinished] =
       }
     };
 
-    registerDevice();
-  }, [
-    authenticated,
-    authChecking,
-    languageChecking,
-  ]);
+    void registerDevice();
+  }, [authenticated, languageChecking]);
 
   // ========================================
   // HANDLE INITIAL NOTIFICATION
-  // AFTER AUTHENTICATION
   // ========================================
 
   useEffect(() => {
     if (
       !authenticated ||
-      authChecking ||
       languageChecking ||
+      !welcomeFinished ||
       !rootNavigationState?.key
     ) {
       return;
@@ -338,150 +311,125 @@ const [welcomeFinished, setWelcomeFinished] =
 
     initialNotificationHandled.current = true;
 
-    const processInitialNotification =
-      async () => {
-        try {
-          await handleInitialNotification();
-        } catch (error) {
-          console.error(
-            'Initial notification error:',
-            error
-          );
-        }
-      };
+    const processInitialNotification = async () => {
+      try {
+        await handleInitialNotification();
+      } catch (error) {
+        console.error(
+          'Initial notification error:',
+          error
+        );
+      }
+    };
 
-    processInitialNotification();
+    void processInitialNotification();
   }, [
     authenticated,
-    authChecking,
     languageChecking,
+    welcomeFinished,
     rootNavigationState?.key,
   ]);
 
   // ========================================
-  // LOADING
+  // AUTHENTICATION NAVIGATION
   // ========================================
 
- if (authChecking || languageChecking) {
-  return <AnimatedSplashOverlay />;
-}
+  useEffect(() => {
+    if (
+      !rootNavigationState?.key ||
+      !appReady ||
+      !welcomeFinished
+    ) {
+      return;
+    }
+
+    const firstSegment = segments[0];
+
+    const isAuthScreen =
+      firstSegment === 'login' ||
+      firstSegment === 'register' ||
+      firstSegment === 'forgot-password';
+
+    if (!authenticated) {
+      if (!isAuthScreen) {
+        router.replace('/login');
+      }
+
+      return;
+    }
+
+    if (isAuthScreen) {
+      router.replace('/(tabs)');
+    }
+  }, [
+    rootNavigationState?.key,
+    appReady,
+    welcomeFinished,
+    authenticated,
+    segments,
+  ]);
+
+  // ========================================
+  // LOADING SCREEN
+  // ========================================
+
+  if (!appReady) {
+    return <AnimatedSplashOverlay />;
+  }
 
   // ========================================
   // APPLICATION
   // ========================================
 
-return (
-  <View style={styles.root}>
-    <Stack
-
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-        {/* AUTHENTICATION */}
-
+  return (
+    <View style={styles.root}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
         <Stack.Screen name="login" />
-
         <Stack.Screen name="register" />
-
         <Stack.Screen name="forgot-password" />
-
-        {/* MAIN APPLICATION */}
 
         <Stack.Screen name="(tabs)" />
 
-        {/* DEITIES */}
-
         <Stack.Screen name="deity/[id]" />
 
-        {/* POOJA / SEVA */}
-
         <Stack.Screen name="pooja-details" />
-
         <Stack.Screen name="pooja-date" />
-
         <Stack.Screen name="pooja-devotee" />
-
         <Stack.Screen name="pooja-payment" />
-
         <Stack.Screen name="pooja-confirmation" />
 
-        {/* DARSHAN */}
-
         <Stack.Screen name="darshan" />
-
         <Stack.Screen name="darshan-videos" />
 
-        {/* GURU VANI */}
-
-        <Stack.Screen
-          name="guru-vani/index"
-          options={{
-            headerShown: false,
-          }}
-        />
-
-        <Stack.Screen
-          name="guru-vani/[id]"
-          options={{
-            headerShown: false,
-          }}
-        />
-
-        {/* EVENTS */}
+        <Stack.Screen name="guru-vani/index" />
+        <Stack.Screen name="guru-vani/[id]" />
 
         <Stack.Screen name="events" />
-
-        <Stack.Screen
-          name="events/[id]"
-          options={{
-            headerShown: false,
-          }}
-        />
-
-        {/* ANNOUNCEMENTS */}
+        <Stack.Screen name="events/[id]" />
 
         <Stack.Screen name="announcements" />
 
-        {/* BOOKINGS */}
-
         <Stack.Screen name="bookings" />
-
         <Stack.Screen name="donations" />
 
-        {/* TEMPLE INFORMATION */}
-
         <Stack.Screen name="about" />
-        
-
         <Stack.Screen name="publications" />
-
         <Stack.Screen name="gallery" />
-
-        {/* ROOMS */}
-
         <Stack.Screen name="rooms" />
 
-        {/* ACCOUNT */}
-
         <Stack.Screen name="profile" />
-
         <Stack.Screen name="account" />
-
         <Stack.Screen name="my-bookings" />
 
-        {/* OTHER */}
-
         <Stack.Screen name="nearby" />
-
         <Stack.Screen name="contact" />
-
         <Stack.Screen name="policies" />
-
-        {/* LANGUAGE SETTINGS */}
-
         <Stack.Screen name="language-settings" />
-           </Stack>
+      </Stack>
 
       {!welcomeFinished && (
         <View style={styles.welcomeOverlay}>

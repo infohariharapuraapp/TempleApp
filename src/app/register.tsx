@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,30 +14,68 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/services/api';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const phoneRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+
   const handleRegister = async () => {
-    if (!fullName.trim() || !email.trim() || !password) {
+    const name = fullName.trim();
+    const mobile = phone.trim();
+    const emailAddress = email.trim().toLowerCase();
+
+    if (name.length < 2 || name.length > 100) {
       Alert.alert(
-        'Registration Required',
-        'Please enter your full name, email and password.'
+        'Invalid Name',
+        'Enter your full name (2–100 characters).'
       );
       return;
     }
 
-    if (password.length < 6) {
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      Alert.alert(
+        'Invalid Mobile Number',
+        'Enter a valid 10-digit Indian mobile number.'
+      );
+      return;
+    }
+
+    if (
+      emailAddress &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)
+    ) {
+      Alert.alert(
+        'Invalid Email',
+        'Enter a valid email address or leave it blank.'
+      );
+      return;
+    }
+
+    if (password.length < 8) {
       Alert.alert(
         'Invalid Password',
-        'Password must contain at least 6 characters.'
+        'Password must contain at least 8 characters.'
+      );
+      return;
+    }
+
+    if (new TextEncoder().encode(password).length > 72) {
+      Alert.alert(
+        'Invalid Password',
+        'Password must not exceed 72 UTF-8 bytes.'
       );
       return;
     }
@@ -47,15 +88,17 @@ export default function RegisterScreen() {
       return;
     }
 
+    Keyboard.dismiss();
+
     try {
       setLoading(true);
 
       const response = await apiRequest('/auth/register', {
         method: 'POST',
         body: {
-          full_name: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          phone: phone.trim() || null,
+          full_name: name,
+          phone: mobile,
+          email: emailAddress || null,
           password,
         },
       });
@@ -63,7 +106,7 @@ export default function RegisterScreen() {
       if (response.success) {
         Alert.alert(
           'Registration Successful',
-          'Your account has been created. Please login to continue.',
+          'Your devotee account has been created. Please login to continue.',
           [
             {
               text: 'Login',
@@ -71,7 +114,6 @@ export default function RegisterScreen() {
             },
           ]
         );
-
         return;
       }
 
@@ -90,230 +132,279 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.label}>TEMPLE</Text>
-
-        <Text style={styles.title}>Create Account</Text>
-
-        <Text style={styles.subtitle}>
-          Create your devotee account to access temple services,
-          bookings and activities.
-        </Text>
-
-        {/* Full Name */}
-        <Text style={styles.inputLabel}>Full Name</Text>
-
-        <TextInput
-          style={styles.input}
-          value={fullName}
-          onChangeText={setFullName}
-          placeholder="Enter your full name"
-          placeholderTextColor="#999"
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-
-        {/* Email */}
-        <Text style={styles.inputLabel}>Email</Text>
-
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Enter your email"
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoCorrect={false}
-        />
-
-        {/* Phone */}
-        <Text style={styles.inputLabel}>Phone Number</Text>
-
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Enter your phone number"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-        />
-
-        {/* Password */}
-        <Text style={styles.inputLabel}>Password</Text>
-
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Create a password"
-          placeholderTextColor="#999"
-          secureTextEntry
-          autoCapitalize="none"
-        />
-
-        {/* Confirm Password */}
-        <Text style={styles.inputLabel}>Confirm Password</Text>
-
-        <TextInput
-          style={styles.input}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          placeholder="Confirm your password"
-          placeholderTextColor="#999"
-          secureTextEntry
-          autoCapitalize="none"
-        />
-
-        {/* Register */}
-        <TouchableOpacity
-          style={[
-            styles.registerButton,
-            loading && styles.disabledButton,
-          ]}
-          onPress={handleRegister}
-          disabled={loading}
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.registerButtonText}>
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.form}>
+            <Text style={styles.label}>HARIHARIPURA TEMPLE</Text>
 
-        {/* Login */}
-        <View style={styles.loginRow}>
-          <Text style={styles.loginText}>
-            Already have an account?
-          </Text>
+            <Text style={styles.title}>Create Account</Text>
 
-          <TouchableOpacity
-            onPress={() => router.replace('/login')}
-            disabled={loading}
-          >
-            <Text style={styles.loginLink}> Login</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.subtitle}>
+              Register as a devotee to access temple services,
+              bookings and activities.
+            </Text>
 
-        {/* Back */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          disabled={loading}
-        >
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Text style={styles.inputLabel}>Full Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Enter your full name"
+              placeholderTextColor="#999"
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              returnKeyType="next"
+              onSubmitEditing={() => phoneRef.current?.focus()}
+              editable={!loading}
+            />
+
+            <Text style={styles.inputLabel}>Mobile Number *</Text>
+            <TextInput
+              ref={phoneRef}
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="10-digit mobile number"
+              placeholderTextColor="#999"
+              keyboardType="phone-pad"
+              maxLength={10}
+              autoComplete="tel"
+              editable={!loading}
+            />
+
+            <Text style={styles.inputLabel}>Email (Optional)</Text>
+            <TextInput
+              ref={emailRef}
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter email if available"
+              placeholderTextColor="#999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              editable={!loading}
+            />
+
+            <Text style={styles.inputLabel}>Password *</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                ref={passwordRef}
+                style={styles.passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Minimum 8 characters"
+                placeholderTextColor="#999"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
+                returnKeyType="next"
+                onSubmitEditing={() => confirmRef.current?.focus()}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={styles.showButton}
+                onPress={() => setShowPassword(!showPassword)}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Text style={styles.showText}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.inputLabel, styles.confirmLabel]}>
+              Confirm Password *
+            </Text>
+            <TextInput
+              ref={confirmRef}
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Confirm your password"
+              placeholderTextColor="#999"
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="new-password"
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+              editable={!loading}
+            />
+
+            <Text style={styles.note}>
+              * Required fields. Email is optional, but is currently
+              needed for password recovery.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.registerButton,
+                loading && styles.disabledButton,
+              ]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.registerButtonText}>
+                  Create Account
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.loginRow}>
+              <Text style={styles.loginText}>
+                Already have an account?
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.replace('/login')}
+                disabled={loading}
+              >
+                <Text style={styles.loginLink}> Login</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
   },
-
   content: {
-    padding: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 30,
+    paddingBottom: 45,
   },
-
+  form: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1.3,
     color: '#B66A2C',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-
   title: {
     fontSize: 30,
     fontWeight: '700',
     color: '#4A2C18',
   },
-
   subtitle: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 21,
     color: '#777',
-    marginTop: 6,
-    marginBottom: 28,
+    marginTop: 8,
+    marginBottom: 25,
   },
-
   inputLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#4A2C18',
-    marginBottom: 7,
+    marginBottom: 8,
   },
-
   input: {
-    height: 50,
+    height: 52,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 15,
-    fontSize: 13,
+    fontSize: 15,
     color: '#333',
     marginBottom: 18,
     borderWidth: 1,
     borderColor: '#EEE3D8',
   },
-
+  passwordContainer: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EEE3D8',
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 15,
+    fontSize: 15,
+    color: '#333',
+  },
+  showButton: {
+    height: '100%',
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+  },
+  showText: {
+    color: '#B66A2C',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmLabel: {
+    marginTop: 18,
+  },
+  note: {
+    color: '#777',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 20,
+  },
   registerButton: {
-    height: 50,
+    height: 54,
     borderRadius: 15,
     backgroundColor: '#B66A2C',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 5,
   },
-
   disabledButton: {
     opacity: 0.6,
   },
-
   registerButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
-
   loginRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 22,
+    marginTop: 24,
   },
-
   loginText: {
     color: '#777',
-    fontSize: 13,
+    fontSize: 14,
   },
-
   loginLink: {
     color: '#B66A2C',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-  },
-
-  backButton: {
-    height: 45,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-
-  backButtonText: {
-    color: '#B66A2C',
-    fontSize: 13,
-    fontWeight: '600',
   },
 });
