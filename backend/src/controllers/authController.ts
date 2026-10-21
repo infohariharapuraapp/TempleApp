@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { sendPasswordResetOTP } from '../services/emailService';
+import { randomInt } from 'node:crypto';
 
 // =========================
 // REGISTER
@@ -357,12 +359,12 @@ export const forgotPassword = async (
     }
 
     // Find user by mobile number
-    const userResult = await pool.query(
-      `SELECT id, full_name, phone
-       FROM users
-       WHERE phone = $1`,
-      [phone]
-    );
+   const userResult = await pool.query(
+  `SELECT id, full_name, phone, email
+   FROM users
+   WHERE phone = $1`,
+  [phone]
+);
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({
@@ -371,8 +373,18 @@ export const forgotPassword = async (
       });
     }
 
-    const user = userResult.rows[0];
-    const otp = '000000';
+   const user = userResult.rows[0];
+
+if (!user.email) {
+  return res.status(400).json({
+    success: false,
+    message:
+      'No email address is registered with this account. Please contact temple support.',
+  });
+}
+
+// Generate secure six-digit OTP
+const otp = randomInt(100000, 1000000).toString();
 
     // Generate 6-digit OTP
    //const otp = crypto
@@ -408,16 +420,35 @@ export const forgotPassword = async (
       ]
     );
 
-    // DEVELOPMENT ONLY
-    // Later this will be replaced with real SMS delivery.
-    console.log(
-      `[DEV OTP] Password reset OTP for ${phone}: ${otp}`
-    );
+    try {
+  await sendPasswordResetOTP(
+    user.email,
+    otp
+  );
+} catch (emailError) {
+  console.error(
+    'Password reset email delivery failed:',
+    emailError
+  );
 
-    return res.json({
-      success: true,
-      message: 'OTP generated successfully',
-    });
+  await pool.query(
+    `DELETE FROM password_reset_otps
+     WHERE user_id = $1`,
+    [user.id]
+  );
+
+  return res.status(503).json({
+    success: false,
+    message:
+      'Unable to send OTP email. Please try again later.',
+  });
+}
+
+return res.json({
+  success: true,
+  message:
+    'Password reset OTP sent to your registered email address.',
+}); 
   } catch (error) {
     console.error(
       'Forgot password error:',
