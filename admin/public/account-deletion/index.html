@@ -78,14 +78,57 @@
       background: #6b1720;
       color: white;
       padding: 12px 22px;
+      border: none;
       border-radius: 9px;
       text-decoration: none;
+      font-family: inherit;
+      font-size: 15px;
       font-weight: bold;
+      cursor: pointer;
       margin-top: 12px;
     }
 
     .button:hover {
       background: #842331;
+    }
+
+    .button-secondary {
+      background: #f7ebd7;
+      color: #6b1720;
+      border: 1px solid #c69a3a;
+    }
+
+    .button-secondary:hover {
+      background: #edd9b6;
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .button-group .button {
+      margin-top: 0;
+    }
+
+    .email {
+      color: #6b1720;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+
+    .help-text {
+      font-size: 14px;
+      color: #786b61;
+    }
+
+    #copy-status {
+      font-size: 14px;
+      color: #326b38;
+      min-height: 22px;
     }
 
     footer {
@@ -107,11 +150,22 @@
       main {
         margin-top: 18px;
       }
+
+      .button-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .button-group .button {
+        width: 100%;
+        text-align: center;
+      }
     }
   </style>
 </head>
 
 <body>
+
   <header>
     <div>🙏 HARIHARIPURA TEMPLE</div>
     <h1>Account Deletion Request</h1>
@@ -119,6 +173,7 @@
   </header>
 
   <main>
+
     <section>
       <h2>Delete Your Devotee Account</h2>
 
@@ -168,32 +223,71 @@
         the request.
       </p>
 
-     
-<p>
-  <strong>Account Deletion Support:</strong><br>
-  <a href="mailto:info.hariharapura@gmail.com">
-    info.hariharapura@gmail.com
-  </a>
-</p>
+      <p>
+        <strong>Account Deletion Support:</strong>
+      </p>
 
-<a
-  class="button"
-  href="mailto:info.hariharapura@gmail.com?subject=Hariharipura%20Temple%20App%20-%20Account%20Deletion%20Request"
->
-  Request Account Deletion
-</a>
+      <p>
+        <a
+          class="email"
+          href="mailto:info.hariharapura@gmail.com"
+        >
+          info.hariharapura@gmail.com
+        </a>
+      </p>
 
-<p>
-  Please mention the mobile number or email address
-  registered with your Temple App account.
-  The temple administration may contact you to
-  verify account ownership before deletion.
-</p>
+      <div class="button-group">
 
-<p>
-  Never include your password or OTP in the email.
-</p>
+        <a
+          class="button"
+          href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=info.hariharapura%40gmail.com&amp;su=Hariharipura%20Temple%20App%20-%20Account%20Deletion%20Request"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Request Account Deletion via Gmail
+        </a>
 
+        <button
+          class="button button-secondary"
+          type="button"
+          onclick="copyEmail()"
+        >
+          Copy Email Address
+        </button>
+
+      </div>
+
+      <p id="copy-status" role="status" aria-live="polite"></p>
+
+      <p class="help-text">
+        The Gmail button opens Gmail in your browser.
+        If you use another email service, copy the support
+        address and send your request from your preferred
+        email application.
+      </p>
+
+      <div class="notice">
+        <strong>What to include in your request:</strong>
+
+        <ul>
+          <li>
+            Your registered email address or mobile number.
+          </li>
+          <li>
+            A statement requesting deletion of your
+            Hariharipura Temple App account.
+          </li>
+        </ul>
+
+        The temple administration may contact you to
+        verify account ownership before processing
+        the deletion.
+      </div>
+
+      <p>
+        <strong>Security:</strong>
+        Never include your password or OTP in the email.
+      </p>
     </section>
 
     <section>
@@ -221,11 +315,13 @@
           remain visible without the deleted account's
           displayed name.
         </li>
+
         <li>
           Room and pooja bookings made through the
           separate temple booking website are managed
           independently of the mobile app account.
         </li>
+
         <li>
           Information that must be retained for legal
           or operational requirements may be retained
@@ -244,14 +340,53 @@
       <h2>Need Assistance?</h2>
 
       <p>
-        For account-deletion assistance, please contact
-        the temple using its confirmed support channel.
+        For account deletion or related assistance,
+        contact the Hariharipura Temple support team:
+      </p>
+
+      <p>
+        <a
+          class="email"
+          href="mailto:info.hariharapura@gmail.com"
+        >
+          info.hariharapura@gmail.com
+        </a>
+      </p>
+
+      <p>
+        Account deletion requests sent by email
+        will be reviewed after verifying account
+        ownership where necessary.
       </p>
     </section>
+
   </main>
 
   <footer>
     Hariharipura Temple App — Account Deletion Information
   </footer>
+
+  <script>
+    async function copyEmail() {
+      const email = "info.hariharapura@gmail.com";
+      const status = document.getElementById("copy-status");
+
+      try {
+        if (!navigator.clipboard ||
+            !navigator.clipboard.writeText) {
+          throw new Error("Clipboard unavailable");
+        }
+
+        await navigator.clipboard.writeText(email);
+
+        status.textContent =
+          "Email address copied successfully.";
+      } catch (error) {
+        status.textContent =
+          "Please select and copy the email address shown above.";
+      }
+    }
+  </script>
+
 </body>
 </html>
