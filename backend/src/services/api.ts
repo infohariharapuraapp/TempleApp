@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
+const API_BASE_URL = 'https://hariharapura-temple-api.onrender.com/api';
 //const API_BASE_URL = 'http://192.168.0.122:5000/api';
 //const API_BASE_URL = 'https://monk0y8jf9.execute-api.ap-south-1.amazonaws.com/api';
 // Local backend testing through USB

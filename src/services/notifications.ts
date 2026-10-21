@@ -26,7 +26,7 @@ const IS_EXPO_GO =
 
 // LOCAL TESTING
 const API_BASE_URL =
- 'https://templeapp-s96e.onrender.com/api';
+ 'https://hariharapura-temple-api.onrender.com/api';
 
  //'http://192.168.0.122:5000/api';
 // PRODUCTION: Switch before building

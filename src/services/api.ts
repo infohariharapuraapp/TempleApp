@@ -8,7 +8,7 @@ import { getToken } from '@/services/authStorage';
 //const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
 // Production backend
- const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
+ const API_BASE_URL = 'https://hariharapura-temple-api.onrender.com/api';
 
 
 type ApiOptions = {
