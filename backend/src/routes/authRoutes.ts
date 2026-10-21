@@ -6,6 +6,7 @@ import {
     updateProfile,
   forgotPassword,
    verifyResetOtp,
+   deleteAccount,
    resetPassword,
 } from '../controllers/authController';
 import { authenticateToken } from '../middleware/authMiddleware';
@@ -36,6 +37,11 @@ router.get(
   '/me',
   authenticateToken,
   getMe
+);
+router.delete(
+  '/account',
+  authenticateToken,
+  deleteAccount
 );
 
 export default router;

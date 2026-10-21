@@ -783,3 +783,127 @@ export const resetPassword = async (
     });
   }
 };
+
+
+ // ========================================
+ // DELETE DEVOTEE ACCOUNT
+ // ========================================
+
+
+
+export const deleteAccount = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  const userId = req.user?.userId;
+  const { password } = req.body ?? {};
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+
+  if (
+    typeof password !== 'string' ||
+    password.length === 0
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Password is required to delete your account',
+    });
+  }
+
+  let client;
+
+  try {
+    client = await pool.connect();
+
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `SELECT id, password_hash, role
+       FROM users
+       WHERE id = $1
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found',
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.role !== 'devotee') {
+      await client.query('ROLLBACK');
+
+      return res.status(403).json({
+        success: false,
+        message: 'This account cannot be deleted here',
+      });
+    }
+
+    if (!user.password_hash) {
+      await client.query('ROLLBACK');
+
+      return res.status(400).json({
+        success: false,
+        message: 'Password verification is unavailable',
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user.password_hash
+    );
+
+    if (!passwordMatches) {
+      await client.query('ROLLBACK');
+
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password',
+      });
+    }
+
+    await client.query(
+      'DELETE FROM users WHERE id = $1',
+      [userId]
+    );
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      message: 'Your account has been deleted successfully',
+    });
+
+  } catch (error) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Rollback error:', rollbackError);
+      }
+    }
+
+    console.error('Delete account error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to delete account',
+    });
+
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+};

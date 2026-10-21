@@ -135,7 +135,7 @@
           q.created_at,
           q.category_id,
           c.name AS category_name,
-          u.full_name AS devotee_name,
+          COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name,
 
           (
             SELECT COUNT(*)::INTEGER
@@ -148,7 +148,7 @@
         FROM dharma_questions q
         JOIN dharma_categories c
           ON c.id = q.category_id
-        JOIN users u
+        LEFT JOIN users u
           ON u.id = q.user_id
 
         WHERE ${whereClause}
@@ -209,13 +209,14 @@
   q.created_at,
   q.category_id,
   c.name AS category_name,
-  u.full_name AS devotee_name
+  COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name
 
         FROM dharma_questions q
         JOIN dharma_categories c
           ON c.id = q.category_id
-        JOIN users u
+       LEFT JOIN users u
           ON u.id = q.user_id
+
 
         WHERE q.id = $1
           AND q.status = 'approved'
@@ -239,7 +240,7 @@
       a.answer,
       a.answer_type,
       a.created_at,
-      u.full_name AS devotee_name,
+     COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name,
 
       (
         SELECT COUNT(*)::INTEGER
@@ -255,7 +256,7 @@
       ) AS is_liked
 
     FROM dharma_answers a
-    JOIN users u
+    LEFT JOIN users u
       ON u.id = a.user_id
 
     WHERE a.question_id = $1
@@ -478,7 +479,7 @@
       }
 
       const question = questionResult.rows[0];
-      
+
 
       if (question.status !== 'approved') {
         await client.query('ROLLBACK');
@@ -942,7 +943,7 @@
           r.status,
           r.created_at,
 
-          reporter.full_name AS reported_by_name,
+          COALESCE(reporter.full_name, 'Deleted Devotee') AS reported_by_name,
 
           q.title AS question_title,
 
@@ -955,7 +956,7 @@
 
         FROM dharma_reports r
 
-        JOIN users reporter
+        LEFT JOIN users reporter
           ON reporter.id = r.reported_by
 
         LEFT JOIN dharma_questions q
@@ -1149,6 +1150,3 @@
       client.release();
     }
   };
-
-
-

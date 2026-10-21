@@ -301,6 +301,22 @@ export default function AccountScreen() {
           </Text>
         </TouchableOpacity>
 
+
+{/* DELETE ACCOUNT */}
+
+<TouchableOpacity
+  style={styles.deleteAccountButton}
+  onPress={() => router.push('/delete-account' as any)}
+  activeOpacity={0.8}
+>
+  <Text style={styles.deleteAccountButtonText}>
+    Delete My Account
+  </Text>
+</TouchableOpacity>
+
+
+
+
         {/* BACK TO HOME */}
 
         <TouchableOpacity
@@ -707,6 +723,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+
+deleteAccountButton: {
+  height: 48,
+  borderRadius: 15,
+  backgroundColor: '#FFF1F0',
+  borderWidth: 1,
+  borderColor: '#D9534F',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 10,
+},
+
+deleteAccountButtonText: {
+  color: '#B42318',
+  fontSize: 13,
+  fontWeight: '700',
+},
+
 
   homeButton: {
     height: 48,

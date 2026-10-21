@@ -64,10 +64,10 @@ export const getAdminDharmaQuestions = async (
         q.status,
         q.created_at,
         q.updated_at,
-        u.full_name AS devotee_name,
+       COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name,
         c.name AS category_name
       FROM dharma_questions q
-      JOIN users u ON u.id = q.user_id
+     LEFT JOIN users u ON u.id = q.user_id
       JOIN dharma_categories c ON c.id = q.category_id
       WHERE ($1::VARCHAR IS NULL OR q.status = $1)
       ORDER BY
@@ -183,10 +183,10 @@ export const getAdminDharmaAnswers = async (
         a.status,
         a.created_at,
         a.updated_at,
-        u.full_name AS devotee_name,
+        COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name,
         q.title AS question_title
       FROM dharma_answers a
-      JOIN users u ON u.id = a.user_id
+     LEFT JOIN users u ON u.id = a.user_id
       JOIN dharma_questions q ON q.id = a.question_id
       WHERE ($1::VARCHAR IS NULL OR a.status = $1)
       ORDER BY
