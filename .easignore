@@ -59,3 +59,17 @@ src.zip
 
 # Include Firebase configuration in EAS cloud builds
 !/google-services.json
+
+
+*.apk
+*.aab
+*.log
+
+node_modules/
+.expo/
+.git/
+
+android/.gradle/
+android/build/
+android/app/build/
+ios/Pods/

@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
      "name": "Divyakshetra Hariharapura",
     "slug": "TempleApp",
@@ -24,7 +24,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.bharathkumardhfm.TempleApp"
+      "package": "com.sreemathhariharapura.templeapp"
     },
     "web": {
       "output": "static",
@@ -70,3 +70,4 @@
     }
   }
 }
+
