@@ -96,6 +96,13 @@ function getCoverImage(event: TempleEvent): string | null {
   return firstImage?.image_url || null;
 }
 
+function validEventTime(value?: string | null): string {
+  if (!value) return '';
+
+  const time = value.slice(0, 5);
+  return time === '00:00' ? '' : time;
+}
+
 export default function EventsScreen() {
   const { t, i18n } = useTranslation();
 
@@ -398,16 +405,18 @@ export default function EventsScreen() {
                         📅 {formatDateRange(event)}
                       </Text>
 
-                      {(event.start_time || event.end_time) && (
-                        <Text style={styles.meta}>
-                          🕐{' '}
-                          {event.start_time && event.end_time
-                            ? `${event.start_time.slice(0, 5)} – ${event.end_time.slice(0, 5)}`
-                            : event.start_time
-                              ? `${t('events.startsAt', { defaultValue: 'Starts at' })} ${event.start_time.slice(0, 5)}`
-                              : `${t('events.endsAt', { defaultValue: 'Ends at' })} ${event.end_time?.slice(0, 5)}`}
-                        </Text>
-                      )}
+                     {(validEventTime(event.start_time) ||
+  validEventTime(event.end_time)) ? (
+  <Text style={styles.meta}>
+    🕐{' '}
+    {validEventTime(event.start_time) &&
+    validEventTime(event.end_time)
+      ? `${validEventTime(event.start_time)} – ${validEventTime(event.end_time)}`
+      : validEventTime(event.start_time)
+        ? `Starts at ${validEventTime(event.start_time)}`
+        : `Ends at ${validEventTime(event.end_time)}`}
+  </Text>
+) : null}
 
                       {event.location ? (
                         <Text

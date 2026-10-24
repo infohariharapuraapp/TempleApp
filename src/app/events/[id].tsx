@@ -74,7 +74,12 @@ const CATEGORY_LANGUAGES: CategoryLanguage[] = [
   'hi',
   'ta',
 ];
+function validEventTime(value?: string | null): string {
+  if (!value) return '';
 
+  const time = value.slice(0, 5);
+  return time === '00:00' ? '' : time;
+}
 export default function EventDetailsScreen() {
   const { id, period } = useLocalSearchParams<{
     id: string;
@@ -450,22 +455,23 @@ export default function EventDetailsScreen() {
                 </Text>
               </View>
 
-              {(event.start_time || event.end_time) && (
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>
-                    {t('events.timings')}
-                  </Text>
-                  <Text style={styles.infoValue}>
-                    🕐{' '}
-                    {event.start_time && event.end_time
-                      ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
-                      : event.start_time
-                        ? `${t('events.startsAt', { defaultValue: 'Starts at' })} ${formatTime(event.start_time)}`
-                        : `${t('events.endsAt', { defaultValue: 'Ends at' })} ${formatTime(event.end_time)}`}
-                  </Text>
-                </View>
-              )}
-
+            {(validEventTime(event.start_time) ||
+  validEventTime(event.end_time)) ? (
+  <View style={styles.infoBox}>
+    <Text style={styles.infoLabel}>
+      {t('events.timings')}
+    </Text>
+    <Text style={styles.infoValue}>
+      🕐{' '}
+      {validEventTime(event.start_time) &&
+      validEventTime(event.end_time)
+        ? `${validEventTime(event.start_time)} – ${validEventTime(event.end_time)}`
+        : validEventTime(event.start_time)
+          ? `Starts at ${validEventTime(event.start_time)}`
+          : `Ends at ${validEventTime(event.end_time)}`}
+    </Text>
+  </View>
+) : null}
               {event.location ? (
                 <View style={styles.infoBox}>
                   <Text style={styles.infoLabel}>
