@@ -68,6 +68,14 @@ const messageOf = (error: unknown, fallback: string) =>
 const datePart = (value?: string | null) => value?.substring(0, 10) || '';
 
 const timePart = (value?: string | null) => value?.substring(0, 5) || '';
+const displayTime = (start?: string | null, end?: string | null) => {
+  const a = timePart(start);
+  const b = timePart(end);
+  return a && b ? `${a} – ${b}` : a ? `Starts at ${a}` : b ? `Ends at ${b}` : '—';
+};
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tif', '.tiff', '.heic', '.heif', '.avif'];
+const IMAGE_ACCEPT = IMAGE_EXTENSIONS.join(',');
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 
 
@@ -519,7 +527,7 @@ export default function Events() {
 
                     <td>{datePart(event.event_date) || '—'}{event.event_end_date && datePart(event.event_end_date) !== datePart(event.event_date) ? ` – ${datePart(event.event_end_date)}` : ''}</td>
 
-                    <td>{timePart(event.start_time) || '—'} – {timePart(event.end_time) || '—'}</td>
+                    <td>{displayTime(event.start_time, event.end_time)}</td>
 
                     <td>{event.location || '—'}</td>
 
@@ -591,8 +599,8 @@ function EventForm({ event, categories, onClose, onSaved }: {
       setFormError('Maximum 10 images per event');
       return;
     }
-    if (incoming.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
-      setFormError('Only JPG, PNG or WebP images up to 5 MB are allowed');
+    if (incoming.some(file => !IMAGE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)) || file.size > MAX_IMAGE_BYTES || file.size === 0)) {
+      setFormError('Use JPG, JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC, HEIF or AVIF images up to 10 MB each');
       return;
     }
     setFormError('');
@@ -688,14 +696,14 @@ function EventForm({ event, categories, onClose, onSaved }: {
           </label>
           <label>Event Date *<input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required /></label>
           <label>Event End Date (Optional)<input type="date" min={eventDate || undefined} value={eventEndDate} onChange={e => setEventEndDate(e.target.value)} /></label>
-          <label>Start Time<input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></label>
-          <label>End Time<input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></label>
+          <label>Start Time (Optional)<input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></label>
+          <label>End Time (Optional)<input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></label>
           <label>Location<input value={location} onChange={e => setLocation(e.target.value)} placeholder="Temple Main Hall" /></label>
           <label style={{ gridColumn: '1 / -1' }}>Description<textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Event description" /></label>
         </div>
         <div style={{ marginTop: 18 }}>
-          <label>Event Photos (maximum 10, JPG/PNG/WebP, 5 MB each)
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || images.length + pendingFiles.length >= 10}
+          <label>Event Photos (maximum 10, JPG/JPEG/PNG/WebP/GIF/BMP/TIFF/HEIC/HEIF/AVIF, 10 MB each)
+            <input type="file" accept={IMAGE_ACCEPT} multiple disabled={saving || images.length + pendingFiles.length >= 10}
               onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
           </label>
           <p style={{ fontSize: 13, color: '#81776d' }}>
