@@ -1,34 +1,26 @@
+
 import React, { useCallback, useState } from 'react';
 
 import {
-
   ActivityIndicator,
-
   Image,
-
   RefreshControl,
-
   ScrollView,
-
   StyleSheet,
-
   Text,
-
   TouchableOpacity,
-
   View,
-
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { useFocusEffect, router } from 'expo-router';
-
 import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '@/services/api';
 
-
+// ========================================
+// TYPES
+// ========================================
 
 type Category = {
   id: number;
@@ -42,436 +34,701 @@ type Category = {
 
 type CategoryLanguage = 'en' | 'te' | 'kn' | 'hi' | 'ta';
 
-function translatedCategoryName(category: Category, language: string): string {
-  const code = language.split('-')[0] as CategoryLanguage;
-  const field: Record<CategoryLanguage, keyof Category> = {
+type TempleEvent = {
+  id: number;
+  title: string;
+  description?: string | null;
+  image_url?: string | null;
+  event_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  location?: string | null;
+  category_id: number;
+  category_name: string;
+};
+
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+};
+
+type Period = 'upcoming' | 'past';
+
+// ========================================
+// LANGUAGE SETTINGS
+// ========================================
+
+const LOCALES: Record<string, string> = {
+  en: 'en-IN',
+  te: 'te-IN',
+  kn: 'kn-IN',
+  hi: 'hi-IN',
+  ta: 'ta-IN',
+};
+
+// ========================================
+// TRANSLATED CATEGORY NAME
+// ========================================
+
+function translatedCategoryName(
+  category: Category,
+  language: string
+): string {
+  const code =
+    language.split('-')[0] as CategoryLanguage;
+
+  const fields: Record<
+    CategoryLanguage,
+    keyof Category
+  > = {
     en: 'name_en',
     te: 'name_te',
     kn: 'name_kn',
     hi: 'name_hi',
     ta: 'name_ta',
   };
-  const translated = category[field[code] || 'name_en'];
-  return typeof translated === 'string' && translated.trim()
-    ? translated.trim()
-    : category.name_en?.trim() || category.name;
-}
 
-type TempleEvent = {
-
-  id: number;
-
-  title: string;
-
-  description?: string | null;
-
-  image_url?: string | null;
-
-  event_date?: string | null;
-
-  start_time?: string | null;
-
-  end_time?: string | null;
-
-  location?: string | null;
-
-  category_id: number;
-
-  category_name: string;
-
-};
-
-type ApiResponse<T> = { success: boolean; data: T };
-
-type Period = 'upcoming' | 'past';
-
-const LOCALES: Record<string, string> = {
-
-  en: 'en-IN', te: 'te-IN', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN',
-
-};
-
-
-
-export default function EventsScreen() {
-
-  const { t, i18n } = useTranslation();
-
-  const [period, setPeriod] = useState<Period>('upcoming');
-
-  const [categoryId, setCategoryId] = useState<number | null>(null);
-
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  const [events, setEvents] = useState<TempleEvent[]>([]);
-
-  const [loading, setLoading] = useState(true);
-
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [error, setError] = useState('');
-
-  const locale = LOCALES[i18n.language.split('-')[0]] || 'en-IN';
-
-
-
-  const loadData = useCallback(async (showLoader = true) => {
-
-    if (showLoader) setLoading(true);
-
-    setError('');
-
-    try {
-
-      const [categoryResponse, eventResponse] = await Promise.all([
-
-        apiRequest<ApiResponse<Category[]>>('/event-categories'),
-
-        apiRequest<ApiResponse<TempleEvent[]>>(`/events?type=${period}`),
-
-      ]);
-
-      const activeCategories = categoryResponse.data || [];
-
-      setCategories(activeCategories);
-
-      setEvents(eventResponse.data || []);
-
-      setCategoryId((current) =>
-
-        current !== null && !activeCategories.some((c) => c.id === current)
-
-          ? null
-
-          : current
-
-      );
-
-    } catch (err) {
-
-      console.error('Load temple events failed:', err);
-
-      setError(t('events.loadError', { defaultValue: 'Unable to load events. Please try again.' }));
-
-    } finally {
-
-      setLoading(false);
-
-      setRefreshing(false);
-
-    }
-
-  }, [period, t]);
-
-
-
-  useFocusEffect(useCallback(() => {
-
-    void loadData();
-
-  }, [loadData]));
-
-
-
-  function formatDate(value?: string | null) {
-
-    if (!value) return '—';
-
-    const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-
-    return Number.isNaN(date.getTime()) ? value.slice(0, 10) :
-
-      date.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
-
+  const field = fields[code] || 'name_en';
+  const translated = category[field];
+
+  if (
+    typeof translated === 'string' &&
+    translated.trim()
+  ) {
+    return translated.trim();
   }
 
+  return category.name_en?.trim() || category.name;
+}
 
+// ========================================
+// EVENTS SCREEN
+// ========================================
 
-  const visibleEvents = categoryId === null
+export default function EventsScreen() {
+  const { t, i18n } = useTranslation();
 
-    ? events
+  const [period, setPeriod] =
+    useState<Period>('upcoming');
 
-    : events.filter((event) => event.category_id === categoryId);
+  const [categoryId, setCategoryId] =
+    useState<number | null>(null);
 
-  const categoryCounts = (id: number) => events.filter((event) => event.category_id === id).length;
+  const [categories, setCategories] =
+    useState<Category[]>([]);
 
-  const categoryNameForEvent = (event: TempleEvent): string => {
-    const category = categories.find((item) => item.id === event.category_id);
+  const [events, setEvents] =
+    useState<TempleEvent[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const currentLanguage =
+    (i18n.resolvedLanguage || i18n.language)
+      .split('-')[0];
+
+  const locale =
+    LOCALES[currentLanguage] || 'en-IN';
+
+  // ========================================
+  // FETCH EVENTS AND CATEGORIES
+  // ========================================
+
+  const loadData = useCallback(
+    async (showLoader = true) => {
+      if (showLoader) {
+        setLoading(true);
+      }
+
+      setError('');
+
+      try {
+        const [
+          categoryResponse,
+          eventResponse,
+        ] = await Promise.all([
+          apiRequest<ApiResponse<Category[]>>(
+            '/event-categories'
+          ),
+
+          apiRequest<ApiResponse<TempleEvent[]>>(
+            `/events?type=${period}`
+          ),
+        ]);
+
+        if (
+          !categoryResponse.success ||
+          !eventResponse.success
+        ) {
+          throw new Error('Failed to load events');
+        }
+
+        const activeCategories =
+          Array.isArray(categoryResponse.data)
+            ? categoryResponse.data
+            : [];
+
+        const loadedEvents =
+          Array.isArray(eventResponse.data)
+            ? eventResponse.data
+            : [];
+
+        setCategories(activeCategories);
+        setEvents(loadedEvents);
+
+        setCategoryId((current) =>
+          current !== null &&
+          !activeCategories.some(
+            (category) => category.id === current
+          )
+            ? null
+            : current
+        );
+      } catch (err) {
+        console.error(
+          'Load temple events failed:',
+          err
+        );
+
+        setError(t('events.loadError'));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [period, t]
+  );
+
+  // ========================================
+  // REFRESH WHEN SCREEN OPENS
+  // ========================================
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData])
+  );
+
+  // ========================================
+  // DATE FORMAT
+  // ========================================
+
+  function formatDate(
+    value?: string | null
+  ): string {
+    if (!value) {
+      return '—';
+    }
+
+    const date = new Date(
+      `${value.slice(0, 10)}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return value.slice(0, 10);
+    }
+
+    return date.toLocaleDateString(locale, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  // ========================================
+  // FILTER EVENTS
+  // ========================================
+
+  const visibleEvents =
+    categoryId === null
+      ? events
+      : events.filter(
+          (event) =>
+            event.category_id === categoryId
+        );
+
+  const categoryCounts = (id: number) =>
+    events.filter(
+      (event) => event.category_id === id
+    ).length;
+
+  const categoryNameForEvent = (
+    event: TempleEvent
+  ): string => {
+    const category = categories.find(
+      (item) => item.id === event.category_id
+    );
+
     return category
-      ? translatedCategoryName(category, i18n.language)
+      ? translatedCategoryName(
+          category,
+          currentLanguage
+        )
       : event.category_name;
   };
 
-
+  // ========================================
+  // RENDER
+  // ========================================
 
   return (
-
     <SafeAreaView style={styles.container}>
-
       <ScrollView
-
         contentContainerStyle={styles.content}
-
         showsVerticalScrollIndicator={false}
-
         refreshControl={
-
-          <RefreshControl refreshing={refreshing} onRefresh={() => {
-
-            setRefreshing(true);
-
-            void loadData(false);
-
-          }} />
-
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void loadData(false);
+            }}
+          />
         }
-
       >
+        {/* HEADER */}
 
-        <Text style={styles.eyebrow}>{t('events.community', { defaultValue: 'Temple Community' })}</Text>
+        <Text style={styles.eyebrow}>
+          {t('events.community')}
+        </Text>
 
-        <Text style={styles.heading}>{t('events.title', { defaultValue: 'Temple Events' })} 📅</Text>
+        <Text style={styles.heading}>
+          {t('events.title')} 📅
+        </Text>
 
-        <Text style={styles.subtitle}>{t('events.subtitle', { defaultValue: 'Explore temple celebrations and special occasions' })}</Text>
+        <Text style={styles.subtitle}>
+          {t('events.subtitle')}
+        </Text>
 
-
+        {/* UPCOMING / PAST */}
 
         <View style={styles.periodRow}>
-
-          {(['upcoming', 'past'] as Period[]).map((value) => (
-
+          {(
+            ['upcoming', 'past'] as Period[]
+          ).map((value) => (
             <TouchableOpacity
-
               key={value}
-
-              style={[styles.periodButton, period === value && styles.periodActive]}
-
-              onPress={() => { setPeriod(value); setCategoryId(null); }}
-
+              style={[
+                styles.periodButton,
+                period === value &&
+                  styles.periodActive,
+              ]}
+              onPress={() => {
+                setPeriod(value);
+                setCategoryId(null);
+              }}
             >
-
-              <Text style={[styles.periodText, period === value && styles.periodTextActive]}>
-
+              <Text
+                style={[
+                  styles.periodText,
+                  period === value &&
+                    styles.periodTextActive,
+                ]}
+              >
                 {value === 'upcoming'
-
-                  ? t('events.upcoming', { defaultValue: 'Upcoming Events' })
-
-                  : t('events.past', { defaultValue: 'Past Events' })}
-
+                  ? t('events.upcoming')
+                  : t('events.past')}
               </Text>
-
             </TouchableOpacity>
-
           ))}
-
         </View>
 
-
+        {/* LOADING */}
 
         {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator
+              size="large"
+              color="#8B4513"
+            />
 
-          <ActivityIndicator size="large" color="#8B4513" style={styles.center} />
-
+            <Text style={styles.loadingText}>
+              {t('events.loading')}
+            </Text>
+          </View>
         ) : error ? (
+          /* ERROR */
 
           <View style={styles.center}>
-
-            <Text style={styles.error}>{error}</Text>
-
-            <TouchableOpacity style={styles.retry} onPress={() => void loadData()}>
-
-              <Text style={styles.retryText}>{t('events.retry', { defaultValue: 'Retry' })}</Text>
-
-            </TouchableOpacity>
-
-          </View>
-
-        ) : (
-
-          <>
-
-            <Text style={styles.sectionHeading}>{t('events.categories', { defaultValue: 'Event Categories' })}</Text>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-
-              <TouchableOpacity
-
-                style={[styles.chip, categoryId === null && styles.chipActive]}
-
-                onPress={() => setCategoryId(null)}
-
-              >
-
-                <Text style={[styles.chipText, categoryId === null && styles.chipTextActive]}>
-
-                  {t('events.allCategories', { defaultValue: 'All Categories' })} ({events.length})
-
-                </Text>
-
-              </TouchableOpacity>
-
-              {categories.map((category) => (
-
-                <TouchableOpacity
-
-                  key={category.id}
-
-                  style={[styles.chip, categoryId === category.id && styles.chipActive]}
-
-                  onPress={() => setCategoryId(category.id)}
-
-                >
-
-                  <Text style={[styles.chipText, categoryId === category.id && styles.chipTextActive]}>
-
-                    {translatedCategoryName(category, i18n.language)} ({categoryCounts(category.id)})
-
-                  </Text>
-
-                </TouchableOpacity>
-
-              ))}
-
-            </ScrollView>
-
-
-
-            <Text style={styles.sectionHeading}>
-
-              {period === 'upcoming'
-
-                ? t('events.upcoming', { defaultValue: 'Upcoming Events' })
-
-                : t('events.past', { defaultValue: 'Past Events' })}
-
+            <Text style={styles.error}>
+              {error}
             </Text>
 
-            {visibleEvents.length === 0 ? (
+            <TouchableOpacity
+              style={styles.retry}
+              onPress={() => void loadData()}
+            >
+              <Text style={styles.retryText}>
+                {t('events.retry')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* EVENT CATEGORIES */}
 
-              <Text style={styles.empty}>{t('events.noEvents', { defaultValue: 'No events found in this category.' })}</Text>
+            <Text style={styles.sectionHeading}>
+              {t('events.categories')}
+            </Text>
 
-            ) : visibleEvents.map((event) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chips}
+            >
+              {/* ALL CATEGORIES */}
 
               <TouchableOpacity
-
-                key={event.id}
-
-                activeOpacity={0.8}
-
-                style={styles.eventCard}
-
-                onPress={() => router.push({ pathname: '/events/[id]' as any, params: { id: String(event.id), period } })}
-
+                style={[
+                  styles.chip,
+                  categoryId === null &&
+                    styles.chipActive,
+                ]}
+                onPress={() =>
+                  setCategoryId(null)
+                }
               >
-
-                {event.image_url ? (
-
-                  <Image source={{ uri: event.image_url }} style={styles.image} resizeMode="cover" />
-
-                ) : (
-
-                  <View style={styles.placeholder}><Text style={styles.placeholderIcon}>🛕</Text></View>
-
-                )}
-
-                <View style={styles.eventBody}>
-
-                  <Text style={styles.categoryLabel}>{categoryNameForEvent(event)}</Text>
-
-                  <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
-
-                  <Text style={styles.meta}>📅 {formatDate(event.event_date)}</Text>
-
-                  {(event.start_time || event.end_time) && (
-
-                    <Text style={styles.meta}>🕐 {[event.start_time?.slice(0, 5), event.end_time?.slice(0, 5)].filter(Boolean).join(' – ')}</Text>
-
-                  )}
-
-                  {event.location ? <Text style={styles.meta} numberOfLines={1}>📍 {event.location}</Text> : null}
-
-                  <Text style={styles.more}>{t('events.viewDetails', { defaultValue: 'View Details' })} →</Text>
-
-                </View>
-
+                <Text
+                  style={[
+                    styles.chipText,
+                    categoryId === null &&
+                      styles.chipTextActive,
+                  ]}
+                >
+                  {t('events.allCategories')}{' '}
+                  ({events.length})
+                </Text>
               </TouchableOpacity>
 
-            ))}
+              {/* DYNAMIC CATEGORIES */}
 
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.chip,
+                    categoryId === category.id &&
+                      styles.chipActive,
+                  ]}
+                  onPress={() =>
+                    setCategoryId(category.id)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      categoryId === category.id &&
+                        styles.chipTextActive,
+                    ]}
+                  >
+                    {translatedCategoryName(
+                      category,
+                      currentLanguage
+                    )}{' '}
+                    ({categoryCounts(category.id)})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* EVENT SECTION TITLE */}
+
+            <Text style={styles.sectionHeading}>
+              {period === 'upcoming'
+                ? t('events.upcoming')
+                : t('events.past')}
+            </Text>
+
+            {/* EVENT LIST */}
+
+            {visibleEvents.length === 0 ? (
+              <Text style={styles.empty}>
+                {t('events.noEvents')}
+              </Text>
+            ) : (
+              visibleEvents.map((event) => (
+                <TouchableOpacity
+                  key={event.id}
+                  activeOpacity={0.8}
+                  style={styles.eventCard}
+                  onPress={() =>
+                    router.push({
+                      pathname:
+                        '/events/[id]' as any,
+                      params: {
+                        id: String(event.id),
+                        period,
+                      },
+                    })
+                  }
+                >
+                  {/* EVENT IMAGE */}
+
+                  {event.image_url ? (
+                    <Image
+                      source={{
+                        uri: event.image_url,
+                      }}
+                      style={styles.image}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.placeholder}>
+                      <Text
+                        style={styles.placeholderIcon}
+                      >
+                        🛕
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* EVENT DETAILS */}
+
+                  <View style={styles.eventBody}>
+                    <Text style={styles.categoryLabel}>
+                      {categoryNameForEvent(event)}
+                    </Text>
+
+                    <Text
+                      style={styles.eventTitle}
+                      numberOfLines={2}
+                    >
+                      {event.title}
+                    </Text>
+
+                    <Text style={styles.meta}>
+                      📅 {formatDate(event.event_date)}
+                    </Text>
+
+                    {(event.start_time ||
+                      event.end_time) && (
+                      <Text style={styles.meta}>
+                        🕐{' '}
+                        {[
+                          event.start_time?.slice(0, 5),
+                          event.end_time?.slice(0, 5),
+                        ]
+                          .filter(Boolean)
+                          .join(' – ')}
+                      </Text>
+                    )}
+
+                    {event.location ? (
+                      <Text
+                        style={styles.meta}
+                        numberOfLines={1}
+                      >
+                        📍 {event.location}
+                      </Text>
+                    ) : null}
+
+                    <Text style={styles.more}>
+                      {t('events.viewDetails')} →
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </>
-
         )}
-
       </ScrollView>
-
     </SafeAreaView>
-
   );
-
 }
 
-
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF9F0',
+  },
 
-  container: { flex: 1, backgroundColor: '#FFF9F0' },
+  content: {
+    padding: 20,
+    paddingBottom: 50,
+  },
 
-  content: { padding: 20, paddingBottom: 50 },
+  eyebrow: {
+    fontSize: 13,
+    color: '#9A806B',
+    marginBottom: 4,
+  },
 
-  eyebrow: { fontSize: 13, color: '#9A806B', marginBottom: 4 },
+  heading: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#4A2C18',
+  },
 
-  heading: { fontSize: 26, fontWeight: '800', color: '#4A2C18' },
+  subtitle: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 6,
+    lineHeight: 19,
+  },
 
-  subtitle: { fontSize: 12, color: '#777', marginTop: 6, lineHeight: 19 },
+  periodRow: {
+    flexDirection: 'row',
+    marginTop: 24,
+    marginBottom: 22,
+    gap: 10,
+  },
 
-  periodRow: { flexDirection: 'row', marginTop: 24, marginBottom: 22, gap: 10 },
+  periodButton: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: '#F2E3D2',
+    alignItems: 'center',
+  },
 
-  periodButton: { flex: 1, paddingVertical: 13, borderRadius: 14, backgroundColor: '#F2E3D2', alignItems: 'center' },
+  periodActive: {
+    backgroundColor: '#8B4513',
+  },
 
-  periodActive: { backgroundColor: '#8B4513' },
+  periodText: {
+    color: '#7B4C2C',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 
-  periodText: { color: '#7B4C2C', fontSize: 12, fontWeight: '700' },
+  periodTextActive: {
+    color: '#FFFFFF',
+  },
 
-  periodTextActive: { color: '#FFFFFF' },
+  sectionHeading: {
+    color: '#4A2C18',
+    fontWeight: '800',
+    fontSize: 17,
+    marginBottom: 12,
+  },
 
-  sectionHeading: { color: '#4A2C18', fontWeight: '800', fontSize: 17, marginBottom: 12 },
+  chips: {
+    paddingBottom: 20,
+    gap: 8,
+  },
 
-  chips: { paddingBottom: 20, gap: 8 },
+  chip: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E4C9A9',
+    backgroundColor: '#FFFFFF',
+  },
 
-  chip: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 22, borderWidth: 1, borderColor: '#E4C9A9', backgroundColor: '#FFFFFF' },
+  chipActive: {
+    backgroundColor: '#8B4513',
+    borderColor: '#8B4513',
+  },
 
-  chipActive: { backgroundColor: '#8B4513', borderColor: '#8B4513' },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#784D2D',
+  },
 
-  chipText: { fontSize: 12, fontWeight: '600', color: '#784D2D' },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
 
-  chipTextActive: { color: '#FFFFFF' },
+  eventCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    marginBottom: 14,
+    overflow: 'hidden',
+    elevation: 2,
+  },
 
-  eventCard: { backgroundColor: '#FFFFFF', borderRadius: 18, marginBottom: 14, overflow: 'hidden', elevation: 2 },
+  image: {
+    width: '100%',
+    height: 160,
+  },
 
-  image: { width: '100%', height: 160 },
+  placeholder: {
+    height: 110,
+    backgroundColor: '#F4E0C5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-  placeholder: { height: 110, backgroundColor: '#F4E0C5', justifyContent: 'center', alignItems: 'center' },
+  placeholderIcon: {
+    fontSize: 38,
+  },
 
-  placeholderIcon: { fontSize: 38 },
+  eventBody: {
+    padding: 16,
+  },
 
-  eventBody: { padding: 16 },
+  categoryLabel: {
+    color: '#B56A22',
+    fontWeight: '700',
+    fontSize: 11,
+    marginBottom: 5,
+  },
 
-  categoryLabel: { color: '#B56A22', fontWeight: '700', fontSize: 11, marginBottom: 5 },
+  eventTitle: {
+    color: '#4A2C18',
+    fontWeight: '800',
+    fontSize: 16,
+    marginBottom: 9,
+  },
 
-  eventTitle: { color: '#4A2C18', fontWeight: '800', fontSize: 16, marginBottom: 9 },
+  meta: {
+    fontSize: 12,
+    color: '#786A60',
+    marginBottom: 5,
+  },
 
-  meta: { fontSize: 12, color: '#786A60', marginBottom: 5 },
+  more: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8B4513',
+    marginTop: 8,
+  },
 
-  more: { fontSize: 12, fontWeight: '700', color: '#8B4513', marginTop: 8 },
+  center: {
+    marginTop: 35,
+    alignItems: 'center',
+  },
 
-  center: { marginTop: 35, alignItems: 'center' },
+  loadingText: {
+    marginTop: 12,
+    color: '#877A70',
+    fontSize: 13,
+  },
 
-  error: { color: '#B3261E', textAlign: 'center', marginBottom: 15 },
+  error: {
+    color: '#B3261E',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
 
-  retry: { backgroundColor: '#8B4513', borderRadius: 18, paddingHorizontal: 24, paddingVertical: 10 },
+  retry: {
+    backgroundColor: '#8B4513',
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
 
-  retryText: { color: '#FFFFFF', fontWeight: '700' },
+  retryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
 
-  empty: { textAlign: 'center', color: '#877A70', marginTop: 25, fontSize: 13 },
-
+  empty: {
+    textAlign: 'center',
+    color: '#877A70',
+    marginTop: 25,
+    fontSize: 13,
+  },
 });

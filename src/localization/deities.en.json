@@ -28,6 +28,27 @@
     "loadFailed": "Failed to load deity details",
     "cannotFind": "We could not find the requested deity.",
     "infoUnavailable": "Information about this deity is not available at the moment.",
-    "prayer": "May the divine blessings of {{name}} bring peace, strength and happiness to all devotees."
+    "prayer": "May the divine blessings of {{name}} bring peace, strength and happiness to all devotees.",
+    "groupLabel": "Deity Group",
+    "exploreDeities": "Explore Deities",
+    "detailsLoading": "Loading deity details...",
+    "detailsNotFound": "Deity Not Found",
+    "detailsNotFoundMessage": "We could not find the requested deity.",
+    "detailsLoadError": "Failed to load deity details.",
+    "detailsGoBack": "Go Back",
+    "detailsGroupSubtitle": "Sacred Deity Group",
+    "detailsIndividualSubtitle": "Divine Presence • Temple Deity",
+    "detailsAbout": "About",
+    "detailsDescriptionFallback": "Information about this deity is not available at the moment.",
+    "detailsExploreHeading": "Explore the Deities",
+    "detailsExploreIntro": "Select a deity to read their individual details.",
+    "detailsChildAction": "View Details",
+    "detailsChildAccessibility": "View details of {{name}}",
+    "detailsNoChildren": "No sub-deities are available at the moment.",
+    "detailsSignificance": "Spiritual Significance",
+    "detailsDevotional": "Devotional Practice",
+    "detailsPrayer": "May the divine blessings of {{name}} bring peace, strength and happiness to all devotees.",
+    "detailsBackToGroup": "Back to Group",
+    "detailsBackToDeities": "Back to Deities"
   }
 }

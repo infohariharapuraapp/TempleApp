@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, {
   useCallback,
   useEffect,
@@ -108,6 +109,7 @@ const getImageUrl = (
 /* ===================================================== */
 
 export default function GalleryScreen() {
+  const { t } = useTranslation();
   /*
    * ===================================================
    * GALLERY DATA
@@ -298,9 +300,7 @@ export default function GalleryScreen() {
           err,
         );
 
-        setError(
-          'Unable to load gallery',
-        );
+        setError(t('galleryScreen.loadError'));
 
         setGalleryAlbums([]);
         setGalleryItems([]);
@@ -308,7 +308,7 @@ export default function GalleryScreen() {
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [t]);
 
   /*
    * Initial load.
@@ -597,8 +597,7 @@ export default function GalleryScreen() {
             mimeType,
 
             dialogTitle:
-              selectedImage.title ||
-              'Share Temple Image',
+              selectedImage.title || t('galleryScreen.shareImage'),
           },
         );
       } catch (err) {
@@ -701,8 +700,8 @@ export default function GalleryScreen() {
                 styles.loadingText
               }
             >
-              Loading gallery...
-            </Text>
+                  {t('galleryScreen.loading')}
+                </Text>
           </View>
         ) : error ? (
           /* =========================================== */
@@ -719,18 +718,16 @@ export default function GalleryScreen() {
                 styles.emptyTitle
               }
             >
-              Unable to load gallery
-            </Text>
+                  {t('galleryScreen.loadError')}
+                </Text>
 
             <Text
               style={
                 styles.emptyText
               }
             >
-              Please check your
-              internet connection and
-              try again.
-            </Text>
+                  {t('galleryScreen.connectionError')}
+                </Text>
 
             <Pressable
               onPress={
@@ -749,8 +746,8 @@ export default function GalleryScreen() {
                   styles.retryText
                 }
               >
-                Try Again
-              </Text>
+                  {t('galleryScreen.retry')}
+                </Text>
             </Pressable>
           </View>
         ) : showAllPhotos &&
@@ -797,7 +794,7 @@ export default function GalleryScreen() {
                     styles.galleryEyebrow
                   }
                 >
-                  TEMPLE GALLERY
+                  {t('galleryScreen.templeGallery')}
                 </Text>
 
                 <Text
@@ -829,8 +826,7 @@ export default function GalleryScreen() {
                       styles.galleryPageSubtitle
                     }
                   >
-                    Explore temple
-                    photographs
+                    {t('galleryScreen.explorePhotos')}
                   </Text>
                 )}
               </View>
@@ -856,7 +852,7 @@ export default function GalleryScreen() {
                     styles.photoCountLabel
                   }
                 >
-                  PHOTOS
+                  {t('galleryScreen.photos')}
                 </Text>
               </View>
             </View>
@@ -973,7 +969,7 @@ export default function GalleryScreen() {
                     styles.eyebrow
                   }
                 >
-                  TEMPLE MEDIA
+                  {t('galleryScreen.templeMedia')}
                 </Text>
 
                 <Text
@@ -981,7 +977,7 @@ export default function GalleryScreen() {
                     styles.title
                   }
                 >
-                  Gallery
+                  {t('galleryScreen.title')}
                 </Text>
 
                 <Text
@@ -989,9 +985,7 @@ export default function GalleryScreen() {
                     styles.subtitle
                   }
                 >
-                  Explore temple photos,
-                  videos and devotional
-                  stotras
+                  {t('galleryScreen.subtitle')}
                 </Text>
               </View>
             </View>
@@ -1012,7 +1006,7 @@ export default function GalleryScreen() {
                     styles.noPhotosTitle
                   }
                 >
-                  No photos available
+                  {t('galleryScreen.noPhotos')}
                 </Text>
 
                 <Text
@@ -1020,10 +1014,7 @@ export default function GalleryScreen() {
                     styles.noPhotosText
                   }
                 >
-                  Temple gallery photos
-                  will appear here when
-                  they are added by the
-                  administrator.
+                  {t('galleryScreen.noPhotosText')}
                 </Text>
               </View>
             ) : (
@@ -1113,8 +1104,8 @@ export default function GalleryScreen() {
                                 styles.viewAllText
                               }
                             >
-                              View All
-                            </Text>
+                  {t('galleryScreen.viewAll')}
+                </Text>
 
                             <Text
                               style={
@@ -1199,17 +1190,7 @@ export default function GalleryScreen() {
                               styles.albumPhotoCount
                             }
                           >
-                            {
-                              album
-                                .images
-                                .length
-                            }{' '}
-                            {album
-                              .images
-                              .length ===
-                            1
-                              ? 'photo'
-                              : 'photos'}
+                            {t('galleryScreen.photoCount', { count: album.images.length })}
                           </Text>
 
                           {album
@@ -1228,12 +1209,7 @@ export default function GalleryScreen() {
                                   styles.albumMorePhotos
                                 }
                               >
-                                +
-                                {album
-                                  .images
-                                  .length -
-                                  3}{' '}
-                                more
+                                {t('galleryScreen.morePhotos', { count: album.images.length - 3 })}
                               </Text>
                             </Pressable>
                           )}
@@ -1453,10 +1429,7 @@ export default function GalleryScreen() {
                   styles.imageActionText
                 }
               >
-                {imageActionLoading ===
-                'share'
-                  ? 'Sharing...'
-                  : 'Share'}
+                {imageActionLoading === 'share' ? t('galleryScreen.sharing') : t('galleryScreen.share')}
               </Text>
             </Pressable>
 
@@ -1494,10 +1467,7 @@ export default function GalleryScreen() {
                   styles.imageActionText
                 }
               >
-                {imageActionLoading ===
-                'download'
-                  ? 'Saving...'
-                  : 'Download'}
+                {imageActionLoading === 'download' ? t('galleryScreen.saving') : t('galleryScreen.download')}
               </Text>
             </Pressable>
           </View>

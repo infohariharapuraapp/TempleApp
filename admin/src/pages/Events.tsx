@@ -17,6 +17,8 @@ type EventItem = {
   image_url?: string | null;
 
   event_date?: string | null;
+  event_end_date?: string | null;
+  images?: Array<string | { image_url: string }>;
 
   start_time?: string | null;
 
@@ -515,7 +517,7 @@ export default function Events() {
 
                     <td>{event.category_name || 'Unassigned'}</td>
 
-                    <td>{datePart(event.event_date) || '—'}</td>
+                    <td>{datePart(event.event_date) || '—'}{event.event_end_date && datePart(event.event_end_date) !== datePart(event.event_date) ? ` – ${datePart(event.event_end_date)}` : ''}</td>
 
                     <td>{timePart(event.start_time) || '—'} – {timePart(event.end_time) || '—'}</td>
 
@@ -558,173 +560,194 @@ export default function Events() {
 
 
 function EventForm({ event, categories, onClose, onSaved }: {
-
   event: EventItem | null;
-
   categories: EventCategory[];
-
   onClose: () => void;
-
   onSaved: () => void;
-
 }) {
-
+  const existingImages = (event?.images ?? []).map(item =>
+    typeof item === 'string' ? item : item.image_url
+  ).filter(Boolean);
   const [title, setTitle] = useState(event?.title || '');
-
   const [description, setDescription] = useState(event?.description || '');
-
-  const [imageUrl, setImageUrl] = useState(event?.image_url || '');
-
   const [eventDate, setEventDate] = useState(datePart(event?.event_date));
-
+  const [eventEndDate, setEventEndDate] = useState(datePart(event?.event_end_date));
   const [startTime, setStartTime] = useState(timePart(event?.start_time));
-
   const [endTime, setEndTime] = useState(timePart(event?.end_time));
-
   const [location, setLocation] = useState(event?.location || '');
-
   const [categoryId, setCategoryId] = useState(event?.category_id ? String(event.category_id) : '');
-
+  const [images, setImages] = useState<string[]>(
+    existingImages.length ? existingImages : event?.image_url ? [event.image_url] : []
+  );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
-
   const [formError, setFormError] = useState('');
-
   const selectedCategory = categories.find(c => c.id === Number(categoryId));
 
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const incoming = Array.from(files);
+    if (images.length + pendingFiles.length + incoming.length > 10) {
+      setFormError('Maximum 10 images per event');
+      return;
+    }
+    if (incoming.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      setFormError('Only JPG, PNG or WebP images up to 5 MB are allowed');
+      return;
+    }
+    setFormError('');
+    setPendingFiles(previous => [...previous, ...incoming]);
+  }
 
+  function moveImage(index: number, direction: number) {
+    const target = index + direction;
+    if (target < 0 || target >= images.length) return;
+    setImages(previous => {
+      const next = [...previous];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
 
   async function handleSubmit(e: FormEvent) {
-
     e.preventDefault();
-
     if (!title.trim()) { setFormError('Event title is required'); return; }
-
     if (!eventDate) { setFormError('Event date is required'); return; }
-
-    if (!selectedCategory || !selectedCategory.is_active) {
-
-      setFormError('Please select an active event category'); return;
-
+    if (eventEndDate && eventEndDate < eventDate) {
+      setFormError('Event end date cannot be earlier than event date'); return;
     }
-
-    if (startTime && endTime && endTime < startTime) {
-
-      setFormError('End time cannot be earlier than start time'); return;
-
+    if (!selectedCategory || !selectedCategory.is_active) {
+      setFormError('Please select an active event category'); return;
+    }
+    if (startTime && endTime && endTime < startTime && (!eventEndDate || eventEndDate === eventDate)) {
+      setFormError('End time cannot be earlier than start time for a single-day event'); return;
+    }
+    if (images.length + pendingFiles.length > 10) {
+      setFormError('Maximum 10 images per event'); return;
     }
 
     try {
-
       setSaving(true);
-
       setFormError('');
-
+      let allImages = [...images];
+      if (pendingFiles.length) {
+        const formData = new FormData();
+        pendingFiles.forEach(file => formData.append('images', file));
+        const uploaded = await apiRequest<{
+          success: boolean;
+          data: Array<{ image_url: string; public_id: string }>;
+        }>('/admin/events/upload-images', {
+          method: 'POST',
+          body: formData,
+        });
+        allImages = [...allImages, ...uploaded.data.map(item => item.image_url)];
+      }
       const payload = {
-
         title: title.trim(),
-
         description: description.trim() || null,
-
-        image_url: imageUrl.trim() || null,
-
+        image_url: allImages[0] || null,
+        images: allImages,
         event_date: eventDate,
-
+        event_end_date: eventEndDate || null,
         start_time: startTime || null,
-
         end_time: endTime || null,
-
         location: location.trim() || null,
-
         category_id: Number(categoryId),
-
       };
-
       await apiRequest(event ? `/admin/events/${event.id}` : '/admin/events', {
-
         method: event ? 'PUT' : 'POST',
-
         body: JSON.stringify(payload),
-
       });
-
       onSaved();
-
     } catch (err) {
-
       setFormError(messageOf(err, 'Failed to save event'));
-
     } finally {
-
       setSaving(false);
-
     }
-
   }
 
-
-
   return (
-
     <div className="card" style={{ marginBottom: 20 }}>
-
-      <div className="section-header"><div><h2>{event ? 'Edit Event' : 'Add Event'}</h2><p>{event ? 'Update temple event details' : 'Create and publish a temple event'}</p></div></div>
-
+      <div className="section-header">
+        <div><h2>{event ? 'Edit Event' : 'Add Event'}</h2>
+          <p>{event ? 'Update temple event details' : 'Create and publish a temple event'}</p></div>
+      </div>
       {formError && <div className="error-message" role="alert">{formError}</div>}
-
       <form onSubmit={handleSubmit}>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-
           <label>Title<input value={title} onChange={e => setTitle(e.target.value)} placeholder="Temple Festival" required /></label>
-
           <label>Event Category
-
             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required>
-
               <option value="">Select category</option>
-
               {categories.filter(c => c.is_active || c.id === event?.category_id).map(category => (
-
                 <option key={category.id} value={category.id} disabled={!category.is_active}>
-
                   {category.name}{!category.is_active ? ' (Inactive)' : ''}
-
                 </option>
-
               ))}
-
             </select>
-
           </label>
-
-          <label>Event Date<input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required /></label>
-
+          <label>Event Date *<input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required /></label>
+          <label>Event End Date (Optional)<input type="date" min={eventDate || undefined} value={eventEndDate} onChange={e => setEventEndDate(e.target.value)} /></label>
           <label>Start Time<input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></label>
-
           <label>End Time<input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></label>
-
           <label>Location<input value={location} onChange={e => setLocation(e.target.value)} placeholder="Temple Main Hall" /></label>
-
-          <label>Image URL<input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." /></label>
-
           <label style={{ gridColumn: '1 / -1' }}>Description<textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Event description" /></label>
-
         </div>
-
-        <p style={{ fontSize: 13, marginTop: 12 }}>New events are published immediately and trigger your existing event notification workflow. You can unpublish an event from the events table.</p>
-
+        <div style={{ marginTop: 18 }}>
+          <label>Event Photos (maximum 10, JPG/PNG/WebP, 5 MB each)
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || images.length + pendingFiles.length >= 10}
+              onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+          </label>
+          <p style={{ fontSize: 13, color: '#81776d' }}>
+            {images.length + pendingFiles.length}/10 selected. The first saved photo is the cover. Use arrows to reorder saved photos.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
+            {images.map((url, index) => (
+              <div key={`${url}-${index}`} style={{ width: 150, border: '1px solid #e8dccb', padding: 8, borderRadius: 8 }}>
+                <img src={url} alt={`Event photo ${index + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 5 }} />
+                <small style={{ display: 'block' }}>{index === 0 ? 'Cover photo' : `Photo ${index + 1}`}</small>
+                <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+                  <button type="button" disabled={saving || index === 0} onClick={() => moveImage(index, -1)}>↑</button>
+                  <button type="button" disabled={saving || index === images.length - 1} onClick={() => moveImage(index, 1)}>↓</button>
+                  <button type="button" disabled={saving} onClick={() => setImages(previous => previous.filter((_, i) => i !== index))}>Remove</button>
+                </div>
+              </div>
+            ))}
+            {pendingFiles.map((file, index) => (
+              <PendingImagePreview key={`${file.name}-${file.lastModified}-${index}`} file={file} index={index}
+                disabled={saving} onRemove={() => setPendingFiles(previous => previous.filter((_, i) => i !== index))} />
+            ))}
+          </div>
+        </div>
+        <p style={{ fontSize: 13, marginTop: 12 }}>
+          New events are published immediately and trigger your existing event notification workflow. You can unpublish an event from the events table.
+        </p>
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-
-          <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Saving...' : event ? 'Update Event' : 'Publish Event'}</button>
-
+          <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Uploading / Saving...' : event ? 'Update Event' : 'Publish Event'}</button>
           <button type="button" onClick={onClose} disabled={saving}>Cancel</button>
-
         </div>
-
       </form>
-
     </div>
-
   );
+}
 
+function PendingImagePreview({ file, index, disabled, onRemove }: {
+  file: File;
+  index: number;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const [preview, setPreview] = useState('');
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return (
+    <div style={{ width: 150, border: '1px dashed #c69a3a', padding: 8, borderRadius: 8 }}>
+      {preview && <img src={preview} alt={`New photo ${index + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 5 }} />}
+      <small style={{ display: 'block' }}>New photo {index + 1}</small>
+      <button type="button" disabled={disabled} onClick={onRemove}>Remove</button>
+    </div>
+  );
 }

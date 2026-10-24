@@ -28,6 +28,27 @@
     "loadFailed": "ದೇವತೆಯ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "cannotFind": "ನೀವು ಹುಡುಕಿದ ದೇವತೆಯ ಮಾಹಿತಿ ಸಿಗಲಿಲ್ಲ.",
     "infoUnavailable": "ಈ ದೇವತೆಯ ಮಾಹಿತಿ ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ.",
-    "prayer": "{{name}} ಅವರ ಆಶೀರ್ವಾದವು ಎಲ್ಲ ಭಕ್ತರಿಗೆ ಶಾಂತಿ, ಶಕ್ತಿ ಮತ್ತು ಸಂತೋಷ ತರಲಿ."
+    "prayer": "{{name}} ಅವರ ಆಶೀರ್ವಾದವು ಎಲ್ಲ ಭಕ್ತರಿಗೆ ಶಾಂತಿ, ಶಕ್ತಿ ಮತ್ತು ಸಂತೋಷ ತರಲಿ.",
+    "groupLabel": "ದೇವತೆಗಳ ಗುಂಪು",
+    "exploreDeities": "ದೇವತೆಗಳನ್ನು ಅನ್ವೇಷಿಸಿ",
+    "detailsLoading": "ದೇವತೆಯ ವಿವರಗಳು ಲೋಡ್ ಆಗುತ್ತಿವೆ...",
+    "detailsNotFound": "ದೇವತೆಯ ವಿವರಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
+    "detailsNotFoundMessage": "ನೀವು ಹುಡುಕಿದ ದೇವತೆಯ ವಿವರಗಳು ಕಂಡುಬಂದಿಲ್ಲ.",
+    "detailsLoadError": "ದೇವತೆಯ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "detailsGoBack": "ಹಿಂದೆ ಹೋಗಿ",
+    "detailsGroupSubtitle": "ಪವಿತ್ರ ದೇವತೆಗಳ ಗುಂಪು",
+    "detailsIndividualSubtitle": "ದಿವ್ಯ ಸಾನ್ನಿಧ್ಯ • ದೇವಾಲಯದ ದೇವತೆ",
+    "detailsAbout": "ಬಗ್ಗೆ",
+    "detailsDescriptionFallback": "ಈ ದೇವತೆಯ ಬಗ್ಗೆ ಮಾಹಿತಿ ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ.",
+    "detailsExploreHeading": "ದೇವತೆಗಳನ್ನು ಅನ್ವೇಷಿಸಿ",
+    "detailsExploreIntro": "ಪ್ರತಿಯೊಬ್ಬ ದೇವತೆಯ ವಿವರಗಳನ್ನು ಓದಲು ದೇವತೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "detailsChildAction": "ವಿವರಗಳನ್ನು ನೋಡಿ",
+    "detailsChildAccessibility": "{{name}} ವಿವರಗಳನ್ನು ನೋಡಿ",
+    "detailsNoChildren": "ಸದ್ಯಕ್ಕೆ ಉಪದೇವತೆಗಳ ವಿವರಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+    "detailsSignificance": "ಆಧ್ಯಾತ್ಮಿಕ ಮಹತ್ವ",
+    "detailsDevotional": "ಭಕ್ತಿ ಸಾಧನೆ",
+    "detailsPrayer": "{{name}} ಅವರ ದಿವ್ಯ ಆಶೀರ್ವಾದವು ಎಲ್ಲಾ ಭಕ್ತರಿಗೆ ಶಾಂತಿ, ಶಕ್ತಿ ಮತ್ತು ಸಂತೋಷವನ್ನು ತರಲಿ.",
+    "detailsBackToGroup": "ದೇವತೆಗಳ ಗುಂಪಿಗೆ ಹಿಂತಿರುಗಿ",
+    "detailsBackToDeities": "ದೇವತೆಗಳ ಪಟ್ಟಿಗೆ ಹಿಂತಿರುಗಿ"
   }
 }

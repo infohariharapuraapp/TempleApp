@@ -1,4 +1,3 @@
-
 {
   "events": {
     "community": "मंदिर समुदाय",
@@ -18,6 +17,9 @@
     "aboutEvent": "इस कार्यक्रम के बारे में",
     "descriptionFallback": "अधिक जानकारी जल्द उपलब्ध होगी।",
     "invalidEvent": "अमान्य कार्यक्रम।",
-    "eventUnavailable": "यह कार्यक्रम अब उपलब्ध नहीं है।"
+    "eventUnavailable": "यह कार्यक्रम अब उपलब्ध नहीं है।",
+    "detailsLoading": "कार्यक्रम का विवरण लोड हो रहा है...",
+    "detailsDate": "कार्यक्रम की तारीख",
+    "detailsDescriptionFallback": "अधिक जानकारी जल्द उपलब्ध होगी।"
   }
 }

@@ -267,7 +267,7 @@ async function createEventReminderNotification(
      * Temple timezone is treated as IST (+05:30).
      */
     const eventDateTime = new Date(
-      `${event.event_date}T${eventTime}+05:30`
+      `${typeof event.event_date === 'string' ? event.event_date.slice(0, 10) : new Date(event.event_date).toISOString().slice(0, 10)}T${eventTime}+05:30`
     );
 
     if (Number.isNaN(eventDateTime.getTime())) {
@@ -340,357 +340,226 @@ async function createEventReminderNotification(
 
 
 /**
- * GET ALL EVENTS FOR ADMIN
+ * Validate event input. Images are Cloudinary URLs returned by
+ * the authenticated /admin/events/upload-images endpoint.
  */
+function parseEventInput(body: Record<string, unknown>) {
+  const title = body.title;
+  const eventDate = body.event_date;
+  const endDate = body.event_end_date === '' || body.event_end_date == null
+    ? null : body.event_end_date;
+  const dateValid = (value: unknown): value is string => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  if (typeof title !== 'string' || !title.trim() || !dateValid(eventDate)) {
+    throw new Error('Valid title and event date are required');
+  }
+  if (endDate !== null && (!dateValid(endDate) || endDate < eventDate)) {
+    throw new Error('End date must be on or after the event date');
+  }
+  for (const field of ['description', 'location', 'image_url', 'start_time', 'end_time']) {
+    if (body[field] != null && typeof body[field] !== 'string') {
+      throw new Error(`Invalid ${field}`);
+    }
+  }
+  const startTime = (body.start_time as string | undefined) || null;
+  const endTime = (body.end_time as string | undefined) || null;
+  const validTime = (value: string | null) => !value || /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
+  if (!validTime(startTime) || !validTime(endTime)) throw new Error('Invalid event time');
+  if (startTime && endTime && (!endDate || endDate === eventDate) && endTime < startTime) {
+    throw new Error('End time cannot be earlier than start time for a single-day event');
+  }
+  let images: string[] | undefined;
+  if (body.images !== undefined) {
+    if (!Array.isArray(body.images) || body.images.length > 10 ||
+        !body.images.every((url: unknown) => typeof url === 'string' && isCloudinaryImage(url))) {
+      throw new Error('Images must be an array of up to 10 valid Cloudinary image URLs');
+    }
+    images = body.images;
+    if (new Set(images).size !== images.length) throw new Error('Duplicate event images are not allowed');
+  }
+  return {
+    title: title.trim(),
+    description: (body.description as string | undefined)?.trim() || null,
+    eventDate,
+    endDate,
+    startTime,
+    endTime,
+    location: (body.location as string | undefined)?.trim() || null,
+    images,
+    legacyImageUrl: (body.image_url as string | undefined)?.trim() || null,
+  };
+}
 
-export const getAllEvents = async (
-  _req: AuthRequest,
-  res: Response
-) => {
+function isCloudinaryImage(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com' &&
+      /^\/[^/]+\/image\/upload\//.test(url.pathname) && value.length <= 2048;
+  } catch { return false; }
+}
+
+const eventSelect = `
+  SELECT e.*, c.name AS category_name,
+    COALESCE((
+      SELECT json_agg(ei.image_url ORDER BY ei.display_order, ei.id)
+      FROM event_images ei WHERE ei.event_id = e.id
+    ), '[]'::json) AS images
+  FROM events e
+  LEFT JOIN event_categories c ON c.id = e.category_id`;
+
+export const getAllEvents = async (_req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT
-         e.id,
-         e.title,
-         e.description,
-         e.image_url,
-         e.event_date,
-         e.start_time,
-         e.end_time,
-         e.location,
-         e.category_id,
-         c.name AS category_name,
-         e.is_active,
-         e.created_at,
-         e.updated_at
-       FROM events e
-       LEFT JOIN event_categories c
-         ON e.category_id = c.id
-       ORDER BY
-         e.event_date ASC NULLS LAST,
-         e.start_time ASC NULLS LAST,
-         e.id ASC`
+      `${eventSelect} ORDER BY e.event_date ASC NULLS LAST, e.start_time ASC NULLS LAST, e.id ASC`
     );
-
-    return res.json({
-      success: true,
-      data: result.rows,
-    });
+    return res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Get all events error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch events',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch events' });
   }
 };
 
-
-/**
- * CREATE EVENT
- */
-
-export const createEvent = async (
-  req: AuthRequest,
-  res: Response
-) => {
+export const createEvent = async (req: AuthRequest, res: Response) => {
+  let input: ReturnType<typeof parseEventInput>;
+  try { input = parseEventInput(req.body ?? {}); }
+  catch (error) {
+    return res.status(400).json({ success: false, message: (error as Error).message });
+  }
+  const categoryId = req.body.category_id;
+  if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+    return res.status(400).json({ success: false, message: 'Valid event category is required' });
+  }
+  const client = await pool.connect();
+  let event: any;
   try {
-    const {
-      title,
-      description,
-      image_url,
-      event_date,
-      start_time,
-      end_time,
-      location,
-      category_id,
-    } = req.body;
-
-    if (
-      typeof title !== 'string' ||
-      !title.trim() ||
-      typeof event_date !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(event_date)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid title and event date are required',
-      });
-    }
-
-    if (
-      !Number.isSafeInteger(category_id) ||
-      category_id <= 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid event category is required',
-      });
-    }
-
-    const categoryResult = await pool.query(
-      `SELECT id
-       FROM event_categories
-       WHERE id = $1 AND is_active = TRUE`,
-      [category_id]
+    await client.query('BEGIN');
+    const category = await client.query(
+      'SELECT id FROM event_categories WHERE id = $1 AND is_active = TRUE', [categoryId]
     );
-
-    if (categoryResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Selected event category is unavailable',
-      });
+    if (!category.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Selected event category is unavailable' });
     }
-
-    const result = await pool.query(
-      `INSERT INTO events (
-         title,
-         description,
-         image_url,
-         event_date,
-         start_time,
-         end_time,
-         location,
-         category_id,
-         is_active
-       )
-       VALUES (
-         $1, $2, $3, $4, $5,
-         $6, $7, $8, TRUE
-       )
-       RETURNING
-         id,
-         title,
-         description,
-         image_url,
-         event_date,
-         start_time,
-         end_time,
-         location,
-         category_id,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        title.trim(),
-        description || null,
-        image_url || null,
-        event_date,
-        start_time || null,
-        end_time || null,
-        location || null,
-        category_id,
-      ]
+    const cover = input.images?.[0] ?? input.legacyImageUrl;
+    const result = await client.query(
+      `INSERT INTO events
+       (title, description, image_url, event_date, event_end_date, start_time, end_time, location, category_id, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE) RETURNING *`,
+      [input.title, input.description, cover, input.eventDate, input.endDate,
+       input.startTime, input.endTime, input.location, categoryId]
     );
-
-    const event = result.rows[0];
-
-    // SEND NEW EVENT NOTIFICATION
-    try {
-      const notification = await createNotification({
-        title: `📅 ${event.title}`,
-        body:
-          `New event: ${event.title}` +
-          `${
-            event.start_time
-              ? ` on ${event.event_date} at ${event.start_time}`
-              : ` on ${event.event_date}`
-          }${
-            event.location
-              ? ` at ${event.location}`
-              : ''
-          }.`,
-        notificationType: 'event',
-        data: {
-          type: 'event',
-          eventId: event.id,
-          screen: '/events',
-        },
-        targetType: 'all',
-        scheduledAt: null,
-      });
-
-      await sendNotificationRecord(notification.id);
-    } catch (notificationError) {
-      console.error(
-        'Event notification error:',
-        notificationError
+    event = result.rows[0];
+    for (const [index, url] of (input.images ?? []).entries()) {
+      await client.query(
+        'INSERT INTO event_images (event_id, image_url, display_order) VALUES ($1,$2,$3)',
+        [event.id, url, index]
       );
     }
-
-    // SCHEDULE 24-HOUR EVENT REMINDER
-    await createEventReminderNotification(event);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Event created successfully',
-      data: event,
-    });
+    await client.query('COMMIT');
+    event.images = input.images ?? [];
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Create event error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create event' });
+  } finally { client.release(); }
 
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create event',
+  // Notifications run only after a successful database commit.
+  try {
+    const notification = await createNotification({
+      title: `📅 ${event.title}`,
+      body: `New event: ${event.title} on ${input.eventDate}` +
+        (input.endDate ? ` to ${input.endDate}` : '') +
+        (input.startTime ? ` at ${input.startTime}` : '') +
+        (input.location ? ` at ${input.location}` : '') + '.',
+      notificationType: 'event',
+      data: { type: 'event', eventId: event.id, screen: '/events' },
+      targetType: 'all', scheduledAt: null,
     });
-  }
+    await sendNotificationRecord(notification.id);
+  } catch (error) { console.error('Event notification error:', error); }
+  await createEventReminderNotification({ ...event, event_date: input.eventDate });
+  return res.status(201).json({ success: true, message: 'Event created successfully', data: event });
 };
 
-
-
-/**
- * UPDATE EVENT
- */
-
-export const updateEvent = async (
-  req: AuthRequest,
-  res: Response
-) => {
+export const updateEvent = async (req: AuthRequest, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid event ID' });
+  }
+  let input: ReturnType<typeof parseEventInput>;
+  try { input = parseEventInput(req.body ?? {}); }
+  catch (error) {
+    return res.status(400).json({ success: false, message: (error as Error).message });
+  }
+  const client = await pool.connect();
+  let event: any;
   try {
-    const { id } = req.params;
-
-    const {
-      title,
-      description,
-      image_url,
-      event_date,
-      start_time,
-      end_time,
-      location,
-      category_id,
-    } = req.body;
-
-    if (
-      typeof title !== 'string' ||
-      !title.trim() ||
-      typeof event_date !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(event_date)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid title and event date are required',
-      });
+    await client.query('BEGIN');
+    const existingResult = await client.query('SELECT * FROM events WHERE id = $1 FOR UPDATE', [id]);
+    if (!existingResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Event not found' });
     }
-
-    const existingResult = await pool.query(
-      `SELECT id, category_id, is_active
-       FROM events
-       WHERE id = $1`,
-      [id]
+    const existing = existingResult.rows[0];
+    const categoryId = req.body.category_id === undefined ? existing.category_id : req.body.category_id;
+    if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Valid event category is required' });
+    }
+    const category = await client.query(
+      'SELECT id FROM event_categories WHERE id = $1 AND (is_active = TRUE OR id = $2)',
+      [categoryId, existing.category_id]
     );
-
-    if (existingResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found',
-      });
+    if (!category.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Selected event category is unavailable' });
     }
-
-    const selectedCategoryId =
-      category_id === undefined
-        ? existingResult.rows[0].category_id
-        : category_id;
-
-    if (
-      !Number.isSafeInteger(selectedCategoryId) ||
-      selectedCategoryId <= 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid event category is required',
-      });
-    }
-
-    const categoryResult = await pool.query(
-      `SELECT id
-       FROM event_categories
-       WHERE id = $1
-         AND (is_active = TRUE OR id = $2)`,
-      [
-        selectedCategoryId,
-        existingResult.rows[0].category_id,
-      ]
+    const cover = input.images !== undefined
+      ? (input.images[0] ?? null)
+      : (input.legacyImageUrl ?? existing.image_url);
+    const updated = await client.query(
+      `UPDATE events SET title=$1, description=$2, image_url=$3, event_date=$4,
+       event_end_date=$5, start_time=$6, end_time=$7, location=$8, category_id=$9,
+       updated_at=CURRENT_TIMESTAMP WHERE id=$10 RETURNING *`,
+      [input.title, input.description, cover, input.eventDate, input.endDate,
+       input.startTime, input.endTime, input.location, categoryId, id]
     );
-
-    if (categoryResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Selected event category is unavailable',
-      });
+    event = updated.rows[0];
+    if (input.images !== undefined) {
+      await client.query('DELETE FROM event_images WHERE event_id = $1', [id]);
+      for (const [index, url] of input.images.entries()) {
+        await client.query(
+          'INSERT INTO event_images (event_id, image_url, display_order) VALUES ($1,$2,$3)',
+          [id, url, index]
+        );
+      }
     }
-
-    const result = await pool.query(
-      `UPDATE events
-       SET
-         title = $1,
-         description = $2,
-         image_url = $3,
-         event_date = $4,
-         start_time = $5,
-         end_time = $6,
-         location = $7,
-         category_id = $8,
-         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9
-       RETURNING
-         id,
-         title,
-         description,
-         image_url,
-         event_date,
-         start_time,
-         end_time,
-         location,
-         category_id,
-         is_active,
-         created_at,
-         updated_at`,
-      [
-        title.trim(),
-        description || null,
-        image_url || null,
-        event_date,
-        start_time || null,
-        end_time || null,
-        location || null,
-        selectedCategoryId,
-        id,
-      ]
+    const images = await client.query(
+      'SELECT image_url FROM event_images WHERE event_id=$1 ORDER BY display_order, id', [id]
     );
+    event.images = images.rows.map((row: { image_url: string }) => row.image_url);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Update event error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update event' });
+  } finally { client.release(); }
 
-    const event = result.rows[0];
-
-    // CANCEL PREVIOUS SCHEDULED REMINDERS
+  // Preserve existing reminder cancellation and rescheduling behavior.
+  try {
     await pool.query(
-      `UPDATE notifications
-       SET
-         status = 'cancelled',
-         updated_at = CURRENT_TIMESTAMP
-       WHERE notification_type = 'event_reminder'
-         AND data->>'eventId' = $1
-         AND status = 'scheduled'`,
+      `UPDATE notifications SET status='cancelled', updated_at=CURRENT_TIMESTAMP
+       WHERE notification_type='event_reminder' AND data->>'eventId'=$1 AND status='scheduled'`,
       [String(id)]
     );
-
-    // SCHEDULE NEW REMINDER IF PUBLISHED
     if (event.is_active) {
-      await createEventReminderNotification(event);
+      await createEventReminderNotification({ ...event, event_date: input.eventDate });
     }
-
-    return res.json({
-      success: true,
-      message: 'Event updated successfully',
-      data: event,
-    });
-  } catch (error) {
-    console.error('Update event error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update event',
-    });
-  }
+  } catch (error) { console.error('Event reminder update error:', error); }
+  return res.json({ success: true, message: 'Event updated successfully', data: event });
 };
 
 

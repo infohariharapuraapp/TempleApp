@@ -1,0 +1,15 @@
+{
+  "guruParamparaScreen": {
+    "sacredLineage": "SACRED LINEAGE",
+    "title": "Guru Parampara",
+    "subtitle": "Walk through the sacred lineage of Gurus who preserved wisdom, devotion and tradition.",
+    "loading": "Loading Guru Parampara...",
+    "loadError": "Unable to load Guru Parampara.",
+    "connectionError": "Unable to load Guru Parampara. Please try again.",
+    "retry": "Retry",
+    "empty": "Guru Parampara information will be available soon.",
+    "legacyTitle": "A Legacy of Wisdom",
+    "legacyDescription": "The sacred lineage of Gurus continues to inspire devotion, knowledge and service for generations.",
+    "back": "Back"
+  }
+}

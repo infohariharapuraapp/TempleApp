@@ -1,4 +1,6 @@
 
+import { useTranslation } from 'react-i18next';
+
 import React, {
   useCallback,
   useState,
@@ -69,6 +71,7 @@ const COLORS = {
 // ========================================
 
 export default function PoojaServicesScreen() {
+  const { t } = useTranslation();
     const { width } = useWindowDimensions();
 
 
@@ -102,7 +105,7 @@ export default function PoojaServicesScreen() {
         if (!response.success) {
           throw new Error(
             response.message ||
-              'Unable to load pooja sections'
+              t('poojaServices.loadError')
           );
         }
 
@@ -115,14 +118,14 @@ export default function PoojaServicesScreen() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Unable to load pooja sections'
+            : t('poojaServices.loadError')
         );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    []
+    [t]
   );
 
   useFocusEffect(
@@ -164,12 +167,12 @@ export default function PoojaServicesScreen() {
           onPress={() => router.back()}
         >
           <Text style={styles.backText}>
-            ‹ Back
+            ‹ {t('poojaServices.back')}
           </Text>
         </TouchableOpacity>
 
         <Text style={styles.label}>
-          TEMPLE RITUALS
+          {t('poojaServices.templeRituals')}
         </Text>
 
         <Text style={styles.title}>
@@ -177,8 +180,7 @@ export default function PoojaServicesScreen() {
         </Text>
 
         <Text style={styles.subtitle}>
-          Explore sacred poojas and offerings
-          available at the temple.
+          {t('poojaServices.subtitle')}
         </Text>
 
         {/* DECORATION */}
@@ -198,13 +200,13 @@ export default function PoojaServicesScreen() {
               color={COLORS.maroon}
             />
             <Text style={styles.infoText}>
-              Loading pooja services...
+              {t('poojaServices.loading')}
             </Text>
           </View>
         ) : error ? (
           <View style={styles.messageCard}>
             <Text style={styles.messageTitle}>
-              Unable to load services
+              {t('poojaServices.loadErrorTitle')}
             </Text>
             <Text style={styles.infoText}>
               {error}
@@ -216,7 +218,7 @@ export default function PoojaServicesScreen() {
               }}
             >
               <Text style={styles.retryText}>
-                Try Again
+                {t('poojaServices.retry')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -226,11 +228,10 @@ export default function PoojaServicesScreen() {
               🪔
             </Text>
             <Text style={styles.messageTitle}>
-              Pooja Services Coming Soon
+              {t('poojaServices.emptyTitle')}
             </Text>
             <Text style={styles.infoText}>
-              Temple pooja information will
-              be available here soon.
+              {t('poojaServices.emptyText')}
             </Text>
           </View>
         ) : (
@@ -268,7 +269,7 @@ export default function PoojaServicesScreen() {
 
       <View style={styles.exploreRow}>
         <Text style={styles.exploreText}>
-          Explore Poojas
+          {t('poojaServices.explore')}
         </Text>
 
         <Text style={styles.arrow}>
@@ -285,12 +286,11 @@ export default function PoojaServicesScreen() {
 
         <View style={styles.offlineCard}>
           <Text style={styles.offlineTitle}>
-            🛕 Offline Pooja Booking
+            🛕 {t('poojaServices.offlineTitle')}
           </Text>
 
           <Text style={styles.offlineText}>
-            Devotees can also book poojas
-            directly at the temple Seva Counter.
+            {t('poojaServices.offlineText')}
           </Text>
         </View>
       </ScrollView>

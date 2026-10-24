@@ -1,4 +1,3 @@
-
 {
   "events": {
     "community": "ದೇವಾಲಯ ಸಮುದಾಯ",
@@ -18,6 +17,9 @@
     "aboutEvent": "ಈ ಕಾರ್ಯಕ್ರಮದ ಬಗ್ಗೆ",
     "descriptionFallback": "ಹೆಚ್ಚಿನ ವಿವರಗಳು ಶೀಘ್ರದಲ್ಲೇ ಲಭ್ಯವಾಗುತ್ತವೆ.",
     "invalidEvent": "ಅಮಾನ್ಯ ಕಾರ್ಯಕ್ರಮ.",
-    "eventUnavailable": "ಈ ಕಾರ್ಯಕ್ರಮ ಈಗ ಲಭ್ಯವಿಲ್ಲ."
+    "eventUnavailable": "ಈ ಕಾರ್ಯಕ್ರಮ ಈಗ ಲಭ್ಯವಿಲ್ಲ.",
+    "detailsLoading": "ಕಾರ್ಯಕ್ರಮದ ವಿವರಗಳು ಲೋಡ್ ಆಗುತ್ತಿವೆ...",
+    "detailsDate": "ಕಾರ್ಯಕ್ರಮದ ದಿನಾಂಕ",
+    "detailsDescriptionFallback": "ಹೆಚ್ಚಿನ ವಿವರಗಳು ಶೀಘ್ರದಲ್ಲೇ ಲಭ್ಯವಾಗುತ್ತವೆ."
   }
 }

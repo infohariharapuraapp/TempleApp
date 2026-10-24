@@ -1,6 +1,7 @@
 
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Dimensions,
@@ -72,6 +73,7 @@ function resolveGuruImage(
 // ========================================
 
 export default function GuruParamparaScreen() {
+  const { t } = useTranslation();
   const [gurus, setGurus] = useState<Guru[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -105,8 +107,7 @@ export default function GuruParamparaScreen() {
       } else {
         setGurus([]);
         setError(
-          response.message ||
-            'Unable to load Guru Parampara.'
+          t('guruParamparaScreen.loadError')
         );
       }
     } catch (err) {
@@ -115,13 +116,11 @@ export default function GuruParamparaScreen() {
         err
       );
 
-      setError(
-        'Unable to load Guru Parampara. Please try again.'
-      );
+      setError(t('guruParamparaScreen.connectionError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Refresh whenever this page becomes active
   useFocusEffect(
@@ -159,18 +158,11 @@ export default function GuruParamparaScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>
-              SACRED LINEAGE
-            </Text>
+            <Text style={styles.eyebrow}>{t('guruParamparaScreen.sacredLineage')}</Text>
 
-            <Text style={styles.title}>
-              Guru Parampara
-            </Text>
+            <Text style={styles.title}>{t('guruParamparaScreen.title')}</Text>
 
-            <Text style={styles.subtitle}>
-              Walk through the sacred lineage of Gurus who
-              preserved wisdom, devotion and tradition.
-            </Text>
+            <Text style={styles.subtitle}>{t('guruParamparaScreen.subtitle')}</Text>
           </View>
         </View>
 
@@ -207,7 +199,7 @@ export default function GuruParamparaScreen() {
                   { marginTop: 12 },
                 ]}
               >
-                Loading Guru Parampara...
+                {t('guruParamparaScreen.loading')}
               </Text>
             </View>
           ) : error ? (
@@ -229,7 +221,7 @@ export default function GuruParamparaScreen() {
                 ]}
               >
                 <Text style={styles.bottomBackText}>
-                  Retry
+                  {t('guruParamparaScreen.retry')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -240,8 +232,7 @@ export default function GuruParamparaScreen() {
                 { paddingVertical: 32 },
               ]}
             >
-              Guru Parampara information will be
-              available soon.
+              {t('guruParamparaScreen.empty')}
             </Text>
           ) : (
             gurus.map((guru, index) => {
@@ -271,9 +262,7 @@ export default function GuruParamparaScreen() {
                     <View style={styles.imageOverlay} />
 
                     <View style={styles.imageLabel}>
-                      <Text style={styles.imageLabelText}>
-                        SACRED LINEAGE
-                      </Text>
+                      <Text style={styles.imageLabelText}>{t('guruParamparaScreen.sacredLineage')}</Text>
                     </View>
 
                     {/* NUMBER */}
@@ -331,14 +320,9 @@ export default function GuruParamparaScreen() {
             ✦
           </Text>
 
-          <Text style={styles.bottomTitle}>
-            A Legacy of Wisdom
-          </Text>
+          <Text style={styles.bottomTitle}>{t('guruParamparaScreen.legacyTitle')}</Text>
 
-          <Text style={styles.bottomText}>
-            The sacred lineage of Gurus continues to inspire
-            devotion, knowledge and service for generations.
-          </Text>
+          <Text style={styles.bottomText}>{t('guruParamparaScreen.legacyDescription')}</Text>
         </View>
 
         {/* BACK BUTTON */}
@@ -351,9 +335,7 @@ export default function GuruParamparaScreen() {
             ‹
           </Text>
 
-          <Text style={styles.bottomBackText}>
-            Back
-          </Text>
+          <Text style={styles.bottomBackText}>{t('guruParamparaScreen.back')}</Text>
         </TouchableOpacity>
 
         <View style={styles.bottomSpace} />

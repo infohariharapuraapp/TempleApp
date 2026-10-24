@@ -437,90 +437,128 @@ export default function ActivitiesScreen() {
             GURU VANI — DYNAMIC
         ======================================== */}
 
-        <FadeIn delay={260}>
-          <SectionHeading
-            eyebrow={t('activities.dailyReflection')}
-            title={t('activities.guruVani')}
-          />
 
-          <LinearGradient
-            colors={['#2F2018', '#503225']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.vaniCard}
-          >
-            <View style={styles.vaniPattern}>
-              <Text style={styles.vaniPatternText}>ॐ</Text>
-            </View>
+{/* ========================================
+    GURU VANI — DYNAMIC & TRANSLATED
+======================================== */}
 
-            <View style={styles.vaniTop}>
-              <View style={styles.vaniBadge}>
-                <Text style={styles.vaniBadgeText}>
-                  {t('activities.guruVani')}
-                </Text>
-              </View>
-              <Text style={styles.vaniMark}>✦</Text>
-            </View>
+<FadeIn delay={260}>
+  <SectionHeading
+    eyebrow={t('activities.dailyReflection')}
+    title={t('activities.guruVani')}
+  />
 
-            {loadingGuruVani ? (
-              <Text style={styles.vaniDescription}>
-                {t('activities.loading')}
-              </Text>
-            ) : guruVaniError ? (
-              <View>
-                <Text style={styles.vaniDescription}>
-                  Unable to load Guru Vani right now.
-                </Text>
-                <Pressable onPress={() => void loadLatestGuruVani()}>
-                  <Text style={styles.vaniExploreText}>Retry ↻</Text>
-                </Pressable>
-              </View>
-            ) : latestGuruVani ? (
-              <>
-                <Text style={styles.vaniTitle}>
-                  {latestGuruVani.title}
-                </Text>
-                <Text style={styles.vaniQuote}>
-                  {latestGuruVani.sloka}
-                </Text>
-                {Boolean(latestGuruVani.transliteration?.trim()) && (
-                  <Text style={styles.vaniDescription}>
-                    {latestGuruVani.transliteration}
-                  </Text>
-                )}
-                {Boolean(latestGuruVani.meaning?.trim()) && (
-                  <>
-                    <View style={styles.vaniDivider} />
-                    <Text style={styles.vaniDescription}>
-                      {latestGuruVani.meaning}
-                    </Text>
-                  </>
-                )}
-                {Boolean(latestGuruVani.guru_name?.trim()) && (
-                  <Text style={styles.vaniGuruName}>
-                    — {latestGuruVani.guru_name}
-                  </Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.vaniDescription}>
-                Guru Vani teachings will appear here when published.
-              </Text>
-            )}
+  <LinearGradient
+    colors={['#2F2018', '#503225']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.vaniCard}
+  >
+    <View style={styles.vaniPattern}>
+      <Text style={styles.vaniPatternText}>
+        ॐ
+      </Text>
+    </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.vaniExploreButton,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={() => router.push('/guru-vani' as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Explore all Guru Vani teachings"
-            >
-              <Text style={styles.vaniExploreText}>Explore All →</Text>
-            </Pressable>
-          </LinearGradient>
-        </FadeIn>
+    <View style={styles.vaniTop}>
+      <View style={styles.vaniBadge}>
+        <Text style={styles.vaniBadgeText}>
+          {t('activities.guruVani')}
+        </Text>
+      </View>
+
+      <Text style={styles.vaniMark}>
+        ✦
+      </Text>
+    </View>
+
+    {/* LOADING */}
+
+    {loadingGuruVani ? (
+      <Text style={styles.vaniDescription}>
+        {t('activities.loading')}
+      </Text>
+    ) : guruVaniError ? (
+      /* ERROR */
+
+      <View>
+        <Text style={styles.vaniDescription}>
+          {t('activities.guruVaniLoadError')}
+        </Text>
+
+        <Pressable
+          onPress={() => void loadLatestGuruVani()}
+        >
+          <Text style={styles.vaniExploreText}>
+            {t('activities.retry')} ↻
+          </Text>
+        </Pressable>
+      </View>
+    ) : latestGuruVani ? (
+      /* GURU VANI CONTENT */
+
+      <>
+        <Text style={styles.vaniTitle}>
+          {latestGuruVani.title}
+        </Text>
+
+        <Text style={styles.vaniQuote}>
+          {latestGuruVani.sloka}
+        </Text>
+
+        {Boolean(
+          latestGuruVani.transliteration?.trim()
+        ) && (
+          <Text style={styles.vaniDescription}>
+            {latestGuruVani.transliteration}
+          </Text>
+        )}
+
+        {Boolean(latestGuruVani.meaning?.trim()) && (
+          <>
+            <View style={styles.vaniDivider} />
+
+            <Text style={styles.vaniDescription}>
+              {latestGuruVani.meaning}
+            </Text>
+          </>
+        )}
+
+        {Boolean(latestGuruVani.guru_name?.trim()) && (
+          <Text style={styles.vaniGuruName}>
+            — {latestGuruVani.guru_name}
+          </Text>
+        )}
+      </>
+    ) : (
+      /* EMPTY STATE */
+
+      <Text style={styles.vaniDescription}>
+        {t('activities.guruVaniEmpty')}
+      </Text>
+    )}
+
+    {/* EXPLORE ALL */}
+
+    <Pressable
+      style={({ pressed }) => [
+        styles.vaniExploreButton,
+        pressed && styles.buttonPressed,
+      ]}
+      onPress={() =>
+        router.push('/guru-vani' as any)
+      }
+      accessibilityRole="button"
+      accessibilityLabel={t(
+        'activities.guruVaniExploreAccessibility'
+      )}
+    >
+      <Text style={styles.vaniExploreText}>
+        {t('activities.guruVaniExploreAll')} →
+      </Text>
+    </Pressable>
+  </LinearGradient>
+</FadeIn>
 
         {/* ========================================
             INSIGHTS

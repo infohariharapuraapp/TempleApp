@@ -1,0 +1,25 @@
+{
+  "galleryScreen": {
+    "loading": "Loading gallery...",
+    "loadError": "Unable to load gallery",
+    "connectionError": "Please check your internet connection and try again.",
+    "retry": "Try Again",
+    "templeGallery": "TEMPLE GALLERY",
+    "explorePhotos": "Explore temple photographs",
+    "photos": "PHOTOS",
+    "templeMedia": "TEMPLE MEDIA",
+    "title": "Gallery",
+    "subtitle": "Explore temple photos, videos and devotional stotras",
+    "noPhotos": "No photos available",
+    "noPhotosText": "Temple gallery photos will appear here when they are added by the administrator.",
+    "viewAll": "View All",
+    "photoCount": "{{count}} photo",
+    "photoCount_plural": "{{count}} photos",
+    "morePhotos": "+{{count}} more",
+    "share": "Share",
+    "sharing": "Sharing...",
+    "download": "Download",
+    "saving": "Saving...",
+    "shareImage": "Share Temple Image"
+  }
+}

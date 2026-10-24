@@ -1,4 +1,6 @@
 
+import { useTranslation } from 'react-i18next';
+
 import React, {
   useCallback,
   useState,
@@ -69,6 +71,7 @@ const COLORS = {
 // ========================================
 
 export default function PoojaDetailsScreen() {
+  const { t } = useTranslation();
   const { id, name } = useLocalSearchParams<{
     id: string;
     name?: string;
@@ -84,7 +87,7 @@ export default function PoojaDetailsScreen() {
       const sectionId = Number(id);
 
       if (!Number.isSafeInteger(sectionId) || sectionId <= 0) {
-        setError('Invalid pooja section.');
+        setError(t('poojaDetails.invalidSection'));
         setLoading(false);
         setRefreshing(false);
         return;
@@ -105,7 +108,7 @@ export default function PoojaDetailsScreen() {
 
         if (!response.success) {
           throw new Error(
-            response.message || 'Unable to load poojas'
+            response.message || t('poojaDetails.loadError')
           );
         }
 
@@ -124,14 +127,14 @@ export default function PoojaDetailsScreen() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Unable to load poojas'
+            : t('poojaDetails.loadError')
         );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [id]
+    [id, t]
   );
 
   useFocusEffect(
@@ -144,7 +147,7 @@ export default function PoojaDetailsScreen() {
     const amount = Number(value);
 
     if (!Number.isFinite(amount)) {
-      return 'Price unavailable';
+      return t('poojaDetails.priceUnavailable');
     }
 
     return `₹${amount.toLocaleString('en-IN', {
@@ -180,23 +183,22 @@ export default function PoojaDetailsScreen() {
           onPress={() => router.back()}
         >
           <Text style={styles.backText}>
-            ‹ Back to Pooja Services
+            ‹ {t('poojaDetails.back')}
           </Text>
         </TouchableOpacity>
 
         {/* HEADER */}
 
         <Text style={styles.label}>
-          SACRED OFFERINGS
+          {t('poojaDetails.label')}
         </Text>
 
         <Text style={styles.title}>
-          {name || 'Temple Poojas'}
+          {name || t('poojaDetails.title')}
         </Text>
 
         <Text style={styles.subtitle}>
-          Explore available poojas and their
-          offerings at the temple.
+          {t('poojaDetails.subtitle')}
         </Text>
 
         {/* DIVIDER */}
@@ -216,13 +218,13 @@ export default function PoojaDetailsScreen() {
               color={COLORS.maroon}
             />
             <Text style={styles.infoText}>
-              Loading poojas...
+              {t('poojaDetails.loading')}
             </Text>
           </View>
         ) : error ? (
           <View style={styles.messageCard}>
             <Text style={styles.messageTitle}>
-              Unable to load poojas
+              {t('poojaDetails.loadError')}
             </Text>
 
             <Text style={styles.infoText}>
@@ -236,7 +238,7 @@ export default function PoojaDetailsScreen() {
               }}
             >
               <Text style={styles.retryText}>
-                Try Again
+                {t('poojaDetails.retry')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -247,19 +249,17 @@ export default function PoojaDetailsScreen() {
             </Text>
 
             <Text style={styles.messageTitle}>
-              No Poojas Available
+              {t('poojaDetails.emptyTitle')}
             </Text>
 
             <Text style={styles.infoText}>
-              Poojas for this section will
-              be available soon.
+              {t('poojaDetails.emptyText')}
             </Text>
           </View>
         ) : (
           <View>
             <Text style={styles.countText}>
-              {poojas.length} Pooja
-              {poojas.length === 1 ? '' : 's'} Available
+              {t('poojaDetails.availableCount', { count: poojas.length })}
             </Text>
 
             {poojas.map(pooja => (
@@ -299,7 +299,7 @@ export default function PoojaDetailsScreen() {
                   onPress={openBooking}
                 >
                   <Text style={styles.bookButtonText}>
-                    Book Pooja
+                    {t('poojaDetails.bookPooja')}
                   </Text>
 
                   <Text style={styles.bookArrow}>
@@ -315,14 +315,11 @@ export default function PoojaDetailsScreen() {
 
         <View style={styles.offlineCard}>
           <Text style={styles.offlineTitle}>
-            🛕 Offline Booking Available
+            🛕 {t('poojaDetails.offlineTitle')}
           </Text>
 
           <Text style={styles.offlineText}>
-            Devotees can book poojas directly
-            at the temple Seva Counter.
-            Please contact the counter for
-            availability and assistance.
+            {t('poojaDetails.offlineText')}
           </Text>
         </View>
 
@@ -330,13 +327,11 @@ export default function PoojaDetailsScreen() {
 
         <View style={styles.onlineCard}>
           <Text style={styles.onlineTitle}>
-            Online Pooja Booking
+            {t('poojaDetails.onlineTitle')}
           </Text>
 
           <Text style={styles.onlineText}>
-            Continue to the official temple
-            booking website to select your
-            pooja and complete the booking.
+            {t('poojaDetails.onlineText')}
           </Text>
 
           <TouchableOpacity
@@ -344,7 +339,7 @@ export default function PoojaDetailsScreen() {
             onPress={openBooking}
           >
             <Text style={styles.onlineButtonText}>
-              Proceed to Booking
+              {t('poojaDetails.proceedBooking')}
             </Text>
 
             <Text style={styles.onlineArrow}>

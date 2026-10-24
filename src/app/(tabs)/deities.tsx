@@ -229,8 +229,8 @@ export default function DeitiesScreen() {
                 {deity.deity_type === 'group' ? (
                   <View style={styles.groupLabel}>
                       <Text style={styles.groupLabelText}>
-                        Deity Group
-                      </Text>
+  {t('deities.groupLabel')}
+</Text>
                     </View>
                 ) : null}
                 <Text style={styles.deityName}>
@@ -247,8 +247,8 @@ export default function DeitiesScreen() {
                 <View style={styles.viewDetailsRow}>
                   <Text style={styles.viewDetails}>
                     {deity.deity_type === 'group'
-                        ? 'Explore Deities'
-                        : t('deities.viewDetails')}
+  ? t('deities.exploreDeities')
+  : t('deities.viewDetails')}
                   </Text>
                   <Text style={styles.arrow}>
                     ›

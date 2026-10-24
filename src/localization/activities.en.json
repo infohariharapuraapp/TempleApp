@@ -1,6 +1,4 @@
-
 {
-    
   "darshan": {
     "templeServices": "Temple Services",
     "title": "Darshan",
@@ -32,7 +30,20 @@
     "guideline3": "Please follow the temple dress guidelines.",
     "guideline4": "Keep your booking confirmation ready.",
     "am": "AM",
-    "pm": "PM"
+    "pm": "PM",
+    "videoTitle": "Today's Darshan",
+    "videoSubtitle": "Sacred moments from the temple",
+    "videoLoading": "Loading today's Darshan...",
+    "videoLoadError": "Unable to load Darshan",
+    "videoTryAgain": "Try Again",
+    "videoIntroTitle": "Divine Darshan",
+    "videoIntroDescription": "Experience today's sacred Darshan from wherever you are.",
+    "videoSingular": "Darshan Video",
+    "videoPlural": "Darshan Videos",
+    "videoWatch": "Watch Darshan",
+    "videoNotification": "Receive notifications whenever a new Darshan video is published.",
+    "videoEmptyTitle": "Today's Darshan",
+    "videoEmptyDescription": "Today's Darshan videos have not been published yet. Please check again later."
   },
   "events": {
     "community": "Temple Community",
@@ -49,5 +60,34 @@
     "timeNotSpecified": "Time not specified",
     "refresh": "Refresh Events",
     "date": "DATE"
+  },
+  "activities": {
+    "guruVaniLoadError": "Unable to load Guru Vani right now.",
+    "guruVaniEmpty": "Guru Vani teachings will appear here when published.",
+    "guruVaniExploreAll": "Explore All",
+    "guruVaniExploreAccessibility": "Explore all Guru Vani teachings"
+  },
+  "activitySection": {
+    "loading": "Loading activities...",
+    "notFound": "Activity section not found",
+    "goBack": "Go Back",
+    "back": "Back",
+    "templeActivities": "TEMPLE ACTIVITIES",
+    "emptyTitle": "No Activities Available",
+    "emptyText": "Activities will appear here when published.",
+    "viewDetails": "View Details"
+  },
+  "activityDetails": {
+    "loading": "Loading activity details...",
+    "notFound": "Activity Not Found",
+    "notFoundText": "This activity is unavailable or may have been removed.",
+    "goBack": "Go Back",
+    "title": "Activity Details",
+    "date": "DATE",
+    "location": "LOCATION",
+    "about": "About This Activity",
+    "descriptionFallback": "More information about this activity will be available soon.",
+    "blessing": "May this sacred activity bring peace, devotion, and blessings to all.",
+    "backToActivities": "Back to Activities"
   }
 }

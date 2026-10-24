@@ -28,6 +28,27 @@
     "loadFailed": "देवता का विवरण लोड नहीं हो सका",
     "cannotFind": "अनुरोधित देवता की जानकारी नहीं मिली।",
     "infoUnavailable": "इस देवता की जानकारी अभी उपलब्ध नहीं है।",
-    "prayer": "{{name}} का दिव्य आशीर्वाद सभी भक्तों को शांति, शक्ति और प्रसन्नता प्रदान करे।"
+    "prayer": "{{name}} का दिव्य आशीर्वाद सभी भक्तों को शांति, शक्ति और प्रसन्नता प्रदान करे।",
+    "groupLabel": "देवताओं का समूह",
+    "exploreDeities": "देवताओं के बारे में जानें",
+    "detailsLoading": "देवता का विवरण लोड हो रहा है...",
+    "detailsNotFound": "देवता नहीं मिले",
+    "detailsNotFoundMessage": "आपके द्वारा खोजे गए देवता का विवरण नहीं मिला।",
+    "detailsLoadError": "देवता का विवरण लोड नहीं हो सका।",
+    "detailsGoBack": "वापस जाएँ",
+    "detailsGroupSubtitle": "पवित्र देवता समूह",
+    "detailsIndividualSubtitle": "दिव्य उपस्थिति • मंदिर के देवता",
+    "detailsAbout": "परिचय",
+    "detailsDescriptionFallback": "इस देवता के बारे में जानकारी अभी उपलब्ध नहीं है।",
+    "detailsExploreHeading": "देवताओं के बारे में जानें",
+    "detailsExploreIntro": "किसी देवता का व्यक्तिगत विवरण पढ़ने के लिए उसे चुनें।",
+    "detailsChildAction": "विवरण देखें",
+    "detailsChildAccessibility": "{{name}} का विवरण देखें",
+    "detailsNoChildren": "अभी उपदेवताओं का विवरण उपलब्ध नहीं है।",
+    "detailsSignificance": "आध्यात्मिक महत्व",
+    "detailsDevotional": "भक्ति साधना",
+    "detailsPrayer": "{{name}} के दिव्य आशीर्वाद से सभी भक्तों को शांति, शक्ति और सुख प्राप्त हो।",
+    "detailsBackToGroup": "देवता समूह पर वापस जाएँ",
+    "detailsBackToDeities": "देवताओं की सूची पर वापस जाएँ"
   }
 }

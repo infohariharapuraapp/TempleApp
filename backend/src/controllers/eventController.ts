@@ -13,7 +13,6 @@ export const getEvents = async (
   try {
     const { type, category_id } = req.query;
 
-    // Validate event type
     if (
       type !== undefined &&
       type !== 'upcoming' &&
@@ -25,7 +24,6 @@ export const getEvents = async (
       });
     }
 
-    // Validate category ID
     let categoryId: number | null = null;
 
     if (category_id !== undefined) {
@@ -49,7 +47,6 @@ export const getEvents = async (
       }
     }
 
-    // Use temple timezone for date comparison
     const todayExpression =
       "(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date";
 
@@ -60,21 +57,20 @@ export const getEvents = async (
 
     const values: unknown[] = [];
 
-    // Default: Upcoming events
+    // Multi-day events remain upcoming until the
+    // final day of the event has passed.
     if (type === 'past') {
       conditions.push(
-        `e.event_date < ${todayExpression}`
+        `COALESCE(e.event_end_date, e.event_date) < ${todayExpression}`
       );
     } else {
       conditions.push(
-        `e.event_date >= ${todayExpression}`
+        `COALESCE(e.event_end_date, e.event_date) >= ${todayExpression}`
       );
     }
 
-    // Optional category filter
     if (categoryId !== null) {
       values.push(categoryId);
-
       conditions.push(
         `e.category_id = $${values.length}`
       );
@@ -90,16 +86,47 @@ export const getEvents = async (
          e.description,
          e.image_url,
          e.event_date,
+         e.event_end_date,
          e.start_time,
          e.end_time,
          e.location,
          e.category_id,
          c.name AS category_name,
-         e.is_active
+         e.is_active,
+
+         COALESCE(
+           (
+             SELECT json_agg(
+               json_build_object(
+                 'id', ei.id,
+                 'image_url', ei.image_url,
+                 'display_order', ei.display_order
+               )
+               ORDER BY ei.display_order, ei.id
+             )
+             FROM event_images ei
+             WHERE ei.event_id = e.id
+           ),
+           CASE
+             WHEN e.image_url IS NOT NULL
+                  AND e.image_url <> ''
+             THEN json_build_array(
+               json_build_object(
+                 'id', null,
+                 'image_url', e.image_url,
+                 'display_order', 0
+               )
+             )
+             ELSE '[]'::json
+           END
+         ) AS images
+
        FROM events e
        INNER JOIN event_categories c
          ON e.category_id = c.id
+
        WHERE ${conditions.join(' AND ')}
+
        ORDER BY
          e.event_date ${sortDirection},
          e.start_time ${sortDirection} NULLS LAST,

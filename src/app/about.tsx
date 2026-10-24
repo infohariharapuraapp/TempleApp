@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   Image,
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import styles from './about.styles';
 
 export default function AboutScreen() {
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -26,21 +28,19 @@ export default function AboutScreen() {
         <View style={styles.heroSection}>
 
           <Text style={styles.smallLabel}>
-            DIVYAKSHETRA HARIHARAPURA
+            {t('aboutDetails.text001')}
           </Text>
 
           <Text style={styles.mainTitle}>
-            A Sacred Convergence of
+            {t('aboutDetails.text002')}
           </Text>
 
           <Text style={styles.highlightTitle}>
-            Yaga • Tapo • Jnana
+            {t('aboutDetails.text003')}
           </Text>
 
           <Text style={styles.heroDescription}>
-            Welcome to Divyakshetra Hariharapura, a sacred
-            spiritual destination on the banks of the
-            Uttaravahini Tunga River in Karnataka.
+            {t('aboutDetails.text004')}
           </Text>
 
         </View>
@@ -69,22 +69,15 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.cardTitle}>
-            Divyakshetra Hariharapura
+            {t('aboutDetails.text006')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Nestled in the lush landscapes of Chikmagalur
-            District, Karnataka, Hariharapura is a divine
-            epicenter revered across ancient scriptures and
-            sacred traditions.
+            {t('aboutDetails.text007')}
           </Text>
 
           <Text style={styles.bodyText}>
-            It is a rare spiritual ground where history,
-            mythology and supreme cosmic energy merge.
-            The sacred kshetra is especially renowned as
-            the meeting ground of Yaga Bhoomi, Tapo Bhoomi
-            and Jnana Bhoomi.
+            {t('aboutDetails.text008')}
           </Text>
 
         </View>
@@ -96,8 +89,8 @@ export default function AboutScreen() {
 
         <SectionHeading
           number="01"
-          title="About the Kshetra"
-          subtitle="The Divine Trinity — Yaga, Tapo & Jnana Bhoomi"
+          title={t('aboutDetails.section1Title')}
+          subtitle={t('aboutDetails.section1Subtitle')}
         />
 
         {/* YAGA BHOOMI */}
@@ -109,33 +102,23 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.subTitle}>
-            Yaga Bhoomi
+            {t('aboutDetails.text010')}
           </Text>
 
           <Text style={styles.subHeading}>
-            The Land of Sacred Sacrifice
+            {t('aboutDetails.text011')}
           </Text>
 
           <Text style={styles.bodyText}>
-            In ancient times, this sacred region was known
-            as Daksha Kshetra or Kapalam. According to the
-            Skanda Purana and sacred traditions, it was here
-            that Lord Daksha Prajapati performed a monumental
-            Maha Yagna.
+            {t('aboutDetails.text012')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Following the divine events surrounding the
-            sacrifice, Lord Shiva manifested from the
-            sacred Yagna Kunda as Swayambhu Dakshahara
-            Someshwara, blessing the land with divine
-            presence.
+            {t('aboutDetails.text013')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The ancient Swayambhu Sri Dakshahara Someshwara
-            temple continues to stand as a testimony to this
-            sacred legend.
+            {t('aboutDetails.text014')}
           </Text>
 
           <Image
@@ -158,30 +141,23 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.subTitle}>
-            Tapo Bhoomi
+            {t('aboutDetails.text016')}
           </Text>
 
           <Text style={styles.subHeading}>
-            The Land of Divine Penance
+            {t('aboutDetails.text017')}
           </Text>
 
           <Text style={styles.bodyText}>
-            During the Treta Yuga, the revered Sage Agastya
-            Maharishi travelled south and chose Hariharapura
-            as the place for his intense spiritual penance.
+            {t('aboutDetails.text018')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Agastya Maharishi worshipped Lord Sri Lakshmi
-            Narasimha and a sacred Shaligrama. His profound
-            tapas is believed to have filled this land with
-            powerful spiritual vibrations.
+            {t('aboutDetails.text019')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The sacred Lakshmi Narasimha Shaligrama and
-            vigraha associated with Sage Agastya continue
-            to be worshipped at the temple.
+            {t('aboutDetails.text020')}
           </Text>
 
           <Image
@@ -203,33 +179,23 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.subTitle}>
-            Jnana Bhoomi
+            {t('aboutDetails.text022')}
           </Text>
 
           <Text style={styles.subHeading}>
-            The Land of Divine Wisdom
+            {t('aboutDetails.text023')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Jagadguru Adi Shankaracharya Bhagavatpada visited
-            this sacred region during his Dharma Yatra and
-            recognized the immense spiritual potency of
-            Hariharapura.
+            {t('aboutDetails.text024')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Here, the revered Acharya installed the sacred
-            Sri Chakra Maha Yantram and consecrated Goddess
-            Sri Sharada Parameshwari, establishing a powerful
-            centre of Jnana and Bhakti.
+            {t('aboutDetails.text025')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Adi Shankaracharya also initiated Sri Swayamprakasha
-            Krishna Yogeendra Saraswathi into Sanyasa. The
-            Guru-Shishya tradition that began through this
-            divine lineage continues to inspire devotees and
-            seekers to this day.
+            {t('aboutDetails.text026')}
           </Text>
 
           <Image
@@ -249,23 +215,18 @@ export default function AboutScreen() {
 
         <SectionHeading
           number="02"
-          title="Temple History & Lineage"
-          subtitle="A sacred heritage preserved through generations"
+          title={t('aboutDetails.section2Title')}
+          subtitle={t('aboutDetails.section2Subtitle')}
         />
 
         <View style={styles.sectionCard}>
 
           <Text style={styles.subTitle}>
-            The Legacy of the Deities
+            {t('aboutDetails.text027')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The sacred Lakshmi Narasimha idol and Shaligrama
-            worshipped by Sage Agastya were preserved through
-            a Guru-Shishya lineage and eventually returned to
-            Hariharapura through the spiritual tradition of
-            Sri Govinda Yogi and the first Peetadhipathi,
-            Sri Swayamprakasha Krishna Yogendra Saraswathi.
+            {t('aboutDetails.text028')}
           </Text>
 
         </View>
@@ -276,28 +237,19 @@ export default function AboutScreen() {
         <View style={styles.sectionCard}>
 
           <Text style={styles.subTitle}>
-            Royal Patronage
+            {t('aboutDetails.text029')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Historical inscriptions from the medieval period
-            record the importance of Hariharapura as an
-            Agrahara associated with the Vijayanagara
-            tradition.
+            {t('aboutDetails.text030')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Historical sources mention Harihara Maharaya,
-            the second ruler of the Vijayanagara Empire, in
-            connection with the development and recognition
-            of this sacred settlement.
+            {t('aboutDetails.text031')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The religious and cultural traditions connected
-            with Sringeri and the Vijayanagara kingdom played
-            an important role in the history of this sacred
-            region.
+            {t('aboutDetails.text032')}
           </Text>
 
         </View>
@@ -308,22 +260,15 @@ export default function AboutScreen() {
         <View style={styles.sectionCard}>
 
           <Text style={styles.subTitle}>
-            The Peetam Today
+            {t('aboutDetails.text033')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The sacred Peetam has been carried forward through
-            a long and illustrious Guru Parampara, preserving
-            Sanatana Dharma, spiritual knowledge and devotional
-            traditions.
+            {t('aboutDetails.text034')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Under the guidance of the present Peethadhipati,
-            Parama Poojya Jagadguru Shankaracharya Sri Sri
-            Swayamprakasha Sachidananda Saraswathi Mahaswamiji,
-            the ancient temple has undergone a monumental
-            transformation and reconstruction.
+            {t('aboutDetails.text035')}
           </Text>
 
         </View>
@@ -336,7 +281,7 @@ export default function AboutScreen() {
         <View style={styles.guruCard}>
 
           <Text style={styles.guruLabel}>
-            GURU PARAMPARA
+            {t('aboutDetails.text036')}
           </Text>
 
           <Text style={styles.sanskrit}>
@@ -378,8 +323,8 @@ export default function AboutScreen() {
 
         <SectionHeading
           number="03"
-          title="The Present Jagadguru"
-          subtitle="Guiding the sacred Peetam today"
+          title={t('aboutDetails.section3Title')}
+          subtitle={t('aboutDetails.section3Subtitle')}
         />
 
         <View style={styles.sectionCard}>
@@ -397,24 +342,15 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.bodyText}>
-            Anantha Sri Vibushita Jagadguru Shankaracharya
-            Parama Pujya Sri Sri Swayamprakasha Sachidananda
-            Saraswati Mahaswamiji is the present Peethadipati
-            of this esteemed Dharma Peetham.
+            {t('aboutDetails.text040')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Mahaswamiji has transformed the ancient mutt into
-            a magnificent temple complex and has continued
-            the sacred traditions of Sri Sharada, Lakshmi
-            Narasimha and the Guru Parampara.
+            {t('aboutDetails.text041')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The teachings of the Peetam emphasize spiritual
-            unity, equality, devotion and service. Mahaswamiji
-            inspires devotees to follow the path of devotion,
-            Dharma and service to society and the Motherland.
+            {t('aboutDetails.text042')}
           </Text>
 
         </View>
@@ -426,8 +362,8 @@ export default function AboutScreen() {
 
         <SectionHeading
           number="04"
-          title="Architectural & Spiritual Marvels"
-          subtitle="Sacred features of Divyakshetra Hariharapura"
+          title={t('aboutDetails.section4Title')}
+          subtitle={t('aboutDetails.section4Subtitle')}
         />
 
 
@@ -440,15 +376,11 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.featureTitle}>
-            Uttaravahini Tunga River
+            {t('aboutDetails.text044')}
           </Text>
 
           <Text style={styles.bodyText}>
-            At Hariharapura, the sacred river Tunga flows
-            northward and is therefore known as Uttaravahini.
-            According to sacred traditions, rivers flowing
-            northward are considered especially auspicious
-            for spiritual practices.
+            {t('aboutDetails.text045')}
           </Text>
 
         </View>
@@ -463,21 +395,15 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.featureTitle}>
-            Vajrasthambha Lakshmi Narasimha Maha Yantram
+            {t('aboutDetails.text047')}
           </Text>
 
           <Text style={styles.bodyText}>
-            One of the unique spiritual highlights of the
-            temple is the magnificent 32-foot Lakshmi
-            Narasimha Maha Yantra in the form of a pillar
-            known as Vajrasthambha.
+            {t('aboutDetails.text048')}
           </Text>
 
           <Text style={styles.bodyText}>
-            At the Bindu-staana at the top of the powerful
-            Vajrasthambha resides an auspicious Lakshmi
-            Narasimha Swamy idol carved from Maragatha
-            stone.
+            {t('aboutDetails.text049')}
           </Text>
 
         </View>
@@ -492,19 +418,15 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.featureTitle}>
-            Dual Sanctums
+            {t('aboutDetails.text051')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The temple complex uniquely brings together
-            Shaivite and Vaishnavite traditions.
+            {t('aboutDetails.text052')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The sacred Swayambhu Someshwara shrine exists
-            alongside the glorious Lakshmi Narasimha and
-            Sharadamba sanctums, creating a distinctive
-            spiritual environment.
+            {t('aboutDetails.text053')}
           </Text>
 
         </View>
@@ -516,8 +438,8 @@ export default function AboutScreen() {
 
         <SectionHeading
           number="05"
-          title="Visitor Information & Sevas"
-          subtitle="Experience the sacred traditions of the Kshetra"
+          title={t('aboutDetails.section5Title')}
+          subtitle={t('aboutDetails.section5Subtitle')}
         />
 
         <View style={styles.locationCard}>
@@ -527,17 +449,15 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.featureTitle}>
-            Location
+            {t('aboutDetails.text055')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Hariharapura, Koppa Taluk,
-            Chikmagalur District, Karnataka.
+            {t('aboutDetails.text056')}
           </Text>
 
           <Text style={styles.bodyText}>
-            The sacred Kshetra is situated on the banks of
-            the Tunga River between Koppa and Sringeri.
+            {t('aboutDetails.text057')}
           </Text>
 
         </View>
@@ -548,31 +468,31 @@ export default function AboutScreen() {
         <View style={styles.sectionCard}>
 
           <Text style={styles.subTitle}>
-            Daily Rituals & Sevas
+            {t('aboutDetails.text058')}
           </Text>
 
           <ServiceRow
             icon="🪔"
-            title="Special Pujas"
-            description="Traditional worship and devotional rituals."
+            title={t('aboutDetails.seva1Title')}
+            description={t('aboutDetails.seva1Description')}
           />
 
           <ServiceRow
             icon="🔥"
-            title="Homas & Havanas"
-            description="Sacred fire rituals connected with the Yaga Bhoomi tradition."
+            title={t('aboutDetails.seva2Title')}
+            description={t('aboutDetails.seva2Description')}
           />
 
           <ServiceRow
             icon="🍚"
-            title="Annadaana"
-            description="Food service offered to pilgrims and devotees."
+            title={t('aboutDetails.seva3Title')}
+            description={t('aboutDetails.seva3Description')}
           />
 
           <ServiceRow
             icon="🐄"
-            title="Go Samrakshana"
-            description="Initiatives dedicated to the protection and care of cows."
+            title={t('aboutDetails.seva4Title')}
+            description={t('aboutDetails.seva4Description')}
           />
 
         </View>
@@ -583,20 +503,15 @@ export default function AboutScreen() {
         <View style={styles.sectionCard}>
 
           <Text style={styles.subTitle}>
-            Significance of Pilgrimage
+            {t('aboutDetails.text059')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Devotees visit Divyakshetra Hariharapura seeking
-            spiritual peace, divine blessings and an
-            opportunity to experience the sacred traditions
-            of this ancient Kshetra.
+            {t('aboutDetails.text060')}
           </Text>
 
           <Text style={styles.bodyText}>
-            Taking a dip in the sacred Tunga River, offering
-            prayers and participating in spiritual practices
-            are regarded by devotees as deeply auspicious.
+            {t('aboutDetails.text061')}
           </Text>
 
         </View>
@@ -613,13 +528,11 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.bottomTitle}>
-            Yaga • Tapo • Jnana
+            {t('aboutDetails.text003')}
           </Text>
 
           <Text style={styles.bottomText}>
-            May the divine blessings of Sri Sharada,
-            Lakshmi Narasimha and the sacred Guru Parampara
-            be with all devotees.
+            {t('aboutDetails.text062')}
           </Text>
 
           <Text style={styles.bottomPrayer}>

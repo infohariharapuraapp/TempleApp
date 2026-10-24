@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/authMiddleware';
 import { requireAdmin } from '../middleware/adminMiddleware';
+import eventImageUploadRoutes from './eventImageUploadRoutes';
 import {
   getAdminEventCategories,
   createEventCategory,
@@ -108,6 +109,6 @@ router.put(
   requireAdmin,
   updateEventCategory
 );
-
+router.use('/events', eventImageUploadRoutes);
 
 export default router;

@@ -1,4 +1,3 @@
-
 {
   "events": {
     "community": "Temple Community",
@@ -18,6 +17,9 @@
     "aboutEvent": "About This Event",
     "descriptionFallback": "More details will be available soon.",
     "invalidEvent": "Invalid event.",
-    "eventUnavailable": "This event is no longer available."
+    "eventUnavailable": "This event is no longer available.",
+    "detailsLoading": "Loading event details...",
+    "detailsDate": "Event Date",
+    "detailsDescriptionFallback": "More details will be available soon."
   }
 }

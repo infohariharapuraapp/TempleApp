@@ -75,7 +75,7 @@ const QUICK_ACTIONS = [
   { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
   { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
-  { icon: '🖼️', titleKey: 'Gallery', route: '/gallery' },
+ { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
 { icon: '🪔', titleKey: 'home.quickSeva', route: '/seva-registration', comingSoon: true },
 
  {
@@ -579,7 +579,7 @@ export default function HomeScreen() {
         icon={item.icon}
         title={
           comingSoon
-            ? `${t(item.titleKey)} (Coming Soon)`
+           ? `${t(item.titleKey)} (Coming Soon in December)`
             : t(item.titleKey)
         }
         index={index}
@@ -593,42 +593,40 @@ export default function HomeScreen() {
   })}
 </View>
 
-          {/* Dharma Sandeham */}
-          <TouchableOpacity
-            style={styles.dharmaCard}
-            activeOpacity={0.85}
-            onPress={() => router.push('/dharma' as any)}
-          >
-            <View style={styles.dharmaIconCircle}>
-              <Text style={styles.dharmaIcon}>ॐ</Text>
-            </View>
+         {/* Dharma Sandeham */}
+<TouchableOpacity
+  style={styles.dharmaCard}
+  activeOpacity={0.85}
+  onPress={() => router.push('/dharma' as any)}
+>
+  <View style={styles.dharmaIconCircle}>
+    <Text style={styles.dharmaIcon}>ॐ</Text>
+  </View>
 
-            <View style={styles.dharmaContent}>
-              <Text style={styles.dharmaTag}>
-                DEVOTEE COMMUNITY
-              </Text>
+  <View style={styles.dharmaContent}>
+    <Text style={styles.dharmaTag}>
+      {t('home.dharmaTag')}
+    </Text>
 
-              <Text style={styles.dharmaTitle}>
-                Dharma Sandeham
-              </Text>
+    <Text style={styles.dharmaTitle}>
+      {t('home.dharmaTitle')}
+    </Text>
 
-              <Text style={styles.dharmaDescription}>
-                Ask questions about temple traditions,
-                pooja rituals and spiritual practices.
-                Share knowledge with fellow devotees.
-              </Text>
+    <Text style={styles.dharmaDescription}>
+      {t('home.dharmaDescription')}
+    </Text>
 
-              <View style={styles.dharmaAction}>
-                <Text style={styles.dharmaActionText}>
-                  Explore Questions
-                </Text>
-                <Text style={styles.dharmaActionArrow}>
-                  →
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+    <View style={styles.dharmaAction}>
+      <Text style={styles.dharmaActionText}>
+        {t('home.exploreQuestions')}
+      </Text>
 
+      <Text style={styles.dharmaActionArrow}>
+        →
+      </Text>
+    </View>
+  </View>
+</TouchableOpacity>
           {/* Watch & Experience */}
           <View style={styles.videoSectionHeader}>
             <View>
@@ -773,7 +771,9 @@ export default function HomeScreen() {
             contentContainerStyle={styles.guruScroll}
           >
             {gurusLoading ? (
-              <Text style={styles.sectionIntro}>Loading Guru Parampara...</Text>
+              <Text style={styles.sectionIntro}>
+  {t('home.guruLoading')}
+</Text>
             ) : gurus.length > 0 ? (
               gurus.map((guru, index) => (
                 <AnimatedGuruCard
@@ -785,8 +785,8 @@ export default function HomeScreen() {
               ))
             ) : (
               <Text style={styles.sectionIntro}>
-                Guru Parampara information will be available soon.
-              </Text>
+  {t('home.guruEmpty')}
+</Text>
             )}
           </ScrollView>
 
@@ -896,9 +896,9 @@ export default function HomeScreen() {
 
             {/* All About Us content sits above the background image */}
             <View style={styles.aboutUsContent}>
-              <Text style={styles.aboutUsImageCaptionSmall}>
-                DIVYAKSHETRA HARIHARAPURA
-              </Text>
+             <Text style={styles.aboutUsImageCaptionSmall}>
+  {t('home.divyakshetraName')}
+</Text>
 
               <Text style={styles.aboutUsImageCaptionTitle}>
                 {t('home.dharmapeetam')}
@@ -938,11 +938,8 @@ export default function HomeScreen() {
 
 <ServiceRow
   icon="🙏"
-  title={t('home.poojaServices', 'Pooja Services')}
-  subtitle={t(
-    'home.poojaServicesSubtitle',
-    'Explore temple poojas and booking options'
-  )}
+  title={t('home.poojaServices')}
+  subtitle={t('home.poojaServicesSubtitle')}
   onPress={() => router.push('/pooja-services' as any)}
 />
             <ServiceRow

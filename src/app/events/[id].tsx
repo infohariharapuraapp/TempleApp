@@ -1,8 +1,5 @@
 
-import React, {
-  useCallback,
-  useState,
-} from 'react';
+import React, { useCallback, useState } from 'react';
 
 import {
   ActivityIndicator,
@@ -15,9 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   router,
@@ -25,14 +20,9 @@ import {
   useLocalSearchParams,
 } from 'expo-router';
 
-import {
-  useTranslation,
-} from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 
-import {
-  apiRequest,
-} from '@/services/api';
-
+import { apiRequest } from '@/services/api';
 
 // ========================================
 // TYPES
@@ -69,8 +59,11 @@ type ApiResponse<T> = {
 type Period = 'upcoming' | 'past';
 
 type CategoryLanguage =
-  'en' | 'te' | 'kn' | 'hi' | 'ta';
-
+  | 'en'
+  | 'te'
+  | 'kn'
+  | 'hi'
+  | 'ta';
 
 // ========================================
 // LANGUAGE CONFIGURATION
@@ -92,13 +85,11 @@ const CATEGORY_LANGUAGES: CategoryLanguage[] = [
   'ta',
 ];
 
-
 // ========================================
 // EVENT DETAILS SCREEN
 // ========================================
 
 export default function EventDetailsScreen() {
-
   const { id, period } = useLocalSearchParams<{
     id: string;
     period?: string;
@@ -121,12 +112,12 @@ export default function EventDetailsScreen() {
   const [error, setError] =
     useState('');
 
-  const currentLanguage =
-    i18n.language.split('-')[0];
+  const currentLanguage = (
+    i18n.resolvedLanguage || i18n.language
+  ).split('-')[0];
 
   const locale =
     LOCALES[currentLanguage] || 'en-IN';
-
 
   // ========================================
   // GET TRANSLATED CATEGORY NAME
@@ -135,9 +126,8 @@ export default function EventDetailsScreen() {
   const getCategoryName = (
     eventItem: TempleEvent
   ): string => {
-
     const category = categories.find(
-      item => item.id === eventItem.category_id
+      (item) => item.id === eventItem.category_id
     );
 
     if (!category) {
@@ -148,7 +138,7 @@ export default function EventDetailsScreen() {
       CATEGORY_LANGUAGES.includes(
         currentLanguage as CategoryLanguage
       )
-        ? currentLanguage as CategoryLanguage
+        ? (currentLanguage as CategoryLanguage)
         : 'en';
 
     const translationKey =
@@ -172,32 +162,22 @@ export default function EventDetailsScreen() {
     );
   };
 
-
   // ========================================
   // LOAD EVENT DETAILS
   // ========================================
 
   const loadEvent = useCallback(
     async (showLoader = true) => {
-
       const eventId = Number(id);
 
       if (
         !Number.isSafeInteger(eventId) ||
         eventId <= 0
       ) {
-
         setEvent(null);
-
-        setError(
-          t('events.invalidEvent', {
-            defaultValue: 'Invalid event.',
-          })
-        );
-
+        setError(t('events.invalidEvent'));
         setLoading(false);
         setRefreshing(false);
-
         return;
       }
 
@@ -208,21 +188,17 @@ export default function EventDetailsScreen() {
       setError('');
 
       try {
-
         const firstPeriod: Period =
           period === 'past'
             ? 'past'
             : 'upcoming';
 
-        // --------------------------------
         // FETCH EVENT AND CATEGORIES
-        // --------------------------------
 
         const [
           firstResponse,
           categoryResponse,
         ] = await Promise.all([
-
           apiRequest<ApiResponse<TempleEvent[]>>(
             `/events?type=${firstPeriod}`
           ),
@@ -230,25 +206,34 @@ export default function EventDetailsScreen() {
           apiRequest<ApiResponse<Category[]>>(
             '/event-categories'
           ),
-
         ]);
 
-        setCategories(
-          categoryResponse.data || []
+        if (
+          !firstResponse.success ||
+          !categoryResponse.success
+        ) {
+          throw new Error('Failed to load event details');
+        }
+
+        const loadedCategories =
+          Array.isArray(categoryResponse.data)
+            ? categoryResponse.data
+            : [];
+
+        setCategories(loadedCategories);
+
+        const firstEvents =
+          Array.isArray(firstResponse.data)
+            ? firstResponse.data
+            : [];
+
+        let selected = firstEvents.find(
+          (item) => item.id === eventId
         );
 
-        let selected =
-          (firstResponse.data || []).find(
-            item => item.id === eventId
-          );
-
-
-        // --------------------------------
         // CHECK OTHER PERIOD IF NECESSARY
-        // --------------------------------
 
         if (!selected) {
-
           const otherPeriod: Period =
             firstPeriod === 'past'
               ? 'upcoming'
@@ -261,39 +246,35 @@ export default function EventDetailsScreen() {
               `/events?type=${otherPeriod}`
             );
 
-          selected =
-            (otherResponse.data || []).find(
-              item => item.id === eventId
-            );
+          if (!otherResponse.success) {
+            throw new Error('Failed to load event');
+          }
+
+          const otherEvents =
+            Array.isArray(otherResponse.data)
+              ? otherResponse.data
+              : [];
+
+          selected = otherEvents.find(
+            (item) => item.id === eventId
+          );
         }
 
         setEvent(selected || null);
-
       } catch (err) {
-
         console.error(
           'Load event details failed:',
           err
         );
 
-        setError(
-          t('events.loadError', {
-            defaultValue:
-              'Unable to load event details. Please try again.',
-          })
-        );
-
+        setError(t('events.loadError'));
       } finally {
-
         setLoading(false);
         setRefreshing(false);
-
       }
-
     },
     [id, period, t]
   );
-
 
   // ========================================
   // RELOAD WHEN SCREEN IS FOCUSED
@@ -301,12 +282,9 @@ export default function EventDetailsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-
       void loadEvent();
-
     }, [loadEvent])
   );
-
 
   // ========================================
   // FORMAT DATE
@@ -314,8 +292,7 @@ export default function EventDetailsScreen() {
 
   function formatDate(
     value?: string | null
-  ) {
-
+  ): string {
     if (!value) {
       return '—';
     }
@@ -328,17 +305,13 @@ export default function EventDetailsScreen() {
       return value.slice(0, 10);
     }
 
-    return date.toLocaleDateString(
-      locale,
-      {
-        weekday: 'long',
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }
-    );
+    return date.toLocaleDateString(locale, {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
   }
-
 
   // ========================================
   // FORMAT TIME
@@ -346,306 +319,189 @@ export default function EventDetailsScreen() {
 
   function formatTime(
     value?: string | null
-  ) {
-
+  ): string {
     return value
       ? value.slice(0, 5)
       : '';
   }
 
-
   // ========================================
-  // UI
+  // RENDER
   // ========================================
 
   return (
-
     <SafeAreaView style={styles.container}>
-
       <ScrollView
-
         contentContainerStyle={styles.content}
-
         showsVerticalScrollIndicator={false}
-
         refreshControl={
-
           <RefreshControl
-
             refreshing={refreshing}
-
             onRefresh={() => {
-
               setRefreshing(true);
-
               void loadEvent(false);
-
             }}
-
           />
-
         }
-
       >
-
         {/* BACK BUTTON */}
 
         <TouchableOpacity
-
           style={styles.backButton}
-
           onPress={() => router.back()}
-
         >
-
           <Text style={styles.backText}>
-
-            ‹  {t('common.back', {
+            ‹ {t('common.back', {
               defaultValue: 'Back',
             })}
-
           </Text>
-
         </TouchableOpacity>
-
 
         {/* LOADING */}
 
         {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator
+              size="large"
+              color="#8B4513"
+            />
 
-          <ActivityIndicator
-
-            size="large"
-
-            color="#8B4513"
-
-            style={styles.center}
-
-          />
-
+            <Text style={styles.loadingText}>
+              {t('events.detailsLoading')}
+            </Text>
+          </View>
         ) : error ? (
-
-          // ERROR
+          /* ERROR */
 
           <View style={styles.center}>
-
             <Text style={styles.error}>
               {error}
             </Text>
 
             <TouchableOpacity
-
               style={styles.retryButton}
-
               onPress={() => void loadEvent()}
-
             >
-
               <Text style={styles.retryText}>
-
-                {t('events.retry', {
-                  defaultValue: 'Retry',
-                })}
-
+                {t('events.retry')}
               </Text>
-
             </TouchableOpacity>
-
           </View>
-
         ) : !event ? (
-
-          // EVENT NOT AVAILABLE
+          /* EVENT NOT AVAILABLE */
 
           <View style={styles.center}>
-
             <Text style={styles.empty}>
-
-              {t('events.eventUnavailable', {
-                defaultValue:
-                  'This event is no longer available.',
-              })}
-
+              {t('events.eventUnavailable')}
             </Text>
-
           </View>
-
         ) : (
-
-          // EVENT DETAILS
+          /* EVENT DETAILS */
 
           <View style={styles.card}>
-
             {/* EVENT IMAGE */}
 
             {event.image_url ? (
-
               <Image
-
                 source={{
                   uri: event.image_url,
                 }}
-
                 style={styles.heroImage}
-
                 resizeMode="contain"
-
               />
-
             ) : (
-
               <View style={styles.placeholder}>
-
                 <Text style={styles.placeholderIcon}>
                   🛕
                 </Text>
-
               </View>
-
             )}
 
-
             <View style={styles.body}>
-
               {/* TRANSLATED CATEGORY */}
 
               <Text style={styles.category}>
-
                 {getCategoryName(event)}
-
               </Text>
-
 
               {/* EVENT TITLE */}
 
               <Text style={styles.title}>
-
                 {event.title}
-
               </Text>
-
 
               {/* EVENT DATE */}
 
               <View style={styles.infoBox}>
-
                 <Text style={styles.infoLabel}>
-
-                  {t('events.date', {
-                    defaultValue: 'Event Date',
-                  })}
-
+                  {t('events.detailsDate')}
                 </Text>
 
                 <Text style={styles.infoValue}>
-
-                  📅  {formatDate(event.event_date)}
-
+                  📅 {formatDate(event.event_date)}
                 </Text>
-
               </View>
-
 
               {/* EVENT TIMINGS */}
 
-              {(event.start_time || event.end_time) && (
-
+              {(event.start_time ||
+                event.end_time) && (
                 <View style={styles.infoBox}>
-
                   <Text style={styles.infoLabel}>
-
-                    {t('events.timings', {
-                      defaultValue: 'Timings',
-                    })}
-
+                    {t('events.timings')}
                   </Text>
 
                   <Text style={styles.infoValue}>
-
-                    🕐  {
-                      [
-                        formatTime(event.start_time),
-                        formatTime(event.end_time),
-                      ]
-                        .filter(Boolean)
-                        .join(' – ')
-                    }
-
+                    🕐{' '}
+                    {[
+                      formatTime(event.start_time),
+                      formatTime(event.end_time),
+                    ]
+                      .filter(Boolean)
+                      .join(' – ')}
                   </Text>
-
                 </View>
-
               )}
-
 
               {/* EVENT LOCATION */}
 
               {event.location ? (
-
                 <View style={styles.infoBox}>
-
                   <Text style={styles.infoLabel}>
-
-                    {t('events.location', {
-                      defaultValue: 'Location',
-                    })}
-
+                    {t('events.location')}
                   </Text>
 
                   <Text style={styles.infoValue}>
-
-                    📍  {event.location}
-
+                    📍 {event.location}
                   </Text>
-
                 </View>
-
               ) : null}
-
 
               {/* EVENT DESCRIPTION */}
 
               <Text style={styles.sectionTitle}>
-
-                {t('events.aboutEvent', {
-                  defaultValue: 'About This Event',
-                })}
-
+                {t('events.aboutEvent')}
               </Text>
 
               <Text style={styles.description}>
-
-                {
-                  event.description?.trim() ||
-
-                  t('events.descriptionFallback', {
-                    defaultValue:
-                      'More details will be available soon.',
-                  })
-                }
-
+                {event.description?.trim() ||
+                  t(
+                    'events.detailsDescriptionFallback'
+                  )}
               </Text>
-
             </View>
-
           </View>
-
         )}
-
       </ScrollView>
-
     </SafeAreaView>
-
   );
 }
-
 
 // ========================================
 // STYLES
 // ========================================
 
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
@@ -671,6 +527,12 @@ const styles = StyleSheet.create({
   center: {
     marginTop: 55,
     alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    color: '#776A5D',
+    fontSize: 13,
   },
 
   error: {
@@ -772,5 +634,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 24,
   },
-
 });

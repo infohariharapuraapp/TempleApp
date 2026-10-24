@@ -1,0 +1,50 @@
+{
+  "poojaServices": {
+    "back": "Back",
+    "templeRituals": "TEMPLE RITUALS",
+    "title": "Pooja Services",
+    "subtitle": "Explore sacred poojas and offerings available at the temple.",
+    "loading": "Loading pooja services...",
+    "loadError": "Unable to load pooja sections",
+    "loadErrorTitle": "Unable to load services",
+    "retry": "Try Again",
+    "emptyTitle": "Pooja Services Coming Soon",
+    "emptyText": "Temple pooja information will be available here soon.",
+    "explore": "Explore Poojas",
+    "offlineTitle": "Offline Pooja Booking",
+    "offlineText": "Devotees can also book poojas directly at the temple Seva Counter."
+  },
+  "poojaDetails": {
+    "back": "Back to Pooja Services",
+    "label": "SACRED OFFERINGS",
+    "title": "Temple Poojas",
+    "subtitle": "Explore available poojas and their offerings at the temple.",
+    "loading": "Loading poojas...",
+    "invalidSection": "Invalid pooja section.",
+    "loadError": "Unable to load poojas",
+    "retry": "Try Again",
+    "emptyTitle": "No Poojas Available",
+    "emptyText": "Poojas for this section will be available soon.",
+    "availableCount": "{{count}} Pooja Available",
+    "availableCount_plural": "{{count}} Poojas Available",
+    "priceUnavailable": "Price unavailable",
+    "bookPooja": "Book Pooja",
+    "offlineTitle": "Offline Booking Available",
+    "offlineText": "Devotees can book poojas directly at the temple Seva Counter. Please contact the counter for availability and assistance.",
+    "onlineTitle": "Online Pooja Booking",
+    "onlineText": "Continue to the official temple booking website to select your pooja and complete the booking.",
+    "proceedBooking": "Proceed to Booking"
+  },
+  "poojaBooking": {
+    "title": "Online Pooja Booking",
+    "subtitle": "Official Temple Website",
+    "connecting": "Connecting to temple booking...",
+    "loadingHint": "The official website may take a little time to load.",
+    "loading": "Loading Pooja Booking...",
+    "errorTitle": "Booking Page Unavailable",
+    "errorText": "We couldn't load the official temple booking website. Please try again.",
+    "retry": "Retry",
+    "browser": "Open in Browser ↗",
+    "footer": "🔒 Booking and payment are managed by the official temple website."
+  }
+}

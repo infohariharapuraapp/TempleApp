@@ -23,11 +23,9 @@
     "sreemath": "Sreemath",
     "peetam": "Sri Adi Shankaracharya Sharada LakshmiNarasimha Peetam",
     "readFullStory": "Read Full Story",
-
     "devotionalStories": "DEVOTIONAL STORIES",
     "storiesTitle": "Stories, wisdom & spiritual content",
     "storiesDescription": "Explore inspiring devotional stories, teachings and timeless spiritual reflections.",
-
     "guruParampara": "Guru Parampara",
     "sacredLineage": "THE SACRED LINEAGE",
     "guruIntro": "Walk through the sacred spiritual lineage and learn about the Gurus.",
@@ -76,6 +74,16 @@
     "quickBookings": "Bookings",
     "quickDonations": "Donations",
     "quickDeities": "Deities",
-    "quickSeva": "Seva Registration"
+    "quickSeva": "Seva Registration",
+    "gallery": "Gallery",
+    "comingSoon": "Coming Soon",
+    "dharmaTag": "DEVOTEE COMMUNITY",
+    "dharmaTitle": "Dharma Sandeham",
+    "dharmaDescription": "Ask questions about temple traditions, pooja rituals and spiritual practices. Share knowledge with fellow devotees.",
+    "exploreQuestions": "Explore Questions",
+    "guruLoading": "Loading Guru Parampara...",
+    "guruEmpty": "Guru Parampara information will be available soon.",
+    "poojaServicesSubtitle": "Explore temple poojas and booking options",
+    "divyakshetraName": "DIVYAKSHETRA HARIHARAPURA"
   }
 }

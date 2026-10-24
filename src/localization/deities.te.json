@@ -28,6 +28,27 @@
     "loadFailed": "దేవత వివరాలను లోడ్ చేయలేకపోయాము",
     "cannotFind": "మీరు కోరిన దేవత వివరాలు కనబడలేదు.",
     "infoUnavailable": "ప్రస్తుతం ఈ దేవత గురించి సమాచారం అందుబాటులో లేదు.",
-    "prayer": "{{name}} దైవ ఆశీస్సులు భక్తులందరికీ శాంతి, బలం, సంతోషం కలిగించుగాక."
+    "prayer": "{{name}} దైవ ఆశీస్సులు భక్తులందరికీ శాంతి, బలం, సంతోషం కలిగించుగాక.",
+    "groupLabel": "దేవతల సమూహం",
+    "exploreDeities": "దేవతలను తెలుసుకోండి",
+    "detailsLoading": "దేవత వివరాలు లోడ్ అవుతున్నాయి...",
+    "detailsNotFound": "దేవత వివరాలు కనుగొనబడలేదు",
+    "detailsNotFoundMessage": "మీరు కోరిన దేవత వివరాలు కనుగొనబడలేదు.",
+    "detailsLoadError": "దేవత వివరాలను లోడ్ చేయలేకపోయాము.",
+    "detailsGoBack": "వెనక్కి వెళ్లండి",
+    "detailsGroupSubtitle": "పవిత్ర దేవతల సమూహం",
+    "detailsIndividualSubtitle": "దివ్య సాన్నిధ్యం • ఆలయ దేవత",
+    "detailsAbout": "గురించి",
+    "detailsDescriptionFallback": "ఈ దేవత గురించి సమాచారం ప్రస్తుతం అందుబాటులో లేదు.",
+    "detailsExploreHeading": "దేవతలను తెలుసుకోండి",
+    "detailsExploreIntro": "ప్రతి దేవత వివరాలను తెలుసుకోవడానికి దేవతను ఎంచుకోండి.",
+    "detailsChildAction": "వివరాలు చూడండి",
+    "detailsChildAccessibility": "{{name}} వివరాలు చూడండి",
+    "detailsNoChildren": "ప్రస్తుతం ఉపదేవతల వివరాలు అందుబాటులో లేవు.",
+    "detailsSignificance": "ఆధ్యాత్మిక ప్రాముఖ్యత",
+    "detailsDevotional": "భక్తి సాధన",
+    "detailsPrayer": "{{name}} దివ్య ఆశీస్సులు భక్తులందరికీ శాంతి, శక్తి మరియు ఆనందాన్ని ప్రసాదించుగాక.",
+    "detailsBackToGroup": "దేవతల సమూహానికి తిరిగి",
+    "detailsBackToDeities": "దేవతల జాబితాకు తిరిగి"
   }
 }

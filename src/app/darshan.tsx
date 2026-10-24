@@ -66,11 +66,12 @@ const COLORS = {
 };
 
 // ========================================
-// FORMAT DATE
+// FORMAT DATE BASED ON APP LANGUAGE
 // ========================================
 
 function formatDarshanDate(
-  dateString: string
+  dateString: string,
+  language: string = 'en'
 ): string {
   if (!dateString) {
     return '';
@@ -86,16 +87,30 @@ function formatDarshanDate(
     return '';
   }
 
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Kolkata',
-  });
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN',
+  };
+
+  const selectedLanguage =
+    language.split('-')[0];
+
+  return date.toLocaleDateString(
+    locales[selectedLanguage] || 'en-IN',
+    {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    }
+  );
 }
 
 // ========================================
-// VIDEO CARD
+// DARSHAN VIDEO CARD
 // ========================================
 
 function DarshanVideoCard({
@@ -103,6 +118,8 @@ function DarshanVideoCard({
 }: {
   darshan: TodayDarshan;
 }) {
+  const { t, i18n } = useTranslation();
+
   const videoUrl =
     `https://www.youtube.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`;
 
@@ -115,7 +132,8 @@ function DarshanVideoCard({
 
         <Text style={styles.videoDate}>
           {formatDarshanDate(
-            darshan.darshan_date
+            darshan.darshan_date,
+            i18n.resolvedLanguage || i18n.language
           )}
         </Text>
       </View>
@@ -171,7 +189,7 @@ function DarshanVideoCard({
         />
 
         <Text style={styles.videoFooterText}>
-          Watch Darshan
+          {t('darshan.videoWatch')}
         </Text>
       </View>
     </View>
@@ -179,7 +197,7 @@ function DarshanVideoCard({
 }
 
 // ========================================
-// SCREEN
+// TODAY'S DARSHAN SCREEN
 // ========================================
 
 export default function TodayDarshanScreen() {
@@ -188,15 +206,17 @@ export default function TodayDarshanScreen() {
   const [videos, setVideos] =
     useState<TodayDarshan[]>([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
   const [refreshing, setRefreshing] =
     useState(false);
 
-  const [error, setError] = useState('');
+  const [error, setError] =
+    useState('');
 
   // ========================================
-  // FETCH TODAY'S DARSHAN VIDEOS
+  // FETCH TODAY'S DARSHAN
   // ========================================
 
   const loadDarshan = useCallback(
@@ -217,8 +237,7 @@ export default function TodayDarshanScreen() {
 
         if (!response.success) {
           throw new Error(
-            response.message ||
-              'Unable to load Darshan.'
+            t('darshan.videoLoadError')
           );
         }
 
@@ -228,20 +247,26 @@ export default function TodayDarshanScreen() {
             : []
         );
       } catch (err) {
+        console.error(
+          'Failed to load Darshan:',
+          err
+        );
+
         setError(
-          err instanceof Error
-            ? err.message
-            : 'Unable to load Darshan.'
+          t('darshan.videoLoadError')
         );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    []
+    [t]
   );
 
-  // Refresh when screen receives focus.
+  // ========================================
+  // REFRESH WHEN SCREEN OPENS
+  // ========================================
+
   useFocusEffect(
     useCallback(() => {
       loadDarshan();
@@ -249,7 +274,7 @@ export default function TodayDarshanScreen() {
   );
 
   // ========================================
-  // RENDER
+  // RENDER SCREEN
   // ========================================
 
   return (
@@ -273,14 +298,16 @@ export default function TodayDarshanScreen() {
 
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>
-            Today's Darshan
+            {t('darshan.videoTitle')}
           </Text>
 
           <Text style={styles.headerSubtitle}>
-            Sacred moments from the temple
+            {t('darshan.videoSubtitle')}
           </Text>
         </View>
       </View>
+
+      {/* LOADING */}
 
       {loading && !refreshing ? (
         <View style={styles.center}>
@@ -290,7 +317,7 @@ export default function TodayDarshanScreen() {
           />
 
           <Text style={styles.statusText}>
-            Loading today's Darshan...
+            {t('darshan.videoLoading')}
           </Text>
         </View>
       ) : (
@@ -307,6 +334,8 @@ export default function TodayDarshanScreen() {
             />
           }
         >
+          {/* ERROR */}
+
           {error ? (
             <View style={styles.emptyCard}>
               <Ionicons
@@ -316,7 +345,7 @@ export default function TodayDarshanScreen() {
               />
 
               <Text style={styles.emptyTitle}>
-                Unable to load Darshan
+                {t('darshan.videoLoadError')}
               </Text>
 
               <Text style={styles.emptyDescription}>
@@ -328,7 +357,7 @@ export default function TodayDarshanScreen() {
                 onPress={() => loadDarshan()}
               >
                 <Text style={styles.retryText}>
-                  Try Again
+                  {t('darshan.videoTryAgain')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -346,24 +375,22 @@ export default function TodayDarshanScreen() {
                 </View>
 
                 <Text style={styles.introTitle}>
-                  Divine Darshan
+                  {t('darshan.videoIntroTitle')}
                 </Text>
 
                 <Text style={styles.introDescription}>
-                  Experience today's sacred Darshan
-                  from wherever you are.
+                  {t('darshan.videoIntroDescription')}
                 </Text>
 
                 <Text style={styles.videoCount}>
-                  {videos.length}
-                  {' '}
+                  {videos.length}{' '}
                   {videos.length === 1
-                    ? 'Darshan Video'
-                    : 'Darshan Videos'}
+                    ? t('darshan.videoSingular')
+                    : t('darshan.videoPlural')}
                 </Text>
               </View>
 
-              {/* ALL VIDEOS */}
+              {/* DARSHAN VIDEOS */}
 
               {videos.map((darshan) => (
                 <DarshanVideoCard
@@ -372,7 +399,7 @@ export default function TodayDarshanScreen() {
                 />
               ))}
 
-              {/* NOTIFICATION INFO */}
+              {/* NOTIFICATION INFORMATION */}
 
               <View style={styles.infoCard}>
                 <Ionicons
@@ -382,12 +409,13 @@ export default function TodayDarshanScreen() {
                 />
 
                 <Text style={styles.infoText}>
-                  Receive notifications whenever
-                  a new Darshan video is published.
+                  {t('darshan.videoNotification')}
                 </Text>
               </View>
             </>
           ) : (
+            /* EMPTY STATE */
+
             <View style={styles.emptyCard}>
               <Ionicons
                 name="videocam-outline"
@@ -396,13 +424,11 @@ export default function TodayDarshanScreen() {
               />
 
               <Text style={styles.emptyTitle}>
-                Today's Darshan
+                {t('darshan.videoEmptyTitle')}
               </Text>
 
               <Text style={styles.emptyDescription}>
-                Today's Darshan videos have not
-                been published yet. Please
-                check again later.
+                {t('darshan.videoEmptyDescription')}
               </Text>
             </View>
           )}
