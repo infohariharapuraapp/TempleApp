@@ -657,8 +657,8 @@ function EventForm({ event, categories, onClose, onSaved }: {
         images: allImages,
         event_date: eventDate,
         event_end_date: eventEndDate || null,
-        start_time: startTime || null,
-        end_time: endTime || null,
+        start_time: startTime && startTime !== '00:00' ? startTime : null,
+end_time: endTime && endTime !== '00:00' ? endTime : null,
         location: location.trim() || null,
         category_id: Number(categoryId),
       };
