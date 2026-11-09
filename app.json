@@ -24,7 +24,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.sreemathhariharapura.templeapp"
+"package": "com.sreemathhariharapura.templeapp",
+"blockedPermissions": [
+  "android.permission.READ_MEDIA_IMAGES",
+  "android.permission.READ_MEDIA_VIDEO"
+]
     },
     "web": {
       "output": "static",

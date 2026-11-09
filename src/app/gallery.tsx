@@ -618,51 +618,25 @@ export default function GalleryScreen() {
    * ===================================================
    */
 
-  const downloadSelectedImage =
-    async () => {
-      if (!selectedImage) {
-        return;
-      }
+const downloadSelectedImage = async () => {
+  if (!selectedImage) return;
 
-      try {
-        setImageActionLoading(
-          'download',
-        );
+  try {
+    setImageActionLoading('download');
 
-        const localUri =
-          await getImageFileUri(
-            selectedImage.image_url,
-          );
+    const localUri = await getImageFileUri(
+      selectedImage.image_url
+    );
 
-        const permission =
-          await MediaLibrary.requestPermissionsAsync();
+    await MediaLibrary.saveToLibraryAsync(localUri);
 
-        if (
-          !permission.granted
-        ) {
-          throw new Error(
-            'Photo library permission was not granted.',
-          );
-        }
-
-        await MediaLibrary.createAssetAsync(
-          localUri,
-        );
-
-        console.log(
-          'Gallery image saved successfully',
-        );
-      } catch (err) {
-        console.error(
-          'Gallery image download error:',
-          err,
-        );
-      } finally {
-        setImageActionLoading(
-          null,
-        );
-      }
-    };
+    console.log('Gallery image saved successfully');
+  } catch (err) {
+    console.error('Gallery image download error:', err);
+  } finally {
+    setImageActionLoading(null);
+  }
+};
       return (
     <SafeAreaView
       style={styles.container}
