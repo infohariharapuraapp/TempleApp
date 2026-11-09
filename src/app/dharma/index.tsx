@@ -357,9 +357,9 @@ export default function DharmaScreen() {
 
   return (
     <SafeAreaView
-      style={styles.safeArea}
-      edges={['top', 'left', 'right']}
-    >
+  style={styles.safeArea}
+  edges={['top', 'bottom', 'left', 'right']}
+>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -898,13 +898,15 @@ const styles = StyleSheet.create({
     color: COLORS.maroon,
     fontWeight: '700',
   },
-  bottomBar: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.white,
-  },
+ bottomBar: {
+  paddingHorizontal: 18,
+  paddingTop: 12,
+  paddingBottom: 12,
+  borderTopWidth: 1,
+  borderTopColor: COLORS.border,
+  backgroundColor: COLORS.white,
+  flexShrink: 0,
+},
   askButton: {
     flexDirection: 'row',
     alignItems: 'center',

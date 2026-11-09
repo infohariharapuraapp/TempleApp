@@ -7,6 +7,7 @@ import {
 } from 'expo-router';
 
 import '@/localization/i18n';
+import { StatusBar } from 'expo-status-bar';
 
 import {
   View,
@@ -381,9 +382,11 @@ export default function RootLayout() {
   // APPLICATION
   // ========================================
 
-  return (
-    <View style={styles.root}>
-      <Stack
+return (
+  <View style={styles.root}>
+  <StatusBar style="light" />
+
+    <Stack
         screenOptions={{
           headerShown: false,
         }}
@@ -445,12 +448,13 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: '#FFFDF8',
   },
 
- welcomeOverlay: {
-  ...StyleSheet.absoluteFill,
-  zIndex: 9999,
-  elevation: 9999,
-  backgroundColor: '#FFFDF8',
-},
+  welcomeOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: '#FFFDF8',
+  },
 });

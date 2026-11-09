@@ -579,7 +579,7 @@ export default function HomeScreen() {
         icon={item.icon}
         title={
           comingSoon
-           ? `${t(item.titleKey)} (Coming Soon in December)`
+           ? `${t(item.titleKey)} (Coming Soon in December  )`
             : t(item.titleKey)
         }
         index={index}
