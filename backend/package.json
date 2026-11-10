@@ -24,7 +24,8 @@
     "nodemailer": "^10.1.7",
     "pg": "^8.23.0",
     "react-native-qrcode-svg": "^6.3.21",
-    "react-native-svg": "^15.15.5"
+    "react-native-svg": "^15.15.5",
+    "sweph": "^2.10.3-8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
