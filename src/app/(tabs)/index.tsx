@@ -83,6 +83,11 @@ const QUICK_ACTIONS = [
     titleKey: 'home.poojaServices',
     route: '/pooja-services',
   },
+  {
+    icon: '☀️',
+    titleKey: 'home.dailyPanchangam',
+    route: '/panchangam',
+  },
 ];
 
 type DarshanVideo = {
@@ -580,7 +585,12 @@ export default function HomeScreen() {
         title={
           comingSoon
            ? `${t(item.titleKey)} (Coming Soon in December  )`
-            : t(item.titleKey)
+           : t(item.titleKey, {
+    defaultValue:
+      item.titleKey === 'home.dailyPanchangam'
+        ? 'Daily Panchangam'
+        : item.titleKey,
+  })
         }
         index={index}
         onPress={

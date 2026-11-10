@@ -54,7 +54,7 @@ import {
   adminWelcomeScreenRouter,
 } from './routes/welcomeScreenRoutes';
 
-
+import panchangamRoutes from './routes/panchangamRoutes';
 import adminGuruVaniRoutes from './routes/adminGuruVaniRoutes';
 import {
   processScheduledNotifications,
@@ -136,6 +136,12 @@ app.use(
   '/api/admin/guru-vani',
   adminGuruVaniRoutes
 );
+// ========================================
+// DAILY PANCHANGAM - PUBLIC API
+// ========================================
+app.use('/api/panchangam', panchangamRoutes);
+
+
 // ========================================
 // WELCOME SLOKAM LIBRARY
 // ========================================
