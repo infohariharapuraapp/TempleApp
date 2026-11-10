@@ -29,9 +29,15 @@ import welcomeSlokamRoutes from './routes/welcomeSlokamRoutes';
 
 import adminWelcomeSlokamRoutes from './routes/adminWelcomeSlokamRoutes';
 
+import quotesRoutes from './routes/quotesRoutes';
+import adminQuotesRoutes from './routes/adminQuotesRoutes';
+
 
 
 import adminTempleContactRoutes from './routes/adminTempleContactRoutes';
+
+import pravachanaRoutes from './routes/pravachanaRoutes';
+import adminPravachanaRoutes from './routes/adminPravachanaRoutes';
 
 
 import adminDarshanRoutes from './routes/adminDarshanRoutes';
@@ -81,6 +87,23 @@ app.use('/api/admin/activities', adminActivityRoutes);
 // ========================================
 // POOJA SERVICES
 // ========================================
+
+app.use('/api/quotes', quotesRoutes);
+app.use('/api/admin/quotes', adminQuotesRoutes);
+
+
+// ========================================
+// PRAVACHANA LIBRARY
+// ========================================
+
+// Public - Devotee App
+app.use('/api/pravachanas', pravachanaRoutes);
+
+// Protected - Admin Management
+app.use('/api/admin/pravachanas', adminPravachanaRoutes);
+
+
+
 
 // Public - Devotee App
 app.use('/api/poojas', poojaRoutes);

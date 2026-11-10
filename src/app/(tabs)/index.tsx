@@ -88,6 +88,11 @@ const QUICK_ACTIONS = [
     titleKey: 'home.dailyPanchangam',
     route: '/panchangam',
   },
+  {
+    icon: '📿',
+    titleKey: 'home.pravachanas',
+    route: '/pravachanas',
+  },
 ];
 
 type DarshanVideo = {
@@ -568,15 +573,26 @@ export default function HomeScreen() {
 
 
 
-          {/* Quick Access */}
-          <SectionHeading
-            title={t('home.quickAccess')}
-            subtitle={t('home.quickSubtitle')}
-          />
+        
+{/* Quick Access */}
+<SectionHeading
+  title={t('home.quickAccess')}
+  subtitle={t('home.quickSubtitle')}
+/>
 
-         <View style={styles.grid}>
+<View style={styles.grid}>
   {QUICK_ACTIONS.map((item, index) => {
-    const comingSoon = 'comingSoon' in item && item.comingSoon;
+    const comingSoon =
+      'comingSoon' in item && item.comingSoon;
+
+    const fallbackTitle =
+      item.titleKey === 'home.dailyPanchangam'
+        ? 'Daily Panchangam'
+        : item.titleKey === 'home.pravachanas'
+          ? 'Pravachana & Quotes'
+          : item.titleKey === 'home.poojaServices'
+            ? 'Pooja Services'
+            : item.titleKey;
 
     return (
       <AnimatedQuickAction
@@ -584,13 +600,12 @@ export default function HomeScreen() {
         icon={item.icon}
         title={
           comingSoon
-           ? `${t(item.titleKey)} (Coming Soon in December  )`
-           : t(item.titleKey, {
-    defaultValue:
-      item.titleKey === 'home.dailyPanchangam'
-        ? 'Daily Panchangam'
-        : item.titleKey,
-  })
+            ? `${t(item.titleKey, {
+                defaultValue: fallbackTitle,
+              })} (Coming Soon in December)`
+            : t(item.titleKey, {
+                defaultValue: fallbackTitle,
+              })
         }
         index={index}
         onPress={
@@ -602,6 +617,7 @@ export default function HomeScreen() {
     );
   })}
 </View>
+
 
          {/* Dharma Sandeham */}
 <TouchableOpacity

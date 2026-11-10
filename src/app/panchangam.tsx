@@ -14,9 +14,12 @@ import {
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
+
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
 
 const C = {
@@ -52,20 +55,46 @@ type NominatimResult = {
     county?: string;
     state_district?: string;
     state?: string;
-    country?: string;
   };
 };
 
+type PanchangamData = {
+  date: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  sunrise: string | null;
+  sunset: string | null;
+  vara: string | null;
+  rahuKalam: string | null;
+  yamaganda: string | null;
+  gulikaKalam: string | null;
+  abhijitMuhurtham: string | null;
+  tithi: string | null;
+  nakshatra: string | null;
+  yoga: string | null;
+  karana: string | null;
+  samvatsara: string | null;
+  masa: string | null;
+  paksha: string | null;
+  ayana: string | null;
+  ritu: string | null;
+  observances?: string[];
+  calculationStatus?: string;
+  calculationNote?: string;
+};
+
+const API =
+  'https://hariharapura-temple-api.onrender.com/api/panchangam';
+
 const DEFAULT_PLACE: Place = {
-  id: 'hariharapura',
-  name: 'Hariharapura',
-  state: 'Karnataka',
+  id: 'current-location',
+  name: 'Current Location',
+  state: 'GPS',
   latitude: null,
   longitude: null,
   source: 'default',
 };
-
-const PENDING = 'Awaiting calculation';
 
 const POPULAR_PLACES = [
   'Hariharapura, Karnataka',
@@ -78,7 +107,19 @@ const POPULAR_PLACES = [
   'Shivamogga, Karnataka',
 ];
 
-function indiaToday() {
+function normalizeDate(date: Date): Date {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    12,
+    0,
+    0,
+    0,
+  );
+}
+
+function indiaToday(): Date {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
@@ -86,18 +127,18 @@ function indiaToday() {
     day: '2-digit',
   }).formatToParts(new Date());
 
-  const part = (type: string) =>
+  const get = (type: string) =>
     Number(parts.find(p => p.type === type)?.value ?? 0);
 
   return new Date(
-    part('year'),
-    part('month') - 1,
-    part('day'),
+    get('year'),
+    get('month') - 1,
+    get('day'),
     12,
   );
 }
 
-function dateKey(date: Date) {
+function dateKey(date: Date): string {
   return [
     date.getFullYear(),
     String(date.getMonth() + 1).padStart(2, '0'),
@@ -105,18 +146,34 @@ function dateKey(date: Date) {
   ].join('-');
 }
 
+function validDate(date: Date): boolean {
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.getFullYear() >= 1900 &&
+    date.getFullYear() <= 2100
+  );
+}
+
+function displayValue(value?: string | null): string {
+  return value?.trim() || 'Not available';
+}
+
 function DetailCard({
   icon,
   label,
+  value,
 }: {
   icon: string;
   label: string;
+  value?: string | null;
 }) {
   return (
     <View style={styles.detailCard}>
       <Text style={styles.detailIcon}>{icon}</Text>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{PENDING}</Text>
+      <Text style={styles.detailValue}>
+        {displayValue(value)}
+      </Text>
     </View>
   );
 }
@@ -124,10 +181,12 @@ function DetailCard({
 function TimingRow({
   icon,
   label,
+  value,
   last = false,
 }: {
   icon: string;
   label: string;
+  value?: string | null;
   last?: boolean;
 }) {
   return (
@@ -141,37 +200,99 @@ function TimingRow({
         <Text style={styles.timingIcon}>{icon}</Text>
         <Text style={styles.timingLabel}>{label}</Text>
       </View>
-
-      <Text style={styles.timingValue}>Not available yet</Text>
+      <Text style={styles.timingValue}>
+        {displayValue(value)}
+      </Text>
     </View>
   );
 }
 
 export default function PanchangamScreen() {
+
+
+
   const [selectedDate, setSelectedDate] =
     useState<Date>(indiaToday);
+
+  const openCalendar = () => {
+    DateTimePickerAndroid.open({
+      value: normalizeDate(selectedDate),
+      mode: 'date',
+      display: 'calendar',
+      minimumDate: new Date(1900, 0, 1, 12),
+      maximumDate: new Date(2100, 11, 31, 12),
+      onChange: (event, pickedDate) => {
+        if (event.type === 'set' && pickedDate) {
+          setSelectedDate(normalizeDate(pickedDate));
+        }
+      },
+    });
+  };
 
   const [selectedPlace, setSelectedPlace] =
     useState<Place>(DEFAULT_PLACE);
 
-  const [calendarVisible, setCalendarVisible] = useState(false);
-  const [locationVisible, setLocationVisible] = useState(false);
+  const [locationVisible, setLocationVisible] =
+    useState(false);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const [locating, setLocating] = useState(true);
+  const [locationError, setLocationError] = useState('');
   const [clock, setClock] = useState('');
+
+  const [panchangam, setPanchangam] =
+    useState<PanchangamData | null>(null);
+
+  const [panchangamLoading, setPanchangamLoading] =
+    useState(false);
+
+  const [panchangamError, setPanchangamError] =
+    useState('');
+
+  const [retryCount, setRetryCount] = useState(0);
 
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(25)).current;
-  const mounted = useRef(true);
-  const requestId = useRef(0);
-  const lastSearchAt = useRef(0);
-  const gpsSubscription =
-    useRef<Location.LocationSubscription | null>(null);
 
+  const mounted = useRef(false);
+  const manualLocationSelected = useRef(false);
+  const gpsRequestId = useRef(0);
+  const searchRequestId = useRef(0);
+  const lastSearchAt = useRef(0);
+
+  const latitude = selectedPlace.latitude;
+  const longitude = selectedPlace.longitude;
+  const selectedDateKey = dateKey(selectedDate);
+
+  const hasLocation =
+    latitude !== null && longitude !== null;
+
+  const isToday =
+    selectedDateKey === dateKey(indiaToday());
+
+  const locationLabel =
+    selectedPlace.source === 'gps'
+      ? 'My Current Location (GPS)'
+      : selectedPlace.source === 'default'
+        ? locating
+          ? 'Detecting Current Location...'
+          : 'Select Current Location'
+        : `${selectedPlace.name}, ${selectedPlace.state}`;
+
+  const dateText = selectedDate.toLocaleDateString(
+    'en-IN',
+    {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    },
+  );
+
+  // Screen animation and cleanup.
   useEffect(() => {
     mounted.current = true;
 
@@ -190,14 +311,14 @@ export default function PanchangamScreen() {
 
     return () => {
       mounted.current = false;
-      requestId.current += 1;
-      gpsSubscription.current?.remove();
-      gpsSubscription.current = null;
+      gpsRequestId.current += 1;
+      searchRequestId.current += 1;
     };
   }, [fade, slide]);
 
+  // Indian Standard Time clock.
   useEffect(() => {
-    const update = () => {
+    const updateClock = () => {
       setClock(
         new Intl.DateTimeFormat('en-IN', {
           timeZone: 'Asia/Kolkata',
@@ -209,28 +330,230 @@ export default function PanchangamScreen() {
       );
     };
 
-    update();
-    const timer = setInterval(update, 1000);
+    updateClock();
+
+    const timer = setInterval(updateClock, 1000);
+
     return () => clearInterval(timer);
   }, []);
 
-  const isToday =
-    dateKey(selectedDate) === dateKey(indiaToday());
+  // Get GPS coordinates.
+  const detectLocation = async (
+    automatic: boolean = false,
+  ) => {
+    const id = ++gpsRequestId.current;
 
-  const changeDate = (days: number) => {
-    setSelectedDate(previous => {
-      const next = new Date(previous);
-      next.setDate(next.getDate() + days);
-      return next;
-    });
+    if (!automatic) {
+      manualLocationSelected.current = false;
+    }
+
+    setLocating(true);
+    setLocationError('');
+
+    try {
+      const permission =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (!mounted.current || id !== gpsRequestId.current) {
+        return;
+      }
+
+      if (automatic && manualLocationSelected.current) {
+        return;
+      }
+
+      if (permission.status !== 'granted') {
+        throw new Error(
+          'Location permission denied. Please allow GPS access or select a city manually.',
+        );
+      }
+
+      const enabled =
+        await Location.hasServicesEnabledAsync();
+
+      if (!enabled) {
+        throw new Error(
+          'Location services are disabled. Enable GPS or select a city manually.',
+        );
+      }
+
+      let position =
+        await Location.getLastKnownPositionAsync({
+          maxAge: 5 * 60 * 1000,
+          requiredAccuracy: 5000,
+        });
+
+      if (!position) {
+        position =
+          await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+      }
+
+      if (!mounted.current || id !== gpsRequestId.current) {
+        return;
+      }
+
+      if (automatic && manualLocationSelected.current) {
+        return;
+      }
+
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lon)
+      ) {
+        throw new Error('Invalid GPS coordinates.');
+      }
+
+      // Backend currently supports Indian coordinates.
+      if (
+        lat < 6 ||
+        lat > 38 ||
+        lon < 68 ||
+        lon > 98
+      ) {
+        throw new Error(
+          'Current Panchangam service supports locations in India. Please select an Indian city.',
+        );
+      }
+
+      setSelectedPlace({
+        id: 'gps',
+        name: 'My Current Location',
+        state: 'GPS',
+        latitude: lat,
+        longitude: lon,
+        source: 'gps',
+      });
+
+      setPanchangamError('');
+      setLocationVisible(false);
+    } catch (error) {
+      if (!mounted.current || id !== gpsRequestId.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to detect your location. Select a city manually.';
+
+      setLocationError(message);
+
+      if (!automatic) {
+        Alert.alert('Location Unavailable', message);
+      }
+    } finally {
+      if (mounted.current && id === gpsRequestId.current) {
+        setLocating(false);
+      }
+    }
   };
 
+  // Automatically detect location on first opening.
+  useEffect(() => {
+    detectLocation(true);
+  }, []);
+
+  // Load Panchangam whenever date/location changes.
+  useEffect(() => {
+    if (!hasLocation) {
+      setPanchangam(null);
+      setPanchangamLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+
+    const load = async () => {
+      setPanchangam(null);
+      setPanchangamLoading(true);
+      setPanchangamError('');
+
+      const timeout = setTimeout(
+        () => controller.abort(),
+        30000,
+      );
+
+      try {
+        const url =
+          `${API}?date=${encodeURIComponent(selectedDateKey)}` +
+          `&lat=${encodeURIComponent(String(latitude))}` +
+          `&lon=${encodeURIComponent(String(longitude))}`;
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        const result = await response.json();
+
+        if (
+          !response.ok ||
+          result.success !== true ||
+          !result.data
+        ) {
+          throw new Error(
+            result.message ||
+            'Panchangam API request failed.',
+          );
+        }
+
+        if (!active) return;
+
+        setPanchangam(result.data as PanchangamData);
+      } catch (error) {
+        if (!active) return;
+
+        console.error('Panchangam API error:', error);
+
+        setPanchangamError(
+          'Unable to load Panchangam. Check your internet connection and tap Retry.',
+        );
+      } finally {
+        clearTimeout(timeout);
+
+        if (active) {
+          setPanchangamLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [
+    hasLocation,
+    latitude,
+    longitude,
+    selectedDateKey,
+    retryCount,
+  ]);
+
   const selectPlace = (place: Place) => {
+    manualLocationSelected.current = true;
+    gpsRequestId.current += 1;
+
+    setLocating(false);
+    setLocationError('');
+    setPanchangamError('');
     setSelectedPlace(place);
+
     setLocationVisible(false);
     setQuery('');
     setResults([]);
     setSearched(false);
+
     Keyboard.dismiss();
   };
 
@@ -247,7 +570,6 @@ export default function PanchangamScreen() {
 
     if (searching) return;
 
-    // Public Nominatim usage: maximum one request per second.
     if (Date.now() - lastSearchAt.current < 1200) {
       Alert.alert(
         'Please Wait',
@@ -257,53 +579,59 @@ export default function PanchangamScreen() {
     }
 
     lastSearchAt.current = Date.now();
-    const id = ++requestId.current;
+    const id = ++searchRequestId.current;
 
     setQuery(term);
     setSearching(true);
     setSearched(false);
     setResults([]);
+
     Keyboard.dismiss();
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      12000,
+    );
 
     try {
-      const url =
-        'https://nominatim.openstreetmap.org/search?' +
-        new URLSearchParams({
-          q: term,
-          countrycodes: 'in',
-          format: 'jsonv2',
-          addressdetails: '1',
-          limit: '15',
-          dedupe: '1',
-        }).toString();
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'DivyakshetraHariharapura/1.0',
-        },
-        signal: controller.signal,
+      const params = new URLSearchParams({
+        q: term,
+        countrycodes: 'in',
+        format: 'jsonv2',
+        addressdetails: '1',
+        limit: '15',
+        dedupe: '1',
       });
 
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent':
+              'DivyakshetraHariharapura/1.0',
+          },
+          signal: controller.signal,
+        },
+      );
+
       if (!response.ok) {
-        throw new Error(`Search service: ${response.status}`);
+        throw new Error('Location search unavailable.');
       }
 
-      const data: NominatimResult[] = await response.json();
+      const data: NominatimResult[] =
+        await response.json();
 
-      if (!mounted.current || requestId.current !== id) {
+      if (
+        !mounted.current ||
+        searchRequestId.current !== id
+      ) {
         return;
       }
 
       const places: Place[] = data
         .map(item => {
-          const latitude = Number(item.lat);
-          const longitude = Number(item.lon);
-
           const address = item.address ?? {};
 
           const name =
@@ -321,8 +649,9 @@ export default function PanchangamScreen() {
               address.state,
             ]
               .filter(Boolean)
-              .filter((value, index, array) =>
-                array.indexOf(value) === index,
+              .filter(
+                (value, index, array) =>
+                  array.indexOf(value) === index,
               )
               .join(', ') || 'India';
 
@@ -330,179 +659,142 @@ export default function PanchangamScreen() {
             id: String(item.place_id),
             name,
             state,
-            latitude,
-            longitude,
+            latitude: Number(item.lat),
+            longitude: Number(item.lon),
             source: 'search' as const,
           };
         })
         .filter(
           place =>
+            place.latitude !== null &&
+            place.longitude !== null &&
             Number.isFinite(place.latitude) &&
-            Number.isFinite(place.longitude),
+            Number.isFinite(place.longitude) &&
+            place.latitude >= 6 &&
+            place.latitude <= 38 &&
+            place.longitude >= 68 &&
+            place.longitude <= 98,
         );
 
       setResults(places);
       setSearched(true);
     } catch (error) {
-      if (mounted.current && requestId.current === id) {
+      if (
+        mounted.current &&
+        searchRequestId.current === id
+      ) {
         Alert.alert(
           'Search Unavailable',
-          'Could not search locations right now. Check your internet connection and try again.',
+          'Could not search locations. Check your internet connection.',
         );
       }
     } finally {
       clearTimeout(timeout);
 
-      if (mounted.current && requestId.current === id) {
+      if (
+        mounted.current &&
+        searchRequestId.current === id
+      ) {
         setSearching(false);
       }
     }
   };
 
-  const useMyLocation = async () => {
-    if (locating) return;
+  const changeDate = (days: number) => {
+    setSelectedDate(previous => {
+      const next = normalizeDate(previous);
+      next.setDate(next.getDate() + days);
 
-    setLocating(true);
-
-    try {
-      const permission =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (permission.status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Allow location access or search for your city manually.',
-        );
-        return;
-      }
-
-      const enabled =
-        await Location.hasServicesEnabledAsync();
-
-      if (!enabled) {
-        Alert.alert(
-          'Location Disabled',
-          'Please enable location services on your phone.',
-        );
-        return;
-      }
-
-      // Fast path: use a recent, reasonably accurate reading.
-      const cached =
-        await Location.getLastKnownPositionAsync({
-          maxAge: 5 * 60 * 1000,
-          requiredAccuracy: 5000,
-        });
-
-      if (cached) {
-        selectPlace({
-          id: 'gps',
-          name: 'My Current Location',
-          state: 'GPS',
-          latitude: cached.coords.latitude,
-          longitude: cached.coords.longitude,
-          source: 'gps',
-        });
-        return;
-      }
-
-      // Wait up to 12 seconds for a fresh location update.
-      const position =
-        await new Promise<Location.LocationObject>(
-          (resolve, reject) => {
-            let finished = false;
-            let timer: ReturnType<typeof setTimeout> | null =
-              null;
-            let subscription:
-              | Location.LocationSubscription
-              | null = null;
-
-            const cleanup = () => {
-              if (timer) clearTimeout(timer);
-              subscription?.remove();
-              gpsSubscription.current?.remove();
-              gpsSubscription.current = null;
-            };
-
-            const succeed = (
-              value: Location.LocationObject,
-            ) => {
-              if (finished) return;
-              finished = true;
-              cleanup();
-              resolve(value);
-            };
-
-            const fail = () => {
-              if (finished) return;
-              finished = true;
-              cleanup();
-              reject(new Error('Location timed out'));
-            };
-
-            timer = setTimeout(fail, 12000);
-
-            Location.watchPositionAsync(
-              {
-                accuracy: Location.Accuracy.Low,
-                timeInterval: 1000,
-                distanceInterval: 0,
-              },
-              succeed,
-            )
-              .then(sub => {
-                if (finished || !mounted.current) {
-                  sub.remove();
-                  return;
-                }
-                subscription = sub;
-                gpsSubscription.current = sub;
-              })
-              .catch(fail);
-          },
-        );
-
-      if (!mounted.current) return;
-
-      selectPlace({
-        id: 'gps',
-        name: 'My Current Location',
-        state: 'GPS',
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        source: 'gps',
-      });
-    } catch (error) {
-      if (mounted.current) {
-        Alert.alert(
-          'Location Unavailable',
-          'GPS did not respond quickly. Please try outdoors or select your city manually.',
-        );
-      }
-    } finally {
-      if (mounted.current) setLocating(false);
-    }
+      return validDate(next)
+        ? normalizeDate(next)
+        : previous;
+    });
   };
 
-  const dateText = selectedDate.toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+ 
 
-  const locationLabel =
-    selectedPlace.source === 'gps'
-      ? 'My Current Location (GPS)'
-      : `${selectedPlace.name}, ${selectedPlace.state}`;
+  const renderNotice = () => {
+    if (locating && !hasLocation) {
+      return (
+        <>
+          <ActivityIndicator color={C.maroon} />
+          <Text style={styles.noticeText}>
+            {'  '}Detecting your current location...
+          </Text>
+        </>
+      );
+    }
+
+    if (panchangamLoading) {
+      return (
+        <>
+          <ActivityIndicator color={C.maroon} />
+          <Text style={styles.noticeText}>
+            {'  '}Calculating Panchangam for the selected
+            date and location...
+          </Text>
+        </>
+      );
+    }
+
+    if (panchangamError) {
+      return (
+        <View style={{ flex: 1 }}>
+          <Text style={styles.noticeText}>
+            {panchangamError}
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 10 }}
+            onPress={() =>
+              setRetryCount(count => count + 1)
+            }
+          >
+            <Text style={styles.retryText}>
+              ↻ Retry Calculation
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (panchangam) {
+      return (
+        <>
+          <Text style={styles.noticeIcon}>✓</Text>
+          <Text style={styles.noticeText}>
+            Panchangam loaded for {selectedDateKey}.
+            Timings are calculated for your selected
+            location and shown in Indian Standard Time.
+          </Text>
+        </>
+      );
+    }
+
+    return (
+      <View style={{ flex: 1 }}>
+        <Text style={styles.noticeText}>
+          {locationError ||
+            'Select a city or use GPS to calculate Panchangam.'}
+        </Text>
+        <TouchableOpacity
+          style={{ marginTop: 10 }}
+          onPress={() => setLocationVisible(true)}
+        >
+          <Text style={styles.retryText}>
+            📍 Select Location
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-  <StatusBar
-  barStyle="dark-content"
-  backgroundColor="#FFF7E8"
-  translucent={false}
-/>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={C.cream}
+        translucent={false}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -538,10 +830,14 @@ export default function PanchangamScreen() {
 
             <View style={styles.headerDivider} />
 
-            <Text style={styles.dateText}>{dateText}</Text>
+            <Text style={styles.dateText}>
+              {dateText}
+            </Text>
 
             <Text style={styles.clockText}>
-              {clock ? `${clock} IST` : 'Indian Standard Time'}
+              {clock
+                ? `${clock} IST`
+                : 'Indian Standard Time'}
             </Text>
 
             <TouchableOpacity
@@ -560,14 +856,11 @@ export default function PanchangamScreen() {
               </Text>
             </TouchableOpacity>
 
-            {selectedPlace.latitude !== null &&
-              selectedPlace.longitude !== null && (
-                <Text style={styles.coordinates}>
-                  {selectedPlace.latitude.toFixed(4)},
-                  {' '}
-                  {selectedPlace.longitude.toFixed(4)}
-                </Text>
-              )}
+            {hasLocation && (
+              <Text style={styles.coordinates}>
+                {latitude.toFixed(4)}, {longitude.toFixed(4)}
+              </Text>
+            )}
           </View>
 
           <View style={styles.dateNavigator}>
@@ -575,12 +868,14 @@ export default function PanchangamScreen() {
               style={styles.dateArrow}
               onPress={() => changeDate(-1)}
             >
-              <Text style={styles.dateArrowText}>‹</Text>
+              <Text style={styles.dateArrowText}>
+                ‹
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.dateCenter}
-              onPress={() => setCalendarVisible(true)}
+              onPress={openCalendar}
             >
               <Text style={styles.dateNavigatorLabel}>
                 {isToday
@@ -589,11 +884,14 @@ export default function PanchangamScreen() {
               </Text>
 
               <Text style={styles.dateNavigatorValue}>
-                {selectedDate.toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+                {selectedDate.toLocaleDateString(
+                  'en-IN',
+                  {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  },
+                )}
               </Text>
 
               <Text style={styles.calendarHint}>
@@ -605,13 +903,15 @@ export default function PanchangamScreen() {
               style={styles.dateArrow}
               onPress={() => changeDate(1)}
             >
-              <Text style={styles.dateArrowText}>›</Text>
+              <Text style={styles.dateArrowText}>
+                ›
+              </Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             style={styles.calendarButton}
-            onPress={() => setCalendarVisible(true)}
+            onPress={openCalendar}
           >
             <Text style={styles.calendarButtonText}>
               📅 Open Calendar
@@ -621,7 +921,9 @@ export default function PanchangamScreen() {
           {!isToday && (
             <TouchableOpacity
               style={styles.todayButton}
-              onPress={() => setSelectedDate(indiaToday())}
+              onPress={() =>
+                setSelectedDate(indiaToday())
+              }
             >
               <Text style={styles.todayButtonText}>
                 Return to Today
@@ -630,13 +932,7 @@ export default function PanchangamScreen() {
           )}
 
           <View style={styles.notice}>
-            <Text style={styles.noticeIcon}>ℹ️</Text>
-            <Text style={styles.noticeText}>
-              Date and location selection are available.
-              Actual Panchangam calculations are not
-              connected yet. Timings will be shown only
-              after the calculation engine is validated.
-            </Text>
+            {renderNotice()}
           </View>
 
           <View style={styles.section}>
@@ -648,15 +944,17 @@ export default function PanchangamScreen() {
             </Text>
 
             <View style={styles.calendarCard}>
-              {[
-                'Samvatsara',
-                'Masa',
-                'Paksha',
-                'Ayana',
-                'Ritu',
-              ].map((label, index) => (
+              {(
+                [
+                  ['Samvatsara', 'samvatsara'],
+                  ['Masa', 'masa'],
+                  ['Paksha', 'paksha'],
+                  ['Ayana', 'ayana'],
+                  ['Ritu', 'ritu'],
+                ] as const
+              ).map(([label, key], index) => (
                 <View
-                  key={label}
+                  key={key}
                   style={[
                     styles.calendarRow,
                     index === 4 && styles.lastRow,
@@ -665,8 +963,9 @@ export default function PanchangamScreen() {
                   <Text style={styles.calendarLabel}>
                     {label}
                   </Text>
+
                   <Text style={styles.calendarValue}>
-                    {PENDING}
+                    {displayValue(panchangam?.[key])}
                   </Text>
                 </View>
               ))}
@@ -677,6 +976,7 @@ export default function PanchangamScreen() {
             <Text style={styles.sectionTitle}>
               ☀️ Sun Timings
             </Text>
+
             <Text style={styles.sectionSubtitle}>
               Based on selected date and location
             </Text>
@@ -684,14 +984,22 @@ export default function PanchangamScreen() {
             <View style={styles.sunRow}>
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌅</Text>
-                <Text style={styles.sunLabel}>SUNRISE</Text>
-                <Text style={styles.sunValue}>--:--</Text>
+                <Text style={styles.sunLabel}>
+                  SUNRISE
+                </Text>
+                <Text style={styles.sunValue}>
+                  {panchangam?.sunrise || '--:--'}
+                </Text>
               </View>
 
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌇</Text>
-                <Text style={styles.sunLabel}>SUNSET</Text>
-                <Text style={styles.sunValue}>--:--</Text>
+                <Text style={styles.sunLabel}>
+                  SUNSET
+                </Text>
+                <Text style={styles.sunValue}>
+                  {panchangam?.sunset || '--:--'}
+                </Text>
               </View>
             </View>
           </View>
@@ -700,16 +1008,37 @@ export default function PanchangamScreen() {
             <Text style={styles.sectionTitle}>
               🪷 Panchanga
             </Text>
+
             <Text style={styles.sectionSubtitle}>
               The five traditional elements
             </Text>
 
             <View style={styles.detailsGrid}>
-              <DetailCard icon="🌙" label="TITHI" />
-              <DetailCard icon="⭐" label="NAKSHATRA" />
-              <DetailCard icon="☀️" label="VARA" />
-              <DetailCard icon="✨" label="YOGA" />
-              <DetailCard icon="🪔" label="KARANA" />
+              <DetailCard
+                icon="🌙"
+                label="TITHI"
+                value={panchangam?.tithi}
+              />
+              <DetailCard
+                icon="⭐"
+                label="NAKSHATRA"
+                value={panchangam?.nakshatra}
+              />
+              <DetailCard
+                icon="☀️"
+                label="VARA"
+                value={panchangam?.vara}
+              />
+              <DetailCard
+                icon="✨"
+                label="YOGA"
+                value={panchangam?.yoga}
+              />
+              <DetailCard
+                icon="🪔"
+                label="KARANA"
+                value={panchangam?.karana}
+              />
             </View>
           </View>
 
@@ -717,6 +1046,7 @@ export default function PanchangamScreen() {
             <Text style={styles.sectionTitle}>
               ⏳ Daily Timings
             </Text>
+
             <Text style={styles.sectionSubtitle}>
               Auspicious and inauspicious periods
             </Text>
@@ -725,18 +1055,22 @@ export default function PanchangamScreen() {
               <TimingRow
                 icon="✨"
                 label="Abhijit Muhurtham"
+                value={panchangam?.abhijitMuhurtham}
               />
               <TimingRow
                 icon="🔴"
                 label="Rahu Kalam"
+                value={panchangam?.rahuKalam}
               />
               <TimingRow
                 icon="🌙"
                 label="Yamaganda"
+                value={panchangam?.yamaganda}
               />
               <TimingRow
                 icon="🪔"
                 label="Gulika Kalam"
+                value={panchangam?.gulikaKalam}
                 last
               />
             </View>
@@ -748,45 +1082,62 @@ export default function PanchangamScreen() {
             </Text>
 
             <View style={styles.observanceCard}>
-              <Text style={styles.observanceIcon}>🛕</Text>
+              <Text style={styles.observanceIcon}>
+                🛕
+              </Text>
+
               <Text style={styles.observanceTitle}>
                 Temple Festivals & Observances
               </Text>
-              <Text style={styles.observanceDescription}>
-                Special occasions and temple observances
-                will appear here after the festival
-                calendar is connected.
-              </Text>
+
+              {panchangam?.observances?.length ? (
+                <>
+                  {panchangam.observances.map(
+                    (item, index) => (
+                      <Text
+                        key={`${index}-${item}`}
+                        style={styles.observanceDescription}
+                      >
+                        • {item}
+                      </Text>
+                    ),
+                  )}
+                  <Text style={styles.observanceDescription}>
+                    Preliminary observances. Confirm
+                    fasting and festival dates with
+                    the temple calendar.
+                  </Text>
+                </>
+              ) : (
+                <Text
+                  style={styles.observanceDescription}
+                >
+                  No preliminary observances available
+                  for the selected date. Temple-specific
+                  festivals require confirmation.
+                </Text>
+              )}
             </View>
           </View>
 
-          <Text style={styles.footer}>हरिः ॐ तत् सत्</Text>
+          <Text style={styles.footer}>
+            हरिः ॐ तत् सत्
+          </Text>
+
           <Text style={styles.footerNote}>
             Divyakshetra Hariharapura
           </Text>
         </Animated.View>
       </ScrollView>
 
-      {calendarVisible && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setCalendarVisible(false);
-
-            if (event.type === 'set' && date) {
-              setSelectedDate(date);
-            }
-          }}
-        />
-      )}
-
+      {/* Location selection modal */}
       <Modal
         visible={locationVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setLocationVisible(false)}
+        onRequestClose={() =>
+          setLocationVisible(false)
+        }
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -798,9 +1149,13 @@ export default function PanchangamScreen() {
               </Text>
 
               <TouchableOpacity
-                onPress={() => setLocationVisible(false)}
+                onPress={() =>
+                  setLocationVisible(false)
+                }
               >
-                <Text style={styles.closeText}>✕</Text>
+                <Text style={styles.closeText}>
+                  ✕
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -813,13 +1168,15 @@ export default function PanchangamScreen() {
                 styles.gpsButton,
                 locating && { opacity: 0.65 },
               ]}
-              onPress={useMyLocation}
+              onPress={() => detectLocation(false)}
               disabled={locating}
             >
               {locating ? (
                 <ActivityIndicator color={C.white} />
               ) : (
-                <Text style={styles.gpsIcon}>📍</Text>
+                <Text style={styles.gpsIcon}>
+                  📍
+                </Text>
               )}
 
               <View style={styles.gpsContent}>
@@ -831,7 +1188,7 @@ export default function PanchangamScreen() {
 
                 <Text style={styles.gpsSubtitle}>
                   {locating
-                    ? 'Waiting for GPS (up to 12 seconds)'
+                    ? 'Waiting for GPS...'
                     : 'Use phone location with permission'}
                 </Text>
               </View>
@@ -850,7 +1207,9 @@ export default function PanchangamScreen() {
                 onChangeText={setQuery}
                 autoCorrect={false}
                 returnKeyType="search"
-                onSubmitEditing={() => searchPlaces()}
+                onSubmitEditing={() =>
+                  searchPlaces()
+                }
               />
 
               <TouchableOpacity
@@ -862,9 +1221,13 @@ export default function PanchangamScreen() {
                 onPress={() => searchPlaces()}
               >
                 {searching ? (
-                  <ActivityIndicator color={C.white} />
+                  <ActivityIndicator
+                    color={C.white}
+                  />
                 ) : (
-                  <Text style={styles.searchButtonText}>
+                  <Text
+                    style={styles.searchButtonText}
+                  >
                     Search
                   </Text>
                 )}
@@ -885,18 +1248,27 @@ export default function PanchangamScreen() {
                     <TouchableOpacity
                       key={place}
                       style={styles.cityRow}
-                      onPress={() => searchPlaces(place)}
+                      onPress={() =>
+                        searchPlaces(place)
+                      }
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={styles.cityName}>
                           {place.split(',')[0]}
                         </Text>
+
                         <Text style={styles.cityState}>
-                          {place.split(',').slice(1).join(',').trim()}
+                          {place
+                            .split(',')
+                            .slice(1)
+                            .join(',')
+                            .trim()}
                         </Text>
                       </View>
 
-                      <Text style={styles.resultArrow}>›</Text>
+                      <Text style={styles.resultArrow}>
+                        ›
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </>
@@ -904,7 +1276,9 @@ export default function PanchangamScreen() {
 
               {searching && (
                 <View style={styles.loadingBox}>
-                  <ActivityIndicator color={C.maroon} />
+                  <ActivityIndicator
+                    color={C.maroon}
+                  />
                   <Text style={styles.loadingText}>
                     Searching Indian locations...
                   </Text>
@@ -926,9 +1300,12 @@ export default function PanchangamScreen() {
                         key={place.id}
                         style={[
                           styles.cityRow,
-                          selected && styles.selectedCityRow,
+                          selected &&
+                            styles.selectedCityRow,
                         ]}
-                        onPress={() => selectPlace(place)}
+                        onPress={() =>
+                          selectPlace(place)
+                        }
                       >
                         <View style={{ flex: 1 }}>
                           <Text style={styles.cityName}>
@@ -941,9 +1318,13 @@ export default function PanchangamScreen() {
 
                           {place.latitude !== null &&
                             place.longitude !== null && (
-                              <Text style={styles.resultCoordinates}>
-                                {place.latitude.toFixed(4)},
-                                {' '}
+                              <Text
+                                style={
+                                  styles.resultCoordinates
+                                }
+                              >
+                                {place.latitude.toFixed(4)}
+                                {', '}
                                 {place.longitude.toFixed(4)}
                               </Text>
                             )}
@@ -958,11 +1339,15 @@ export default function PanchangamScreen() {
 
                   {results.length === 0 && (
                     <View style={styles.emptyBox}>
-                      <Text style={styles.emptyIcon}>🔎</Text>
+                      <Text style={styles.emptyIcon}>
+                        🔎
+                      </Text>
                       <Text style={styles.emptyTitle}>
                         No matching places found
                       </Text>
-                      <Text style={styles.emptyDescription}>
+                      <Text
+                        style={styles.emptyDescription}
+                      >
                         Try adding the state name or
                         searching a nearby town.
                       </Text>
@@ -1171,6 +1556,11 @@ const styles = StyleSheet.create({
     color: '#795B35',
     fontSize: 12,
     lineHeight: 19,
+  },
+  retryText: {
+    color: C.maroon,
+    fontWeight: '800',
+    fontSize: 13,
   },
   section: {
     marginTop: 25,

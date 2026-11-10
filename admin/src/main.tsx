@@ -8,6 +8,10 @@
 
   import Publications from './pages/Publications';
 
+  import Pravachanas from './pages/Pravachanas';
+
+  import Quotes from './pages/Quotes';
+
 
 
   import Activities from './pages/Activities';
@@ -142,6 +146,8 @@
 
     ['users', 'Users'],
     ['guru-vani', 'Guru Vani'],
+    ['quotes', 'Quotes'],
+    ['pravachanas', 'Pravachanas'],
     ['welcome-slokams', 'Welcome Slokam Library'],
 ['welcome-screen', 'Welcome Screen Settings'],
 
@@ -3861,6 +3867,12 @@
         {page === 'guru-vani' && (
           <GuruVani />
         )}
+
+        {page === 'quotes' && <Quotes />}
+        
+        {page === 'pravachanas' && (
+  <Pravachanas />
+)}
 
         {page === 'welcome-slokams' && (
     <WelcomeSlokams />
