@@ -75,6 +75,15 @@ export default function MenuScreen() {
             title={t('menu.pravachanas', 'Pravachana Library')}
             onPress={() => router.push('/pravachanas' as any)}
           />
+          <MenuItem
+  title={t(
+    'menu.mahaswamijiProgrammes',
+    'Mahaswamiji Programmes'
+  )}
+  onPress={() =>
+    router.push('/mahaswamiji-programmes' as any)
+  }
+/>
 
           <MenuItem
             title={t('features.rooms')}

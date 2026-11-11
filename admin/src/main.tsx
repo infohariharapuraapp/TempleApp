@@ -21,6 +21,7 @@
 
   import Events from './pages/Events';
 
+  import MahaswamijiProgrammes from './pages/MahaswamijiProgrammes';
 
 
   import Users from './pages/Users';
@@ -148,6 +149,10 @@
     ['guru-vani', 'Guru Vani'],
     ['quotes', 'Quotes'],
     ['pravachanas', 'Pravachanas'],
+
+    ['mahaswamiji-programmes', 'Mahaswamiji Programmes'],
+
+
     ['welcome-slokams', 'Welcome Slokam Library'],
 ['welcome-screen', 'Welcome Screen Settings'],
 
@@ -3872,6 +3877,10 @@
         
         {page === 'pravachanas' && (
   <Pravachanas />
+)}
+
+{page === 'mahaswamiji-programmes' && (
+  <MahaswamijiProgrammes />
 )}
 
         {page === 'welcome-slokams' && (

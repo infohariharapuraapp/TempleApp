@@ -93,6 +93,11 @@ const QUICK_ACTIONS = [
     titleKey: 'home.pravachanas',
     route: '/pravachanas',
   },
+  {
+  icon: '📅',
+  titleKey: 'home.mahaswamijiProgrammes',
+  route: '/mahaswamiji-programmes',
+},
 ];
 
 type DarshanVideo = {
@@ -586,13 +591,16 @@ export default function HomeScreen() {
       'comingSoon' in item && item.comingSoon;
 
     const fallbackTitle =
-      item.titleKey === 'home.dailyPanchangam'
-        ? 'Daily Panchangam'
-        : item.titleKey === 'home.pravachanas'
-          ? 'Pravachana & Quotes'
-          : item.titleKey === 'home.poojaServices'
-            ? 'Pooja Services'
-            : item.titleKey;
+  item.titleKey === 'home.mahaswamijiProgrammes'
+    ? 'Mahaswamiji Programmes'
+    : item.titleKey === 'home.dailyPanchangam'
+      ? 'Daily Panchangam'
+      : item.titleKey === 'home.pravachanas'
+        ? 'Pravachana & Quotes'
+        : item.titleKey === 'home.poojaServices'
+          ? 'Pooja Services'
+          : item.titleKey;
+          
 
     return (
       <AnimatedQuickAction

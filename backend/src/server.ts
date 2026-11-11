@@ -33,6 +33,10 @@ import quotesRoutes from './routes/quotesRoutes';
 import adminQuotesRoutes from './routes/adminQuotesRoutes';
 
 
+import mahaswamijiProgrammeRoutes from './routes/mahaswamijiProgrammeRoutes';
+import adminMahaswamijiProgrammeRoutes from './routes/adminMahaswamijiProgrammeRoutes';
+
+
 
 import adminTempleContactRoutes from './routes/adminTempleContactRoutes';
 
@@ -103,6 +107,22 @@ app.use('/api/pravachanas', pravachanaRoutes);
 app.use('/api/admin/pravachanas', adminPravachanaRoutes);
 
 
+
+// ========================================
+// MAHASWAMIJI PROGRAMMES
+// ========================================
+
+// Public - Devotee App
+app.use(
+  '/api/mahaswamiji-programmes',
+  mahaswamijiProgrammeRoutes
+);
+
+// Protected - Admin Dashboard
+app.use(
+  '/api/admin/mahaswamiji-programmes',
+  adminMahaswamijiProgrammeRoutes
+);
 
 
 // Public - Devotee App
