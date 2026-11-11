@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -199,14 +200,14 @@ export default function ProgrammeDetails() {
         >
           <Ionicons name="arrow-back" size={23} color={C.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Programme Details</Text>
+        <AutoTranslatedText style={styles.headerTitle}>Programme Details</AutoTranslatedText>
         <Text style={styles.om}>ॐ</Text>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.maroon} />
-          <Text style={styles.muted}>Loading programme...</Text>
+          <AutoTranslatedText style={styles.muted}>Loading programme...</AutoTranslatedText>
         </View>
       ) : error || !programme ? (
         <View style={styles.center}>
@@ -219,7 +220,7 @@ export default function ProgrammeDetails() {
             {error || 'Programme not found.'}
           </Text>
           <TouchableOpacity onPress={() => void load()}>
-            <Text style={styles.retry}>Try Again</Text>
+            <AutoTranslatedText style={styles.retry}>Try Again</AutoTranslatedText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -240,9 +241,9 @@ export default function ProgrammeDetails() {
                 style={styles.placeholder}
               >
                 <Text style={styles.placeholderOm}>ॐ</Text>
-                <Text style={styles.placeholderLabel}>
+                <AutoTranslatedText style={styles.placeholderLabel}>
                   MAHASWAMIJI PROGRAMMES
-                </Text>
+                </AutoTranslatedText>
               </LinearGradient>
             )}
 
@@ -257,9 +258,9 @@ export default function ProgrammeDetails() {
 
               <View style={styles.separator} />
 
-              <Text style={styles.sectionTitle}>
+              <AutoTranslatedText style={styles.sectionTitle}>
                 About the Programme
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.description}>
                 {programme.description}
@@ -268,9 +269,9 @@ export default function ProgrammeDetails() {
               {!!(starts || ends || programme.venue) && (
                 <>
                   <View style={styles.separator} />
-                  <Text style={styles.sectionTitle}>
+                  <AutoTranslatedText style={styles.sectionTitle}>
                     Programme Information
-                  </Text>
+                  </AutoTranslatedText>
 
                   <InfoRow
                     icon="calendar-outline"
@@ -294,13 +295,13 @@ export default function ProgrammeDetails() {
                 <>
                   <View style={styles.separator} />
 
-                  <Text style={styles.sectionTitle}>
+                  <AutoTranslatedText style={styles.sectionTitle}>
                     Watch Programme Video
-                  </Text>
+                  </AutoTranslatedText>
 
-                  <Text style={styles.videoHint}>
+                  <AutoTranslatedText style={styles.videoHint}>
                     Watch the programme within the app.
-                  </Text>
+                  </AutoTranslatedText>
 
                   <View style={styles.videoFrame}>
                     {playing ? (
@@ -363,9 +364,9 @@ export default function ProgrammeDetails() {
                         size={20}
                         color={C.maroon}
                       />
-                      <Text style={styles.closeText}>
+                      <AutoTranslatedText style={styles.closeText}>
                         Close Video
-                      </Text>
+                      </AutoTranslatedText>
                     </TouchableOpacity>
                   )}
                 </>

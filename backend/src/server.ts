@@ -28,6 +28,9 @@ import { getTempleContact } from './controllers/templeContactController';
 import welcomeSlokamRoutes from './routes/welcomeSlokamRoutes';
 
 import translationRoutes from './routes/translationRoutes';
+import {
+  publicTranslationMiddleware,
+} from './middleware/publicTranslation';
 
 
 import adminWelcomeSlokamRoutes from './routes/adminWelcomeSlokamRoutes';
@@ -80,6 +83,9 @@ const PORT = Number(process.env.PORT) || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+app.use(publicTranslationMiddleware);
+
 app.use(
   '/uploads',
   express.static('uploads')

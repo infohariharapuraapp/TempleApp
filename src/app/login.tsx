@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useState } from 'react';
 import { notifyAuthChanged } from '@/services/authSession';
@@ -101,17 +102,17 @@ export default function LoginScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.form}>
-              <Text style={styles.label}>HARIHARIPURA TEMPLE</Text>
+              <AutoTranslatedText style={styles.label}>HARIHARIPURA TEMPLE</AutoTranslatedText>
 
-              <Text style={styles.title}>Welcome Back</Text>
+              <AutoTranslatedText style={styles.title}>Welcome Back</AutoTranslatedText>
 
-              <Text style={styles.subtitle}>
+              <AutoTranslatedText style={styles.subtitle}>
                 Login to access temple services, bookings and activities.
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.inputLabel}>
+              <AutoTranslatedText style={styles.inputLabel}>
                 Mobile Number or Email
-              </Text>
+              </AutoTranslatedText>
 
               <TextInput
                 style={styles.input}
@@ -127,7 +128,7 @@ export default function LoginScreen() {
                 editable={!loading}
               />
 
-              <Text style={styles.inputLabel}>Password</Text>
+              <AutoTranslatedText style={styles.inputLabel}>Password</AutoTranslatedText>
 
               <View style={styles.passwordContainer}>
                 <TextInput
@@ -161,7 +162,7 @@ export default function LoginScreen() {
                 onPress={() => router.push('/forgot-password')}
                 disabled={loading}
               >
-                <Text style={styles.forgotText}>Forgot Password?</Text>
+                <AutoTranslatedText style={styles.forgotText}>Forgot Password?</AutoTranslatedText>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -175,20 +176,20 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
+                  <AutoTranslatedText style={styles.loginButtonText}>Login</AutoTranslatedText>
                 )}
               </TouchableOpacity>
 
               <View style={styles.registerRow}>
-                <Text style={styles.secondaryText}>
+                <AutoTranslatedText style={styles.secondaryText}>
                   New devotee?
-                </Text>
+                </AutoTranslatedText>
 
                 <TouchableOpacity
                   onPress={() => router.push('/register')}
                   disabled={loading}
                 >
-                  <Text style={styles.linkText}> Create Account</Text>
+                  <AutoTranslatedText style={styles.linkText}> Create Account</AutoTranslatedText>
                 </TouchableOpacity>
               </View>
             </View>

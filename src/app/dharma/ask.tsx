@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useEffect,
@@ -295,9 +296,9 @@ export default function AskQuestionScreen() {
           />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
+        <AutoTranslatedText style={styles.headerTitle}>
           Ask a Question
-        </Text>
+        </AutoTranslatedText>
 
         <View style={{ width: 40 }} />
       </View>
@@ -331,22 +332,22 @@ export default function AskQuestionScreen() {
               ॐ
             </Text>
 
-            <Text style={styles.introTitle}>
+            <AutoTranslatedText style={styles.introTitle}>
               Dharma Sandeham
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.introDescription}>
+            <AutoTranslatedText style={styles.introDescription}>
               Have a question about temple traditions,
               pooja rituals, or spiritual practices?
               Ask fellow devotees and share knowledge.
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           {/* CATEGORY SELECTION */}
 
-          <Text style={styles.label}>
+          <AutoTranslatedText style={styles.label}>
             Select Category *
-          </Text>
+          </AutoTranslatedText>
 
           {loadingCategories ? (
             <View style={styles.categoryLoading}>
@@ -354,9 +355,9 @@ export default function AskQuestionScreen() {
                 color={COLORS.maroon}
               />
 
-              <Text style={styles.loadingText}>
+              <AutoTranslatedText style={styles.loadingText}>
                 Loading categories...
-              </Text>
+              </AutoTranslatedText>
             </View>
           ) : categoryError ? (
             <View style={styles.categoryMessage}>
@@ -372,9 +373,9 @@ export default function AskQuestionScreen() {
             </View>
           ) : categories.length === 0 ? (
             <View style={styles.categoryMessage}>
-              <Text style={styles.categoryMessageText}>
+              <AutoTranslatedText style={styles.categoryMessageText}>
                 No question categories are currently available.
-              </Text>
+              </AutoTranslatedText>
             </View>
           ) : (
             <View style={styles.categories}>
@@ -411,9 +412,9 @@ export default function AskQuestionScreen() {
 
           {/* QUESTION TITLE */}
 
-          <Text style={styles.label}>
+          <AutoTranslatedText style={styles.label}>
             Your Question *
-          </Text>
+          </AutoTranslatedText>
 
           <TextInput
             style={styles.questionInput}
@@ -437,9 +438,9 @@ export default function AskQuestionScreen() {
 
           {/* QUESTION DESCRIPTION */}
 
-          <Text style={styles.label}>
+          <AutoTranslatedText style={styles.label}>
             Additional Details (Optional)
-          </Text>
+          </AutoTranslatedText>
 
           <TextInput
             ref={descriptionRef}
@@ -474,9 +475,9 @@ export default function AskQuestionScreen() {
                 color={COLORS.maroon}
               />
 
-              <Text style={styles.keyboardDoneText}>
+              <AutoTranslatedText style={styles.keyboardDoneText}>
                 Done Typing
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           )}
 
@@ -522,9 +523,9 @@ export default function AskQuestionScreen() {
                   color={COLORS.white}
                 />
 
-                <Text style={styles.submitText}>
+                <AutoTranslatedText style={styles.submitText}>
                   Submitting...
-                </Text>
+                </AutoTranslatedText>
               </>
             ) : (
               <>
@@ -534,16 +535,16 @@ export default function AskQuestionScreen() {
                   color={COLORS.white}
                 />
 
-                <Text style={styles.submitText}>
+                <AutoTranslatedText style={styles.submitText}>
                   Submit Question
-                </Text>
+                </AutoTranslatedText>
               </>
             )}
           </TouchableOpacity>
 
-          <Text style={styles.footerNote}>
+          <AutoTranslatedText style={styles.footerNote}>
             Please ask respectful, temple-related questions.
-          </Text>
+          </AutoTranslatedText>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

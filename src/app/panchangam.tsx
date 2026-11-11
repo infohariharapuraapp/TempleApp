@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -749,9 +750,9 @@ export default function PanchangamScreen() {
               setRetryCount(count => count + 1)
             }
           >
-            <Text style={styles.retryText}>
+            <AutoTranslatedText style={styles.retryText}>
               ↻ Retry Calculation
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
       );
@@ -780,9 +781,9 @@ export default function PanchangamScreen() {
           style={{ marginTop: 10 }}
           onPress={() => setLocationVisible(true)}
         >
-          <Text style={styles.retryText}>
+          <AutoTranslatedText style={styles.retryText}>
             📍 Select Location
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
       </View>
     );
@@ -804,7 +805,7 @@ export default function PanchangamScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹ Back</Text>
+          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
         </TouchableOpacity>
 
         <Animated.View
@@ -816,17 +817,17 @@ export default function PanchangamScreen() {
           <View style={styles.header}>
             <Text style={styles.headerSymbol}>ॐ</Text>
 
-            <Text style={styles.eyebrow}>
+            <AutoTranslatedText style={styles.eyebrow}>
               DIVYAKSHETRA HARIHARAPURA
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.title}>
+            <AutoTranslatedText style={styles.title}>
               Daily Panchangam
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.subtitle}>
+            <AutoTranslatedText style={styles.subtitle}>
               Sacred Time • Traditional Wisdom
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.headerDivider} />
 
@@ -851,9 +852,9 @@ export default function PanchangamScreen() {
                 📍 {locationLabel}
               </Text>
 
-              <Text style={styles.locationChange}>
+              <AutoTranslatedText style={styles.locationChange}>
                 Change ›
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
 
             {hasLocation && (
@@ -894,9 +895,9 @@ export default function PanchangamScreen() {
                 )}
               </Text>
 
-              <Text style={styles.calendarHint}>
+              <AutoTranslatedText style={styles.calendarHint}>
                 📅 Tap to choose date
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -913,9 +914,9 @@ export default function PanchangamScreen() {
             style={styles.calendarButton}
             onPress={openCalendar}
           >
-            <Text style={styles.calendarButtonText}>
+            <AutoTranslatedText style={styles.calendarButtonText}>
               📅 Open Calendar
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
 
           {!isToday && (
@@ -925,9 +926,9 @@ export default function PanchangamScreen() {
                 setSelectedDate(indiaToday())
               }
             >
-              <Text style={styles.todayButtonText}>
+              <AutoTranslatedText style={styles.todayButtonText}>
                 Return to Today
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           )}
 
@@ -936,12 +937,12 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               ✦ Hindu Calendar
-            </Text>
-            <Text style={styles.sectionSubtitle}>
+            </AutoTranslatedText>
+            <AutoTranslatedText style={styles.sectionSubtitle}>
               Traditional calendar details
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.calendarCard}>
               {(
@@ -973,20 +974,20 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               ☀️ Sun Timings
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionSubtitle}>
+            <AutoTranslatedText style={styles.sectionSubtitle}>
               Based on selected date and location
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.sunRow}>
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌅</Text>
-                <Text style={styles.sunLabel}>
+                <AutoTranslatedText style={styles.sunLabel}>
                   SUNRISE
-                </Text>
+                </AutoTranslatedText>
                 <Text style={styles.sunValue}>
                   {panchangam?.sunrise || '--:--'}
                 </Text>
@@ -994,9 +995,9 @@ export default function PanchangamScreen() {
 
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌇</Text>
-                <Text style={styles.sunLabel}>
+                <AutoTranslatedText style={styles.sunLabel}>
                   SUNSET
-                </Text>
+                </AutoTranslatedText>
                 <Text style={styles.sunValue}>
                   {panchangam?.sunset || '--:--'}
                 </Text>
@@ -1005,13 +1006,13 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               🪷 Panchanga
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionSubtitle}>
+            <AutoTranslatedText style={styles.sectionSubtitle}>
               The five traditional elements
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.detailsGrid}>
               <DetailCard
@@ -1043,13 +1044,13 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               ⏳ Daily Timings
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionSubtitle}>
+            <AutoTranslatedText style={styles.sectionSubtitle}>
               Auspicious and inauspicious periods
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.timingsCard}>
               <TimingRow
@@ -1077,18 +1078,18 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               🙏 Special Observances
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.observanceCard}>
               <Text style={styles.observanceIcon}>
                 🛕
               </Text>
 
-              <Text style={styles.observanceTitle}>
+              <AutoTranslatedText style={styles.observanceTitle}>
                 Temple Festivals & Observances
-              </Text>
+              </AutoTranslatedText>
 
               {panchangam?.observances?.length ? (
                 <>
@@ -1102,20 +1103,20 @@ export default function PanchangamScreen() {
                       </Text>
                     ),
                   )}
-                  <Text style={styles.observanceDescription}>
+                  <AutoTranslatedText style={styles.observanceDescription}>
                     Preliminary observances. Confirm
                     fasting and festival dates with
                     the temple calendar.
-                  </Text>
+                  </AutoTranslatedText>
                 </>
               ) : (
-                <Text
+                <AutoTranslatedText
                   style={styles.observanceDescription}
                 >
                   No preliminary observances available
                   for the selected date. Temple-specific
                   festivals require confirmation.
-                </Text>
+                </AutoTranslatedText>
               )}
             </View>
           </View>
@@ -1124,9 +1125,9 @@ export default function PanchangamScreen() {
             हरिः ॐ तत् सत्
           </Text>
 
-          <Text style={styles.footerNote}>
+          <AutoTranslatedText style={styles.footerNote}>
             Divyakshetra Hariharapura
-          </Text>
+          </AutoTranslatedText>
         </Animated.View>
       </ScrollView>
 
@@ -1144,9 +1145,9 @@ export default function PanchangamScreen() {
             <View style={styles.modalHandle} />
 
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <AutoTranslatedText style={styles.modalTitle}>
                 Select Panchangam Location
-              </Text>
+              </AutoTranslatedText>
 
               <TouchableOpacity
                 onPress={() =>
@@ -1159,9 +1160,9 @@ export default function PanchangamScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <AutoTranslatedText style={styles.modalSubtitle}>
               Search across India or use your GPS location.
-            </Text>
+            </AutoTranslatedText>
 
             <TouchableOpacity
               style={[
@@ -1194,9 +1195,9 @@ export default function PanchangamScreen() {
               </View>
             </TouchableOpacity>
 
-            <Text style={styles.orText}>
+            <AutoTranslatedText style={styles.orText}>
               OR SEARCH ANYWHERE IN INDIA
-            </Text>
+            </AutoTranslatedText>
 
             <View style={styles.searchBar}>
               <TextInput
@@ -1225,11 +1226,11 @@ export default function PanchangamScreen() {
                     color={C.white}
                   />
                 ) : (
-                  <Text
+                  <AutoTranslatedText
                     style={styles.searchButtonText}
                   >
                     Search
-                  </Text>
+                  </AutoTranslatedText>
                 )}
               </TouchableOpacity>
             </View>
@@ -1240,9 +1241,9 @@ export default function PanchangamScreen() {
             >
               {!searched && !searching && (
                 <>
-                  <Text style={styles.resultsHeading}>
+                  <AutoTranslatedText style={styles.resultsHeading}>
                     POPULAR LOCATIONS
-                  </Text>
+                  </AutoTranslatedText>
 
                   {POPULAR_PLACES.map(place => (
                     <TouchableOpacity
@@ -1279,9 +1280,9 @@ export default function PanchangamScreen() {
                   <ActivityIndicator
                     color={C.maroon}
                   />
-                  <Text style={styles.loadingText}>
+                  <AutoTranslatedText style={styles.loadingText}>
                     Searching Indian locations...
-                  </Text>
+                  </AutoTranslatedText>
                 </View>
               )}
 
@@ -1342,26 +1343,26 @@ export default function PanchangamScreen() {
                       <Text style={styles.emptyIcon}>
                         🔎
                       </Text>
-                      <Text style={styles.emptyTitle}>
+                      <AutoTranslatedText style={styles.emptyTitle}>
                         No matching places found
-                      </Text>
-                      <Text
+                      </AutoTranslatedText>
+                      <AutoTranslatedText
                         style={styles.emptyDescription}
                       >
                         Try adding the state name or
                         searching a nearby town.
-                      </Text>
+                      </AutoTranslatedText>
                     </View>
                   )}
                 </>
               )}
             </ScrollView>
 
-            <Text style={styles.modalFootnote}>
+            <AutoTranslatedText style={styles.modalFootnote}>
               Search data © OpenStreetMap contributors.
               Public search service for testing;
               subject to usage limits.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
       </Modal>

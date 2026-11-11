@@ -320,84 +320,97 @@ export default function HomeScreen() {
     void playWelcomeSlokam();
   }, [player, playerStatus.isLoaded, welcomeAudioReady, welcomeVisit]);
 
-  useEffect(() => {
-    loadEvents();
-    loadDarshanVideos();
-    void loadGurus();
+  // Refresh public content whenever Home gains focus or the language changes.
+  // A generation ID prevents stale requests from replacing newer translations.
+  const currentLanguage = (
+    i18n.resolvedLanguage || i18n.language || 'en'
+  ).split('-')[0];
+  const contentRequestId = useRef(0);
 
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const requestId = ++contentRequestId.current;
+      let active = true;
+      const isCurrent = () => active && contentRequestId.current === requestId;
+      const lang = encodeURIComponent(currentLanguage);
 
-  const loadGurus = async () => {
-    try {
-      setGurusLoading(true);
-      const response = await apiRequest<{
-        success: boolean;
-        data: Guru[];
-      }>('/guru-parampara');
+      const loadGurus = async () => {
+        try {
+          setGurusLoading(true);
+          const response = await apiRequest<{
+            success: boolean;
+            data: Guru[];
+          }>(`/guru-parampara?lang=${lang}`);
+          if (!isCurrent()) return;
+          setGurus(response.success && Array.isArray(response.data) ? response.data : []);
+        } catch (error) {
+          if (isCurrent()) {
+            console.error('Home Guru Parampara error:', error);
+            setGurus([]);
+          }
+        } finally {
+          if (isCurrent()) setGurusLoading(false);
+        }
+      };
 
-      if (response.success && Array.isArray(response.data)) {
-        setGurus(response.data);
-      } else {
-        setGurus([]);
-      }
-    } catch (error) {
-      console.error('Home Guru Parampara error:', error);
-      setGurus([]);
-    } finally {
-      setGurusLoading(false);
-    }
-  };
+      const loadEvents = async () => {
+        try {
+          setEventsLoading(true);
+          const response = await apiRequest<{ success: boolean; data: any[] }>(
+            `/events?lang=${lang}`
+          );
+          if (!isCurrent()) return;
+          setEvents(response.success && Array.isArray(response.data)
+            ? response.data.slice(0, 2)
+            : []);
+        } catch (error) {
+          if (isCurrent()) {
+            console.error('Home events error:', error);
+            setEvents([]);
+          }
+        } finally {
+          if (isCurrent()) setEventsLoading(false);
+        }
+      };
 
-  const loadEvents = async () => {
-    try {
-      setEventsLoading(true);
-      const response = await apiRequest('/events');
+      const loadDarshanVideos = async () => {
+        try {
+          const response = await apiRequest<{
+            success: boolean;
+            data: DarshanVideo[];
+          }>(`/darshan-videos?lang=${lang}`);
+          if (!isCurrent()) return;
+          setDarshanVideos(response.success && Array.isArray(response.data)
+            ? response.data
+            : []);
+        } catch (error) {
+          if (isCurrent()) {
+            console.error('Home Darshan Videos error:', error);
+            setDarshanVideos([]);
+          }
+        }
+      };
 
-      if (response.success && Array.isArray(response.data)) {
-        setEvents(response.data.slice(0, 2));
-      }
-    } catch (error) {
-      console.error('Home events error:', error);
-    } finally {
-      setEventsLoading(false);
-    }
-  };
+      void loadGurus();
+      void loadEvents();
+      void loadDarshanVideos();
+
+      return () => {
+        active = false;
+        contentRequestId.current += 1;
+      };
+    }, [currentLanguage])
+  );
 
   const loadUnreadNotificationCount = async () => {
     try {
-      const response = await apiRequest(
-        '/notifications/unread-count'
-      );
-
+      const response = await apiRequest('/notifications/unread-count');
       if (response.success) {
-        setUnreadNotificationCount(
-          response.data?.unreadCount || 0
-        );
+        setUnreadNotificationCount(response.data?.unreadCount || 0);
       }
     } catch (error) {
-      console.error(
-        'Unread notification count error:',
-        error
-      );
-
+      console.error('Unread notification count error:', error);
       setUnreadNotificationCount(0);
-    }
-  };
-  const loadDarshanVideos = async () => {
-    try {
-      const response = await apiRequest<{
-        success: boolean;
-        data: DarshanVideo[];
-      }>('/darshan-videos');
-
-      if (response.success && Array.isArray(response.data)) {
-        setDarshanVideos(response.data);
-      } else {
-        setDarshanVideos([]);
-      }
-    } catch (error) {
-      console.error('Home Darshan Videos error:', error);
-      setDarshanVideos([]);
     }
   };
 
@@ -625,7 +638,7 @@ const fallbackTitle =
           comingSoon
             ? `${t(item.titleKey, {
                 defaultValue: fallbackTitle,
-              })} (Coming Soon in December)`
+              })} (${({ en: 'Coming Soon in December', te: 'డిసెంబర్‌లో త్వరలో', kn: 'ಡಿಸೆಂಬರ್‌ನಲ್ಲಿ ಶೀಘ್ರದಲ್ಲೇ', hi: 'दिसंबर में जल्द आ रहा है', ta: 'டிசம்பரில் விரைவில்' } as Record<string, string>)[currentLanguage] || 'Coming Soon in December'})`
             : t(item.titleKey, {
                 defaultValue: fallbackTitle,
               })
@@ -895,7 +908,7 @@ const fallbackTitle =
                 date={
                   event.event_date
                     ? new Date(event.event_date)
-                      .toLocaleDateString(({ en: 'en-US', te: 'te-IN', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN' } as Record<string, string>)[i18n.language] || 'en-US', {
+                      .toLocaleDateString(({ en: 'en-US', te: 'te-IN', kn: 'kn-IN', hi: 'hi-IN', ta: 'ta-IN' } as Record<string, string>)[currentLanguage] || 'en-US', {
                         month: 'short',
                         day: '2-digit',
                       })

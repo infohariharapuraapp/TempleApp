@@ -63,3 +63,5 @@ src.zip
 # Android build outputs
 *.apk
 *.aab
+
+*.tsx.bak

@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
   import React, {
     useCallback,
@@ -579,9 +580,9 @@ setVotedIds(
                 color={COLORS.green}
               />
 
-              <Text style={styles.verifiedText}>
+              <AutoTranslatedText style={styles.verifiedText}>
                 Official Temple Answer — Verified
-              </Text>
+              </AutoTranslatedText>
             </View>
           )}
 
@@ -646,9 +647,9 @@ setVotedIds(
               color={COLORS.muted}
             />
 
-            <Text style={styles.reportButtonText}>
+            <AutoTranslatedText style={styles.reportButtonText}>
               Report Answer
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
       );
@@ -676,9 +677,9 @@ setVotedIds(
             />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>
+          <AutoTranslatedText style={styles.headerTitle}>
             Dharma Sandeham
-          </Text>
+          </AutoTranslatedText>
 
           <View style={{ width: 40 }} />
         </View>
@@ -702,9 +703,9 @@ setVotedIds(
                 color={COLORS.maroon}
               />
 
-              <Text style={styles.stateText}>
+              <AutoTranslatedText style={styles.stateText}>
                 Loading question...
-              </Text>
+              </AutoTranslatedText>
             </View>
 
           ) : error && !question ? (
@@ -726,9 +727,9 @@ setVotedIds(
                 style={styles.retryButton}
                 onPress={() => loadQuestion()}
               >
-                <Text style={styles.retryText}>
+                <AutoTranslatedText style={styles.retryText}>
                   Try Again
-                </Text>
+                </AutoTranslatedText>
               </TouchableOpacity>
             </View>
 
@@ -797,9 +798,9 @@ setVotedIds(
                         color={COLORS.muted}
                       />
 
-                      <Text style={styles.reportButtonText}>
+                      <AutoTranslatedText style={styles.reportButtonText}>
                         Report Question
-                      </Text>
+                      </AutoTranslatedText>
                     </TouchableOpacity>
 
                     {/* QUESTION AUTHOR */}
@@ -828,14 +829,14 @@ setVotedIds(
                   {officialAnswers.length > 0 && (
                     <View style={styles.officialSection}>
 
-                      <Text style={styles.sectionTitle}>
+                      <AutoTranslatedText style={styles.sectionTitle}>
                         Official Temple Guidance
-                      </Text>
+                      </AutoTranslatedText>
 
-                      <Text style={styles.sectionSubtitle}>
+                      <AutoTranslatedText style={styles.sectionSubtitle}>
                         Verified answers from temple
                         administration
-                      </Text>
+                      </AutoTranslatedText>
 
                       <View style={{ marginTop: 16 }}>
                         {officialAnswers.map(
@@ -850,13 +851,13 @@ setVotedIds(
 
                   <View style={styles.answersHeader}>
                     <View>
-                      <Text style={styles.sectionTitle}>
+                      <AutoTranslatedText style={styles.sectionTitle}>
                         Community Answers
-                      </Text>
+                      </AutoTranslatedText>
 
-                      <Text style={styles.sectionSubtitle}>
+                      <AutoTranslatedText style={styles.sectionSubtitle}>
                         Shared by fellow devotees
-                      </Text>
+                      </AutoTranslatedText>
                     </View>
 
                     <View style={styles.answerCountBadge}>
@@ -901,14 +902,14 @@ setVotedIds(
                         color={COLORS.gold}
                       />
 
-                      <Text style={styles.noAnswersText}>
+                      <AutoTranslatedText style={styles.noAnswersText}>
                         No approved community answers yet.
-                      </Text>
+                      </AutoTranslatedText>
 
-                      <Text style={styles.sectionSubtitle}>
+                      <AutoTranslatedText style={styles.sectionSubtitle}>
                         Be the first to share your
                         knowledge.
-                      </Text>
+                      </AutoTranslatedText>
                     </View>
                   ) : (
                     communityAnswers.map(
@@ -931,14 +932,14 @@ setVotedIds(
         answerSectionY.current = event.nativeEvent.layout.y;
       }}
     >
-                    <Text style={styles.sectionTitle}>
+                    <AutoTranslatedText style={styles.sectionTitle}>
                       Share Your Answer
-                    </Text>
+                    </AutoTranslatedText>
 
-                    <Text style={styles.sectionSubtitle}>
+                    <AutoTranslatedText style={styles.sectionSubtitle}>
                       Help another devotee by sharing
                       your knowledge.
-                    </Text>
+                    </AutoTranslatedText>
 
                     {isFull ? (
                       <View style={styles.fullNotice}>
@@ -981,9 +982,9 @@ setVotedIds(
                               size={19}
                               color={COLORS.white}
                             />
-                            <Text style={styles.doneTypingText}>
+                            <AutoTranslatedText style={styles.doneTypingText}>
                               Done Typing
-                            </Text>
+                            </AutoTranslatedText>
                           </TouchableOpacity>
                         )}
 

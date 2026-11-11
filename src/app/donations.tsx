@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useRef, useState } from 'react';
 
@@ -84,10 +85,10 @@ export default function DonationsScreen() {
         </View>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Donations</Text>
-          <Text style={styles.headerSubtitle}>
+          <AutoTranslatedText style={styles.headerTitle}>Donations</AutoTranslatedText>
+          <AutoTranslatedText style={styles.headerSubtitle}>
             Support our temple with devotion
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         <TouchableOpacity
@@ -192,14 +193,14 @@ export default function DonationsScreen() {
               color={COLORS.gold}
             />
 
-            <Text style={styles.errorTitle}>
+            <AutoTranslatedText style={styles.errorTitle}>
               Unable to load Donations
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.errorText}>
+            <AutoTranslatedText style={styles.errorText}>
               Please check your internet connection
               and try again.
-            </Text>
+            </AutoTranslatedText>
 
             <TouchableOpacity
               style={styles.retryButton}
@@ -210,15 +211,15 @@ export default function DonationsScreen() {
                 size={18}
                 color="#FFFFFF"
               />
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={openInBrowser}>
-              <Text style={styles.browserText}>
+              <AutoTranslatedText style={styles.browserText}>
                 Open in Browser
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}
@@ -229,9 +230,9 @@ export default function DonationsScreen() {
               size="large"
               color={COLORS.maroon}
             />
-            <Text style={styles.loadingText}>
+            <AutoTranslatedText style={styles.loadingText}>
               Loading donation services...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
       </View>

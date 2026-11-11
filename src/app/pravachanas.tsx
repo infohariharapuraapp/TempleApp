@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -159,7 +160,7 @@ function VideoCard({
 
               {latest && (
                 <View style={styles.latestTag}>
-                  <Text style={styles.latestTagText}>LATEST</Text>
+                  <AutoTranslatedText style={styles.latestTagText}>LATEST</AutoTranslatedText>
                 </View>
               )}
             </ImageBackground>
@@ -197,7 +198,7 @@ function VideoCard({
               size={19}
               color={C.maroon}
             />
-            <Text style={styles.watchText}>Watch</Text>
+            <AutoTranslatedText style={styles.watchText}>Watch</AutoTranslatedText>
           </View>
         </View>
       </View>
@@ -223,7 +224,7 @@ function GuruCard({ item }: { item: GuruVani }) {
         </View>
 
         <View style={styles.guruTopText}>
-          <Text style={styles.guruLabel}>GURU VANI</Text>
+          <AutoTranslatedText style={styles.guruLabel}>GURU VANI</AutoTranslatedText>
           <Text style={styles.guruDate}>
             {formatDate(item.published_at)}
           </Text>
@@ -249,7 +250,7 @@ function GuruCard({ item }: { item: GuruVani }) {
       )}
 
       <View style={styles.guruFooter}>
-        <Text style={styles.readTeaching}>Read Teaching</Text>
+        <AutoTranslatedText style={styles.readTeaching}>Read Teaching</AutoTranslatedText>
         <Ionicons
           name="arrow-forward"
           size={17}
@@ -485,9 +486,9 @@ export default function PravachanasScreen() {
           />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
+        <AutoTranslatedText style={styles.headerTitle}>
           Pravachana & Quotes
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.headerRight}>
           <Text style={styles.headerOm}>ॐ</Text>
@@ -529,9 +530,9 @@ export default function PravachanasScreen() {
             size="large"
             color={C.maroon}
           />
-          <Text style={styles.loadingText}>
+          <AutoTranslatedText style={styles.loadingText}>
             Loading divine teachings...
-          </Text>
+          </AutoTranslatedText>
         </View>
       ) : (
         <ScrollView
@@ -550,7 +551,7 @@ export default function PravachanasScreen() {
             <View style={styles.notice}>
               <Text style={styles.noticeText}>{error}</Text>
               <TouchableOpacity onPress={() => loadData()}>
-                <Text style={styles.retryText}>Retry</Text>
+                <AutoTranslatedText style={styles.retryText}>Retry</AutoTranslatedText>
               </TouchableOpacity>
             </View>
           )}
@@ -562,13 +563,13 @@ export default function PravachanasScreen() {
                 size={42}
                 color={C.gold}
               />
-              <Text style={styles.emptyTitle}>
+              <AutoTranslatedText style={styles.emptyTitle}>
                 No content available yet
-              </Text>
-              <Text style={styles.emptyText}>
+              </AutoTranslatedText>
+              <AutoTranslatedText style={styles.emptyText}>
                 New spiritual teachings will appear here
                 when published.
-              </Text>
+              </AutoTranslatedText>
             </View>
           ) : tab === 'All' ? (
             feed.map((entry) => {

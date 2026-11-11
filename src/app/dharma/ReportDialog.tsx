@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useState } from 'react';
 
@@ -152,9 +153,9 @@ export default function ReportDialog({
                   : 'Answer'}
               </Text>
 
-              <Text style={styles.subtitle}>
+              <AutoTranslatedText style={styles.subtitle}>
                 Help keep Dharma Sandeham respectful.
-              </Text>
+              </AutoTranslatedText>
             </View>
 
             <TouchableOpacity
@@ -169,9 +170,9 @@ export default function ReportDialog({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionLabel}>
+          <AutoTranslatedText style={styles.sectionLabel}>
             WHY ARE YOU REPORTING THIS?
-          </Text>
+          </AutoTranslatedText>
 
           <ScrollView
             style={styles.reasonsScroll}
@@ -222,10 +223,10 @@ export default function ReportDialog({
               color={COLORS.maroon}
             />
 
-            <Text style={styles.infoText}>
+            <AutoTranslatedText style={styles.infoText}>
               Reports are reviewed by temple admins.
               Reporting does not automatically remove content.
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <TouchableOpacity
@@ -261,9 +262,9 @@ export default function ReportDialog({
             onPress={handleClose}
             disabled={submitting}
           >
-            <Text style={styles.cancelText}>
+            <AutoTranslatedText style={styles.cancelText}>
               Cancel
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
       </View>

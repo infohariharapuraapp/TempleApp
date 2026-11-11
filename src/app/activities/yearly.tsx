@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,14 +18,14 @@ export default function CategoryScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Back</Text>
+          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
         </TouchableOpacity>
 
-        <Text style={styles.eyebrow}>TEMPLE ACTIVITIES</Text>
-        <Text style={styles.title}>Yearly Activities</Text>
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.eyebrow}>TEMPLE ACTIVITIES</AutoTranslatedText>
+        <AutoTranslatedText style={styles.title}>Yearly Activities</AutoTranslatedText>
+        <AutoTranslatedText style={styles.subtitle}>
           Annual festivals and important celebrations of Sri Adi Shankaracharya Sharada Lakshminarasimha Peetam.
-        </Text>
+        </AutoTranslatedText>
 
         {yearlyActivities.map(([number, title, image]) => (
           <View key={number} style={styles.itemCard}>

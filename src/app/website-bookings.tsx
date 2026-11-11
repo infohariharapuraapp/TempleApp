@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -102,7 +103,7 @@ export default function WebsiteBookingsScreen() {
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>My Bookings</Text>
+        <AutoTranslatedText style={styles.title}>My Bookings</AutoTranslatedText>
 
         <View style={{ width: 30 }} />
       </View>
@@ -148,25 +149,25 @@ export default function WebsiteBookingsScreen() {
               size="large"
               color="#8B0000"
             />
-            <Text style={styles.message}>
+            <AutoTranslatedText style={styles.message}>
               Loading your bookings...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
 
         {hasError && (
           <View style={styles.loading}>
-            <Text style={styles.message}>
+            <AutoTranslatedText style={styles.message}>
               Unable to load your bookings.
-            </Text>
+            </AutoTranslatedText>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={handleRetry}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}

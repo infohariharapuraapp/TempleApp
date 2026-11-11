@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useEffect,
@@ -175,9 +176,9 @@ export default function DarshanVideosScreen() {
 
             <View style={styles.noImage}>
 
-              <Text style={styles.noImageText}>
+              <AutoTranslatedText style={styles.noImageText}>
                 YouTube
-              </Text>
+              </AutoTranslatedText>
 
             </View>
 

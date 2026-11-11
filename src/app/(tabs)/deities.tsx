@@ -1,5 +1,5 @@
 import React, {
-  useEffect,
+  useCallback,
   useMemo,
   useState,
 } from 'react';
@@ -17,6 +17,7 @@ import {
 } from 'react-native-safe-area-context';
 import {
   router,
+  useFocusEffect,
 } from 'expo-router';
 import {
   useTranslation,
@@ -49,39 +50,50 @@ type Deity = {
 // DEITIES SCREEN
 // ========================================
 export default function DeitiesScreen() {
-  const { t } = useTranslation();
-  const [deities, setDeities] =
-    useState<Deity[]>([]);
-  const [search, setSearch] =
-    useState('');
-  const [loading, setLoading] =
-    useState(true);
-  // ========================================
-  // LOAD DEITIES
-  // ========================================
-  useEffect(() => {
-    loadDeities();
-  }, []);
-  const loadDeities = async () => {
-    try {
+  const { t, i18n } = useTranslation();
+  const language = (i18n.resolvedLanguage || i18n.language || 'en')
+    .split('-')[0].toLowerCase();
+
+  const [deities, setDeities] = useState<Deity[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Refresh on tab focus and language changes. Ignore outdated responses.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
       setLoading(true);
-      const response =
-        await apiRequest('/deities');
-      if (
-        response.success &&
-        Array.isArray(response.data)
-      ) {
-        setDeities(response.data);
-      }
-    } catch (error) {
-      console.error(
-        'Deities loading error:',
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      setDeities([]); // Do not display previous-language data while loading.
+
+      const loadDeities = async () => {
+        try {
+          const response = await apiRequest<{
+            success: boolean;
+            data: Deity[];
+          }>(`/deities?lang=${encodeURIComponent(language)}`);
+
+          if (!active) return;
+          setDeities(
+            response.success && Array.isArray(response.data)
+              ? response.data
+              : []
+          );
+        } catch (error) {
+          if (!active) return;
+          console.error('Deities loading error:', error);
+          setDeities([]);
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+
+      void loadDeities();
+      return () => {
+        active = false;
+      };
+    }, [language])
+  );
+
   // ========================================
   // FILTER DEITIES
   // ========================================

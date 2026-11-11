@@ -21,10 +21,41 @@ const PROVIDER = 'mymemory';
 const MAX_REQUEST_BYTES = 450;
 const REQUEST_TIMEOUT_MS = 15000;
 
-// Conservative default below the anonymous MyMemory allowance.
-// Counts attempted source characters, including failed requests.
-// The provider's own accounting remains authoritative.
-const DEFAULT_DAILY_LIMIT = 4000;
+const ANONYMOUS_DAILY_LIMIT = 4000;
+const EMAIL_DAILY_LIMIT = 45000;
+
+// Avoid repeated simultaneous requests for identical text
+// within the same Node.js process.
+const pendingTranslations = new Map<
+  string,
+  Promise<string>
+>();
+
+// Limit concurrent provider calls across all public API requests.
+// Cache hits do not enter this queue.
+const MAX_PROVIDER_CONCURRENCY = 2;
+let activeProviderCalls = 0;
+const providerWaiters: Array<() => void> = [];
+
+async function withProviderSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeProviderCalls >= MAX_PROVIDER_CONCURRENCY) {
+    await new Promise<void>((resolve) => providerWaiters.push(resolve));
+  } else {
+    activeProviderCalls += 1;
+  }
+  try {
+    return await work();
+  } finally {
+    const next = providerWaiters.shift();
+    if (next) {
+      // Transfer this occupied slot to the next waiting request.
+      next();
+    } else {
+      activeProviderCalls -= 1;
+    }
+  }
+}
+
 
 export class TranslationError extends Error {
   constructor(
@@ -54,6 +85,14 @@ function sourceHash(text: string): string {
 }
 
 function dailyLimit(): number {
+  const hasEmail = Boolean(
+    process.env.MYMEMORY_EMAIL?.trim()
+  );
+
+  const maximum = hasEmail
+    ? EMAIL_DAILY_LIMIT
+    : ANONYMOUS_DAILY_LIMIT;
+
   const configured = Number(
     process.env.TRANSLATION_DAILY_LIMIT
   );
@@ -62,14 +101,12 @@ function dailyLimit(): number {
     Number.isSafeInteger(configured) &&
     configured > 0
   ) {
-    return Math.min(configured, 4000);
+    return Math.min(configured, maximum);
   }
 
-  return DEFAULT_DAILY_LIMIT;
+  return maximum;
 }
 
-// Split at sentence/word boundaries where possible.
-// Keep each request safely below MyMemory's byte limit.
 function splitText(text: string): string[] {
   const chunks: string[] = [];
   let remaining = text;
@@ -121,8 +158,6 @@ function splitText(text: string): string[] {
   return chunks;
 }
 
-// Reserve usage atomically in PostgreSQL.
-// Concurrent Render requests cannot exceed our configured limit.
 async function reserveQuota(
   characters: number
 ): Promise<void> {
@@ -174,20 +209,23 @@ async function translateChunk(
   sourceLanguage: TranslationLanguage,
   targetLanguage: TranslationLanguage
 ): Promise<string> {
-  // Reserve BEFORE calling the external provider.
-  await reserveQuota(Array.from(text).length);
+  await reserveQuota(
+    Array.from(text).length
+  );
 
   const url = new URL(
     'https://api.mymemory.translated.net/get'
   );
 
   url.searchParams.set('q', text);
+
   url.searchParams.set(
     'langpair',
     `${sourceLanguage}|${targetLanguage}`
   );
 
-  const email = process.env.MYMEMORY_EMAIL?.trim();
+  const email =
+    process.env.MYMEMORY_EMAIL?.trim();
 
   if (email) {
     url.searchParams.set('de', email);
@@ -196,12 +234,12 @@ async function translateChunk(
   let response: globalThis.Response;
 
   try {
-    response = await fetch(url.toString(), {
-      method: 'GET',
-      signal: AbortSignal.timeout(
-        REQUEST_TIMEOUT_MS
-      ),
-    });
+    response = await withProviderSlot(() =>
+      fetch(url.toString(), {
+        method: 'GET',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    );
   } catch {
     throw new TranslationError(
       'Translation provider is temporarily unreachable.'
@@ -224,7 +262,9 @@ async function translateChunk(
     );
   }
 
-  if (Number(data?.responseStatus) !== 200) {
+  if (
+    Number(data?.responseStatus) !== 200
+  ) {
     throw new TranslationError(
       typeof data?.responseDetails === 'string'
         ? data.responseDetails
@@ -232,7 +272,8 @@ async function translateChunk(
     );
   }
 
-  const translated = data?.responseData?.translatedText;
+  const translated =
+    data?.responseData?.translatedText;
 
   if (
     typeof translated !== 'string' ||
@@ -244,6 +285,87 @@ async function translateChunk(
   }
 
   return translated;
+}
+
+async function performTranslation(
+  text: string,
+  targetLanguage: TranslationLanguage,
+  sourceLanguage: TranslationLanguage
+): Promise<string> {
+  const hash = sourceHash(text);
+
+  const cached = await pool.query(
+    `
+    SELECT source_text, translated_text
+    FROM translation_cache
+    WHERE source_language = $1
+      AND target_language = $2
+      AND source_hash = $3
+    LIMIT 1
+    `,
+    [
+      sourceLanguage,
+      targetLanguage,
+      hash,
+    ]
+  );
+
+  if (
+    cached.rows.length > 0 &&
+    cached.rows[0].source_text === text
+  ) {
+    return cached.rows[0].translated_text;
+  }
+
+  const chunks = splitText(text);
+  const translatedChunks: string[] = [];
+
+  for (const chunk of chunks) {
+    translatedChunks.push(
+      await translateChunk(
+        chunk,
+        sourceLanguage,
+        targetLanguage
+      )
+    );
+  }
+
+  const translatedText =
+    translatedChunks.join('');
+
+  await pool.query(
+    `
+    INSERT INTO translation_cache (
+      source_language,
+      target_language,
+      source_hash,
+      source_text,
+      translated_text,
+      provider
+    )
+    VALUES ($1, $2, $3, $4, $5, $6)
+    ON CONFLICT (
+      source_language,
+      target_language,
+      source_hash
+    )
+    DO UPDATE SET
+      translated_text =
+        EXCLUDED.translated_text,
+      provider = EXCLUDED.provider,
+      updated_at = NOW()
+    `,
+    [
+      sourceLanguage,
+      targetLanguage,
+      hash,
+      text,
+      translatedText,
+      PROVIDER,
+    ]
+  );
+
+  return translatedText;
 }
 
 export async function translateText(
@@ -272,81 +394,42 @@ export async function translateText(
     );
   }
 
-  if (sourceLanguage === targetLanguage) {
+  if (
+    sourceLanguage === targetLanguage
+  ) {
     return text;
   }
 
-  const hash = sourceHash(text);
+  const key = [
+    sourceLanguage,
+    targetLanguage,
+    sourceHash(text),
+  ].join(':');
 
-  // Check cache first.
-  const cached = await pool.query(
-    `
-    SELECT source_text, translated_text
-    FROM translation_cache
-    WHERE source_language = $1
-      AND target_language = $2
-      AND source_hash = $3
-    LIMIT 1
-    `,
-    [sourceLanguage, targetLanguage, hash]
-  );
+  const existing =
+    pendingTranslations.get(key);
 
-  if (
-    cached.rows.length > 0 &&
-    cached.rows[0].source_text === text
-  ) {
-    return cached.rows[0].translated_text;
+  if (existing) {
+    return existing;
   }
 
-  const chunks = splitText(text);
-  const translatedChunks: string[] = [];
-
-  // Translate sequentially to avoid bursts.
-  for (const chunk of chunks) {
-    translatedChunks.push(
-      await translateChunk(
-        chunk,
-        sourceLanguage,
-        targetLanguage
-      )
-    );
-  }
-
-  const translatedText = translatedChunks.join('');
-
-  // Save only after every chunk succeeds.
-  await pool.query(
-    `
-    INSERT INTO translation_cache (
-      source_language,
-      target_language,
-      source_hash,
-      source_text,
-      translated_text,
-      provider
-    )
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (
-      source_language,
-      target_language,
-      source_hash
-    )
-    DO UPDATE SET
-      translated_text = EXCLUDED.translated_text,
-      provider = EXCLUDED.provider,
-      updated_at = NOW()
-    `,
-    [
-      sourceLanguage,
-      targetLanguage,
-      hash,
-      text,
-      translatedText,
-      PROVIDER,
-    ]
+  const task = performTranslation(
+    text,
+    targetLanguage,
+    sourceLanguage
   );
 
-  return translatedText;
+  pendingTranslations.set(key, task);
+
+  try {
+    return await task;
+  } finally {
+    if (
+      pendingTranslations.get(key) === task
+    ) {
+      pendingTranslations.delete(key);
+    }
+  }
 }
 
 export async function translateToAllLanguages(
@@ -358,7 +441,9 @@ export async function translateToAllLanguages(
     string
   >;
 
-  for (const language of SUPPORTED_LANGUAGES) {
+  for (
+    const language of SUPPORTED_LANGUAGES
+  ) {
     result[language] =
       language === sourceLanguage
         ? text
@@ -372,8 +457,51 @@ export async function translateToAllLanguages(
   return result;
 }
 
-// Safe fallback for displaying existing public content.
-// Use strict translateText() when generating or saving translations.
+// Translate multiple content fields into all
+// supported languages using one shared service.
+export async function translateFieldsToAllLanguages(
+  fields: Record<string, string>,
+  sourceLanguage: TranslationLanguage = 'en'
+): Promise<
+  Record<
+    TranslationLanguage,
+    Record<string, string>
+  >
+> {
+  const result = {} as Record<
+    TranslationLanguage,
+    Record<string, string>
+  >;
+
+  for (
+    const language of SUPPORTED_LANGUAGES
+  ) {
+    result[language] = {};
+
+    for (
+      const [field, text] of Object.entries(fields)
+    ) {
+      if (typeof text !== 'string') {
+        throw new TranslationError(
+          `Invalid translation field: ${field}`,
+          400
+        );
+      }
+
+      result[language][field] =
+        language === sourceLanguage
+          ? text
+          : await translateText(
+              text,
+              language,
+              sourceLanguage
+            );
+    }
+  }
+
+  return result;
+}
+
 export async function translateTextOrOriginal(
   text: string,
   targetLanguage: TranslationLanguage,

@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 
 import {
   translateText,
+  translateTextOrOriginal,
   TranslationError,
   TranslationLanguage,
   SUPPORTED_LANGUAGES,
@@ -19,6 +20,8 @@ function isSupportedLanguage(
   );
 }
 
+// Existing admin translation endpoint.
+// Keep its response structure unchanged.
 export const translateContent = async (
   req: Request,
   res: Response
@@ -70,10 +73,7 @@ export const translateContent = async (
       },
     });
   } catch (error) {
-    console.error(
-      'Translation controller error:',
-      error
-    );
+    console.error('Translation controller error:', error);
 
     if (error instanceof TranslationError) {
       res.status(error.statusCode).json({
@@ -82,6 +82,104 @@ export const translateContent = async (
       });
       return;
     }
+
+    res.status(503).json({
+      success: false,
+      message: 'Translation service unavailable.',
+    });
+  }
+};
+
+// Public batch translation for UI text.
+// Uses the existing PostgreSQL translation cache.
+export const translatePublicBatch = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const {
+      texts,
+      targetLanguage,
+      sourceLanguage = 'en',
+    } = req.body ?? {};
+
+    if (
+      !isSupportedLanguage(targetLanguage) ||
+      !isSupportedLanguage(sourceLanguage)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: 'Unsupported language.',
+      });
+      return;
+    }
+
+    if (
+      !Array.isArray(texts) ||
+      texts.length === 0 ||
+      texts.length > 10 ||
+      !texts.every(
+        (text) =>
+          typeof text === 'string' &&
+          text.length <= 500
+      )
+    ) {
+      res.status(400).json({
+        success: false,
+        message:
+          'Provide 1 to 10 text strings, maximum 500 characters each.',
+      });
+      return;
+    }
+
+    const totalCharacters = texts.reduce(
+      (sum: number, text: string) =>
+        sum + Array.from(text).length,
+      0
+    );
+
+    if (totalCharacters > 1500) {
+      res.status(400).json({
+        success: false,
+        message:
+          'Maximum 1500 characters per request.',
+      });
+      return;
+    }
+
+    const uniqueTexts = [
+      ...new Set(texts as string[]),
+    ];
+
+    const translatedMap = new Map<string, string>();
+
+    // Sequential requests avoid overwhelming
+    // the free translation provider.
+    for (const text of uniqueTexts) {
+      const translated = await translateTextOrOriginal(
+        text,
+        targetLanguage,
+        sourceLanguage
+      );
+
+      translatedMap.set(text, translated);
+    }
+
+    const translations = texts.map(
+      (text: string) =>
+        translatedMap.get(text) ?? text
+    );
+
+    res.json({
+      success: true,
+      data: {
+        sourceLanguage,
+        targetLanguage,
+        translations,
+      },
+    });
+  } catch (error) {
+    console.error('Public batch translation error:', error);
 
     res.status(503).json({
       success: false,

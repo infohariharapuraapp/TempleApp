@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -186,18 +187,18 @@ export default function PublicationsScreen() {
           />
         }
       >
-        <Text style={styles.smallTitle}>
+        <AutoTranslatedText style={styles.smallTitle}>
           TEMPLE RESOURCES
-        </Text>
+        </AutoTranslatedText>
 
-        <Text style={styles.title}>
+        <AutoTranslatedText style={styles.title}>
           Publications 📚
-        </Text>
+        </AutoTranslatedText>
 
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.subtitle}>
           Explore books, magazines, news and
           devotional reading material.
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.banner}>
           <Text style={styles.bannerIcon}>
@@ -205,20 +206,20 @@ export default function PublicationsScreen() {
           </Text>
 
           <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>
+            <AutoTranslatedText style={styles.bannerTitle}>
               Spiritual Knowledge
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.bannerText}>
+            <AutoTranslatedText style={styles.bannerText}>
               Discover publications and devotional
               resources from the temple.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Explore Publications
-        </Text>
+        </AutoTranslatedText>
 
         {loading && (
           <View style={styles.centerBox}>
@@ -227,9 +228,9 @@ export default function PublicationsScreen() {
               color="#B66A2C"
             />
 
-            <Text style={styles.message}>
+            <AutoTranslatedText style={styles.message}>
               Loading publications...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
 
@@ -243,9 +244,9 @@ export default function PublicationsScreen() {
               style={styles.retryButton}
               onPress={() => void loadCategories()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}
@@ -258,15 +259,15 @@ export default function PublicationsScreen() {
                 📚
               </Text>
 
-              <Text style={styles.emptyTitle}>
+              <AutoTranslatedText style={styles.emptyTitle}>
                 No Publications Available
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.message}>
+              <AutoTranslatedText style={styles.message}>
                 Publication categories will
                 appear here once added by
                 the temple administration.
-              </Text>
+              </AutoTranslatedText>
             </View>
           )}
 
@@ -302,9 +303,9 @@ export default function PublicationsScreen() {
                     </Text>
                   )}
 
-                  <Text style={styles.viewText}>
+                  <AutoTranslatedText style={styles.viewText}>
                     Explore ›
-                  </Text>
+                  </AutoTranslatedText>
                 </View>
               </TouchableOpacity>
             ))}
@@ -317,15 +318,15 @@ export default function PublicationsScreen() {
           </Text>
 
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>
+            <AutoTranslatedText style={styles.infoTitle}>
               Devotional Reading
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.infoText}>
+            <AutoTranslatedText style={styles.infoText}>
               Explore spiritual books, magazines,
               articles and downloadable publications
               shared by the temple.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
@@ -335,9 +336,9 @@ export default function PublicationsScreen() {
             router.replace('/(tabs)')
           }
         >
-          <Text style={styles.homeButtonText}>
+          <AutoTranslatedText style={styles.homeButtonText}>
             Back to Home
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

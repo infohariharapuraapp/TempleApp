@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,18 +9,18 @@ export default function CategoryScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Back</Text>
+          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
         </TouchableOpacity>
 
-        <Text style={styles.eyebrow}>TEMPLE ACTIVITIES</Text>
-        <Text style={styles.title}>Services</Text>
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.eyebrow}>TEMPLE ACTIVITIES</AutoTranslatedText>
+        <AutoTranslatedText style={styles.title}>Services</AutoTranslatedText>
+        <AutoTranslatedText style={styles.subtitle}>
           Educational, charitable and community-service initiatives of Sreemath Hariharapura.
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.itemCard}>
           <Text style={styles.number}>01</Text>
-          <Text style={styles.itemTitle}>GOSAMRAKSHANA (COW PROTECTION PROGRAM)</Text>
+          <AutoTranslatedText style={styles.itemTitle}>GOSAMRAKSHANA (COW PROTECTION PROGRAM)</AutoTranslatedText>
           <Image
             source={{ uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/services/1.jpg' }}
             style={styles.itemImage}
@@ -32,7 +33,7 @@ export default function CategoryScreen() {
 
         <View style={styles.itemCard}>
           <Text style={styles.number}>02</Text>
-          <Text style={styles.itemTitle}>VEDA PATASHALA</Text>
+          <AutoTranslatedText style={styles.itemTitle}>VEDA PATASHALA</AutoTranslatedText>
           <Image
             source={{ uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/services/2.jpg' }}
             style={styles.itemImage}
@@ -45,7 +46,7 @@ export default function CategoryScreen() {
 
         <View style={styles.itemCard}>
           <Text style={styles.number}>03</Text>
-          <Text style={styles.itemTitle}>EDUCATIONAL INSTITUTIONS</Text>
+          <AutoTranslatedText style={styles.itemTitle}>EDUCATIONAL INSTITUTIONS</AutoTranslatedText>
           <Image
             source={{ uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/services/3.jpg' }}
             style={styles.itemImage}
@@ -63,7 +64,7 @@ export default function CategoryScreen() {
 
         <View style={styles.itemCard}>
           <Text style={styles.number}>04</Text>
-          <Text style={styles.itemTitle}>ANNADANAM (FREE FOOD FOR ALL)</Text>
+          <AutoTranslatedText style={styles.itemTitle}>ANNADANAM (FREE FOOD FOR ALL)</AutoTranslatedText>
           <Image
             source={{ uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/services/4.jpg' }}
             style={styles.itemImage}

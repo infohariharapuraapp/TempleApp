@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,12 +37,12 @@ export default function MySevasScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>My Seva Registrations</Text>
+        <AutoTranslatedText style={styles.title}>My Seva Registrations</AutoTranslatedText>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>My Sevas</Text>
-        <Text style={styles.subtitle}>View registrations and the seva assigned by temple admin.</Text>
+        <AutoTranslatedText style={styles.heading}>My Sevas</AutoTranslatedText>
+        <AutoTranslatedText style={styles.subtitle}>View registrations and the seva assigned by temple admin.</AutoTranslatedText>
 
         {MOCK_MY_SEVAS.map((item) => (
           <View key={item.id} style={styles.card}>
@@ -62,17 +63,17 @@ export default function MySevasScreen() {
             </View>
 
             <TouchableOpacity style={styles.details}>
-              <Text style={styles.detailsText}>Registration Details</Text>
+              <AutoTranslatedText style={styles.detailsText}>Registration Details</AutoTranslatedText>
               <Text style={styles.arrow}>→</Text>
             </TouchableOpacity>
           </View>
         ))}
 
         <TouchableOpacity style={styles.button} onPress={() => router.push('/seva-registration')}>
-          <Text style={styles.buttonText}>Register New Seva</Text>
+          <AutoTranslatedText style={styles.buttonText}>Register New Seva</AutoTranslatedText>
         </TouchableOpacity>
 
-        <Text style={styles.note}>MOCK DATA • BACKEND WILL BE CONNECTED LATER</Text>
+        <AutoTranslatedText style={styles.note}>MOCK DATA • BACKEND WILL BE CONNECTED LATER</AutoTranslatedText>
       </ScrollView>
     </SafeAreaView>
   );

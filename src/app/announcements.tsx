@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -120,7 +121,17 @@ function announcementDate(item: Announcement) {
 // ========================================
 
 export default function AnnouncementsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+const supportedLanguages = ['en', 'te', 'kn', 'hi', 'ta'];
+
+const currentLanguage = i18n.resolvedLanguage || i18n.language || 'en';
+
+const languageCode = currentLanguage.split('-')[0].toLowerCase();
+
+const selectedLanguage = supportedLanguages.includes(languageCode)
+  ? languageCode
+  : 'en';
 
   const params = useLocalSearchParams<{
     id?: string | string[];
@@ -164,7 +175,7 @@ export default function AnnouncementsScreen() {
           const response = await apiRequest<
             ApiResponse<Announcement>
           >(
-            `/announcements/${encodeURIComponent(id)}`
+            `/announcements/${encodeURIComponent(id)}?lang=${selectedLanguage}`
           );
 
           if (response.success && response.data) {
@@ -177,7 +188,7 @@ export default function AnnouncementsScreen() {
           // New Divyakshetra Updates listing.
           const response = await apiRequest<
             ApiResponse<Announcement[]>
-          >('/announcements');
+         >(`/announcements?lang=${selectedLanguage}`);
 
           if (response.success) {
             setItems(
@@ -207,8 +218,8 @@ export default function AnnouncementsScreen() {
         setLoading(false);
         setRefreshing(false);
       }
-    },
-    [id]
+      },
+    [id, selectedLanguage]
   );
 
   useEffect(() => {
@@ -351,13 +362,13 @@ export default function AnnouncementsScreen() {
           </Pressable>
 
           <View style={styles.headerText}>
-            <Text style={styles.headerEyebrow}>
+            <AutoTranslatedText style={styles.headerEyebrow}>
               DIVYAKSHETRA HARIHARAPURA
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.headerTitle}>
+            <AutoTranslatedText style={styles.headerTitle}>
               Update Details
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
@@ -381,9 +392,9 @@ export default function AnnouncementsScreen() {
               style={styles.retryButton}
               onPress={() => void loadData()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </Pressable>
           </View>
         ) : (
@@ -417,9 +428,9 @@ export default function AnnouncementsScreen() {
                       color="#8A5A11"
                     />
 
-                    <Text style={styles.pinnedText}>
+                    <AutoTranslatedText style={styles.pinnedText}>
                       Important
-                    </Text>
+                    </AutoTranslatedText>
                   </View>
                 )}
               </View>
@@ -462,9 +473,9 @@ export default function AnnouncementsScreen() {
 
               <View style={styles.goldDivider} />
 
-              <Text style={styles.sectionHeading}>
+              <AutoTranslatedText style={styles.sectionHeading}>
                 Announcement Details
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.detailMessage}>
                 {announcement.message}
@@ -487,9 +498,9 @@ export default function AnnouncementsScreen() {
                     color={COLORS.white}
                   />
 
-                  <Text style={styles.pdfButtonText}>
+                  <AutoTranslatedText style={styles.pdfButtonText}>
                     View PDF Attachment
-                  </Text>
+                  </AutoTranslatedText>
 
                   <Ionicons
                     name="open-outline"
@@ -511,15 +522,15 @@ export default function AnnouncementsScreen() {
                   color={COLORS.maroon}
                 />
 
-                <Text style={styles.shareButtonText}>
+                <AutoTranslatedText style={styles.shareButtonText}>
                   Share Update
-                </Text>
+                </AutoTranslatedText>
               </Pressable>
             </View>
 
-            <Text style={styles.footerText}>
+            <AutoTranslatedText style={styles.footerText}>
               Divyakshetra Hariharapura
-            </Text>
+            </AutoTranslatedText>
           </ScrollView>
         )}
       </View>
@@ -547,13 +558,13 @@ export default function AnnouncementsScreen() {
         </Pressable>
 
         <View style={styles.headerText}>
-          <Text style={styles.headerEyebrow}>
+          <AutoTranslatedText style={styles.headerEyebrow}>
             DIVYAKSHETRA HARIHARAPURA
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.headerTitle}>
+          <AutoTranslatedText style={styles.headerTitle}>
             Divyakshetra Updates
-          </Text>
+          </AutoTranslatedText>
         </View>
       </View>
 
@@ -580,15 +591,15 @@ export default function AnnouncementsScreen() {
             />
           </View>
 
-          <Text style={styles.introTitle}>
+          <AutoTranslatedText style={styles.introTitle}>
             Temple News & Announcements
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.introDescription}>
+          <AutoTranslatedText style={styles.introDescription}>
             Stay connected with festivals, poojas,
             sevas, special programmes and important
             updates from Divyakshetra Hariharapura.
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         {/* CATEGORY FILTERS */}
@@ -654,9 +665,9 @@ export default function AnnouncementsScreen() {
               style={styles.retryButton}
               onPress={() => void loadData()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </Pressable>
           </View>
         ) : filteredItems.length === 0 ? (
@@ -667,14 +678,14 @@ export default function AnnouncementsScreen() {
               color={COLORS.gold}
             />
 
-            <Text style={styles.emptyTitle}>
+            <AutoTranslatedText style={styles.emptyTitle}>
               No Updates Available
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.emptyText}>
+            <AutoTranslatedText style={styles.emptyText}>
               New temple announcements will appear
               here when published.
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : (
           filteredItems.map(item => (
@@ -699,9 +710,9 @@ export default function AnnouncementsScreen() {
                     color={COLORS.goldSoft}
                   />
 
-                  <Text style={styles.placeholderText}>
+                  <AutoTranslatedText style={styles.placeholderText}>
                     DIVYAKSHETRA
-                  </Text>
+                  </AutoTranslatedText>
                 </View>
               )}
 
@@ -721,9 +732,9 @@ export default function AnnouncementsScreen() {
                         color="#8A5A11"
                       />
 
-                      <Text style={styles.pinnedText}>
+                      <AutoTranslatedText style={styles.pinnedText}>
                         Pinned
-                      </Text>
+                      </AutoTranslatedText>
                     </View>
                   )}
                 </View>
@@ -756,9 +767,9 @@ export default function AnnouncementsScreen() {
                   </View>
 
                   <View style={styles.readMore}>
-                    <Text style={styles.readMoreText}>
+                    <AutoTranslatedText style={styles.readMoreText}>
                       Read More
-                    </Text>
+                    </AutoTranslatedText>
 
                     <Ionicons
                       name="arrow-forward"
@@ -772,9 +783,9 @@ export default function AnnouncementsScreen() {
           ))
         )}
 
-        <Text style={styles.footerText}>
+        <AutoTranslatedText style={styles.footerText}>
           Divyakshetra Hariharapura
-        </Text>
+        </AutoTranslatedText>
       </ScrollView>
     </View>
   );

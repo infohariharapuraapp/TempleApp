@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -140,9 +141,9 @@ export default function GuruVaniDetailsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backText}>
+          <AutoTranslatedText style={styles.backText}>
             ← Back to Guru Vani
-          </Text>
+          </AutoTranslatedText>
         </Pressable>
 
         {/* HEADER */}
@@ -167,17 +168,17 @@ export default function GuruVaniDetailsScreen() {
             ॐ
           </Text>
 
-          <Text style={styles.heroEyebrow}>
+          <AutoTranslatedText style={styles.heroEyebrow}>
             SACRED TEACHINGS
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.heroTitle}>
+          <AutoTranslatedText style={styles.heroTitle}>
             Guru Vani
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.heroSubtitle}>
+          <AutoTranslatedText style={styles.heroSubtitle}>
             Timeless wisdom for the spiritual journey
-          </Text>
+          </AutoTranslatedText>
         </LinearGradient>
 
         {/* LOADING */}
@@ -189,9 +190,9 @@ export default function GuruVaniDetailsScreen() {
               color={COLORS.maroon}
             />
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Loading teaching...
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : error || !item ? (
           <View style={styles.stateCard}>
@@ -207,9 +208,9 @@ export default function GuruVaniDetailsScreen() {
               style={styles.retryButton}
               onPress={() => void loadDetails()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </Pressable>
           </View>
         ) : (
@@ -218,9 +219,9 @@ export default function GuruVaniDetailsScreen() {
 
             <View style={styles.mainCard}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardEyebrow}>
+                <AutoTranslatedText style={styles.cardEyebrow}>
                   GURU VANI
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.date}>
                   {new Date(
@@ -250,13 +251,13 @@ export default function GuruVaniDetailsScreen() {
 
             {item.transliteration?.trim() ? (
               <View style={styles.infoCard}>
-                <Text style={styles.infoEyebrow}>
+                <AutoTranslatedText style={styles.infoEyebrow}>
                   PRONUNCIATION
-                </Text>
+                </AutoTranslatedText>
 
-                <Text style={styles.infoTitle}>
+                <AutoTranslatedText style={styles.infoTitle}>
                   Transliteration
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.infoText}>
                   {item.transliteration}
@@ -268,13 +269,13 @@ export default function GuruVaniDetailsScreen() {
 
             {item.meaning?.trim() ? (
               <View style={styles.infoCard}>
-                <Text style={styles.infoEyebrow}>
+                <AutoTranslatedText style={styles.infoEyebrow}>
                   SPIRITUAL UNDERSTANDING
-                </Text>
+                </AutoTranslatedText>
 
-                <Text style={styles.infoTitle}>
+                <AutoTranslatedText style={styles.infoTitle}>
                   Meaning
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.infoText}>
                   {item.meaning}
@@ -289,10 +290,10 @@ export default function GuruVaniDetailsScreen() {
                 ✦
               </Text>
 
-              <Text style={styles.footerText}>
+              <AutoTranslatedText style={styles.footerText}>
                 May these sacred teachings guide
                 your spiritual journey.
-              </Text>
+              </AutoTranslatedText>
             </View>
           </>
         )}

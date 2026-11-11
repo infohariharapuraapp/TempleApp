@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React from 'react';
 import {
   Image,
@@ -21,25 +22,25 @@ export default function CategoryScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹ Back</Text>
+          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
         </TouchableOpacity>
 
-        <Text style={styles.eyebrow}>TEMPLE ACTIVITIES</Text>
+        <AutoTranslatedText style={styles.eyebrow}>TEMPLE ACTIVITIES</AutoTranslatedText>
 
-        <Text style={styles.title}>Social Activities</Text>
+        <AutoTranslatedText style={styles.title}>Social Activities</AutoTranslatedText>
 
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.subtitle}>
           Initiatives that promote Sanatana Dharma, spiritual learning and
           community participation.
-        </Text>
+        </AutoTranslatedText>
 
         {/* 01 - Shiva Deeksha */}
         <View style={styles.itemCard}>
           <Text style={styles.number}>01</Text>
 
-          <Text style={styles.itemTitle}>
+          <AutoTranslatedText style={styles.itemTitle}>
             SHIVA DEEKSHA PROGRAMME
-          </Text>
+          </AutoTranslatedText>
 
           <Image
             source={{
@@ -92,9 +93,9 @@ export default function CategoryScreen() {
         <View style={styles.itemCard}>
           <Text style={styles.number}>02</Text>
 
-          <Text style={styles.itemTitle}>
+          <AutoTranslatedText style={styles.itemTitle}>
             VISHWA GAYATRI UPASAK PARISHAT
-          </Text>
+          </AutoTranslatedText>
 
           <Image
             source={{

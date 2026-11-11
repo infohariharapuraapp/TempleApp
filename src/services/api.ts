@@ -1,21 +1,97 @@
+
 import { getToken } from '@/services/authStorage';
+import i18n from '@/localization/i18n';
 
-//const API_BASE_URL = 'https://templeapp-s96e.onrender.com/api';
-//const API_BASE_URL = 'http://192.168.0.122:5000/api';
-//const API_BASE_URL = 'https://monk0y8jf9.execute-api.ap-south-1.amazonaws.com/api';
-
-// Local backend testing through USB
-//const API_BASE_URL = 'http://127.0.0.1:5000/api';
-
-// Production backend
- const API_BASE_URL = 'https://hariharapura-temple-api.onrender.com/api';
-
+// Production Render backend
+const API_BASE_URL =
+  'https://hariharapura-temple-api.onrender.com/api';
 
 type ApiOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: any;
   token?: string;
 };
+
+type SupportedLanguage =
+  | 'en'
+  | 'te'
+  | 'kn'
+  | 'hi'
+  | 'ta';
+
+const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
+  'en',
+  'te',
+  'kn',
+  'hi',
+  'ta',
+];
+
+function getSelectedLanguage(): SupportedLanguage {
+  const currentLanguage =
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en';
+
+  const normalized =
+    currentLanguage
+      .toLowerCase()
+      .split('-')[0] as SupportedLanguage;
+
+  return SUPPORTED_LANGUAGES.includes(normalized)
+    ? normalized
+    : 'en';
+}
+
+function shouldAppendLanguage(
+  endpoint: string,
+  method: string
+): boolean {
+  if (method !== 'GET') {
+    return false;
+  }
+
+  const path = endpoint.split('?')[0];
+
+  // Don't translate authentication, admin,
+  // private user information or translation endpoints.
+  const excludedPrefixes = [
+    '/auth',
+    '/admin',
+    '/dharma',
+    '/notifications',
+    '/translate',
+  ];
+
+  return !excludedPrefixes.some(
+    (prefix) =>
+      path === prefix ||
+      path.startsWith(prefix + '/')
+  );
+}
+
+function buildEndpoint(
+  endpoint: string,
+  method: string
+): string {
+  if (!shouldAppendLanguage(endpoint, method)) {
+    return endpoint;
+  }
+
+  const language = getSelectedLanguage();
+
+  const separator = endpoint.includes('?')
+    ? '&'
+    : '?';
+
+  // Respect any explicit language parameter
+  // already supplied by a screen.
+  if (/[?&]lang=/i.test(endpoint)) {
+    return endpoint;
+  }
+
+  return `${endpoint}${separator}lang=${language}`;
+}
 
 export async function apiRequest<T = any>(
   endpoint: string,
@@ -39,18 +115,32 @@ export async function apiRequest<T = any>(
       `Bearer ${authToken}`;
   }
 
+  const finalEndpoint = buildEndpoint(
+    endpoint,
+    method
+  );
+
   const response = await fetch(
-    `${API_BASE_URL}${endpoint}`,
+    `${API_BASE_URL}${finalEndpoint}`,
     {
       method,
       headers,
-      body: body
-        ? JSON.stringify(body)
-        : undefined,
+      body:
+        body !== undefined
+          ? JSON.stringify(body)
+          : undefined,
     }
   );
 
-  const data = await response.json();
+  let data: any;
+
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      'Invalid response from server'
+    );
+  }
 
   if (!response.ok) {
     throw new Error(

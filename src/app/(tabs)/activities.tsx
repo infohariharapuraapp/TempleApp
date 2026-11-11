@@ -1,4 +1,3 @@
-
 import React, {
   useCallback,
   useEffect,
@@ -135,7 +134,12 @@ function SectionHeading({
 // ACTIVITIES SCREEN
 // ========================================
 export default function ActivitiesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+const currentLanguage =
+  i18n.resolvedLanguage ||
+  i18n.language ||
+  'en';
   // Language-dependent content is defined
   // inside the component so it updates
   // immediately when the language changes.
@@ -168,68 +172,98 @@ export default function ActivitiesScreen() {
     useState(true);
   const [sectionError, setSectionError] =
     useState(false);
-  useEffect(() => {
-    loadActivitySections();
-  }, []);
+
   const [latestGuruVani, setLatestGuruVani] =
     useState<GuruVani | null>(null);
   const [loadingGuruVani, setLoadingGuruVani] = useState(true);
   const [guruVaniError, setGuruVaniError] = useState(false);
 
-  const loadLatestGuruVani = useCallback(async () => {
-    try {
-      setLoadingGuruVani(true);
-      setGuruVaniError(false);
-      const response = await apiRequest('/guru-vani/latest');
-      if (response.success) {
-        setLatestGuruVani((response.data as GuruVani | null) ?? null);
-      } else {
-        setGuruVaniError(true);
-      }
-    } catch (error) {
-      console.error('Guru Vani loading error:', error);
-      setGuruVaniError(true);
-    } finally {
-      setLoadingGuruVani(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadLatestGuruVani();
-    }, [loadLatestGuruVani])
-  );
-
   // ========================================
-  // LOAD ACTIVITY SECTIONS
+  // REFRESH API CONTENT SAFELY
   // ========================================
-  const loadActivitySections = async () => {
+  // Each new request invalidates older results, so switching
+  // languages quickly cannot display stale translations.
+  const sectionsRequestId = useRef(0);
+  const guruVaniRequestId = useRef(0);
+
+  const loadActivitySections = useCallback(async () => {
+    const requestId = ++sectionsRequestId.current;
+    const language = currentLanguage;
+
+    setLoadingSections(true);
+    setSectionError(false);
+
     try {
-      setLoadingSections(true);
-      setSectionError(false);
       const response = await apiRequest(
-        '/activity-sections'
+        `/activity-sections?lang=${encodeURIComponent(language)}`
       );
-      if (
-        response.success &&
-        Array.isArray(response.data)
-      ) {
-        setSections(response.data);
+
+      if (requestId !== sectionsRequestId.current) return;
+
+      if (response.success && Array.isArray(response.data)) {
+        setSections(response.data as ActivitySection[]);
       } else {
         setSections([]);
         setSectionError(true);
       }
     } catch (error) {
-      console.error(
-        'Activity sections loading error:',
-        error
-      );
+      if (requestId !== sectionsRequestId.current) return;
+      console.error('Activity sections loading error:', error);
       setSections([]);
       setSectionError(true);
     } finally {
-      setLoadingSections(false);
+      if (requestId === sectionsRequestId.current) {
+        setLoadingSections(false);
+      }
     }
-  };
+  }, [currentLanguage]);
+
+  const loadLatestGuruVani = useCallback(async () => {
+    const requestId = ++guruVaniRequestId.current;
+    const language = currentLanguage;
+
+    setLoadingGuruVani(true);
+    setGuruVaniError(false);
+
+    try {
+      const response = await apiRequest(
+        `/guru-vani/latest?lang=${encodeURIComponent(language)}`
+      );
+
+      if (requestId !== guruVaniRequestId.current) return;
+
+      if (response.success) {
+        setLatestGuruVani((response.data as GuruVani | null) ?? null);
+      } else {
+        setLatestGuruVani(null);
+        setGuruVaniError(true);
+      }
+    } catch (error) {
+      if (requestId !== guruVaniRequestId.current) return;
+      console.error('Guru Vani loading error:', error);
+      setLatestGuruVani(null);
+      setGuruVaniError(true);
+    } finally {
+      if (requestId === guruVaniRequestId.current) {
+        setLoadingGuruVani(false);
+      }
+    }
+  }, [currentLanguage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadActivitySections();
+      void loadLatestGuruVani();
+
+      return () => {
+        // Ignore requests that finish after this screen loses focus
+        // or after the user switches languages.
+        sectionsRequestId.current += 1;
+        guruVaniRequestId.current += 1;
+      };
+    }, [loadActivitySections, loadLatestGuruVani])
+  );
+
   // ========================================
   // OPEN ACTIVITY SECTION
   // ========================================

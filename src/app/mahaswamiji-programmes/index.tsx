@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -165,9 +166,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
             style={styles.posterPlaceholder}
           >
             <Text style={styles.placeholderOm}>ॐ</Text>
-            <Text style={styles.placeholderText}>
+            <AutoTranslatedText style={styles.placeholderText}>
               MAHASWAMIJI PROGRAMMES
-            </Text>
+            </AutoTranslatedText>
           </LinearGradient>
         )}
       </TouchableOpacity>
@@ -182,9 +183,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
 
           {videoId && (
             <View style={styles.videoBadge}>
-              <Text style={styles.videoBadgeText}>
+              <AutoTranslatedText style={styles.videoBadgeText}>
                 ▶ VIDEO
-              </Text>
+              </AutoTranslatedText>
             </View>
           )}
         </View>
@@ -218,18 +219,18 @@ function ProgrammeCard({ item }: { item: Programme }) {
 
         {hasSchedule && (
           <View style={styles.infoSection}>
-            <Text style={styles.infoHeading}>
+            <AutoTranslatedText style={styles.infoHeading}>
               PROGRAMME SCHEDULE
-            </Text>
+            </AutoTranslatedText>
 
             {(item.start_date || item.start_time) && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>📅</Text>
 
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>
+                  <AutoTranslatedText style={styles.infoLabel}>
                     Starts
-                  </Text>
+                  </AutoTranslatedText>
 
                   <Text style={styles.infoValue}>
                     {[
@@ -248,9 +249,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
                 <Text style={styles.infoIcon}>🕒</Text>
 
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>
+                  <AutoTranslatedText style={styles.infoLabel}>
                     Ends
-                  </Text>
+                  </AutoTranslatedText>
 
                   <Text style={styles.infoValue}>
                     {[
@@ -271,9 +272,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
             <Text style={styles.infoIcon}>📍</Text>
 
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
+              <AutoTranslatedText style={styles.infoLabel}>
                 Venue
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.infoValue}>
                 {item.venue}
@@ -290,9 +291,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
             activeOpacity={0.85}
             accessibilityRole="button"
           >
-            <Text style={styles.videoButtonText}>
+            <AutoTranslatedText style={styles.videoButtonText}>
               View Programme Details
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.buttonArrow}>
               →
@@ -300,9 +301,9 @@ function ProgrammeCard({ item }: { item: Programme }) {
           </TouchableOpacity>
 
           {videoId && (
-            <Text style={styles.videoHint}>
+            <AutoTranslatedText style={styles.videoHint}>
               Programme video available in details
-            </Text>
+            </AutoTranslatedText>
           )}
         </View>
       </View>
@@ -409,9 +410,9 @@ export default function MahaswamijiProgrammesScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>
+          <AutoTranslatedText style={styles.backText}>
             ← Back
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
         {/* Hero banner */}
@@ -421,19 +422,19 @@ export default function MahaswamijiProgrammesScreen() {
         >
           <Text style={styles.heroIcon}>ॐ</Text>
 
-          <Text style={styles.heroEyebrow}>
+          <AutoTranslatedText style={styles.heroEyebrow}>
             DIVINE PROGRAMMES
-          </Text>
+          </AutoTranslatedText>
 
           <Text style={styles.heroTitle}>
             Mahaswamiji{'\n'}Programmes
           </Text>
 
-          <Text style={styles.heroSubtitle}>
+          <AutoTranslatedText style={styles.heroSubtitle}>
             Stay connected with sacred gatherings,
             spiritual discourses and programmes
             of Mahaswamiji.
-          </Text>
+          </AutoTranslatedText>
 
           <View style={styles.heroLine} />
         </LinearGradient>
@@ -465,9 +466,9 @@ export default function MahaswamijiProgrammesScreen() {
 
         <View style={styles.headingRow}>
           <View>
-            <Text style={styles.sectionEyebrow}>
+            <AutoTranslatedText style={styles.sectionEyebrow}>
               SPIRITUAL GATHERINGS
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.sectionTitle}>
               {TABS.find(
@@ -491,9 +492,9 @@ export default function MahaswamijiProgrammesScreen() {
               color={COLORS.maroon}
             />
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Loading programmes...
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : error ? (
           <View style={styles.stateCard}>
@@ -501,10 +502,10 @@ export default function MahaswamijiProgrammesScreen() {
               ⚠️
             </Text>
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Unable to load programmes.
               Please try again.
-            </Text>
+            </AutoTranslatedText>
 
             <TouchableOpacity
               style={styles.retryButton}
@@ -512,9 +513,9 @@ export default function MahaswamijiProgrammesScreen() {
                 void loadProgrammes()
               }
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         ) : filtered.length === 0 ? (
@@ -527,10 +528,10 @@ export default function MahaswamijiProgrammesScreen() {
               No {activeTab} programmes
             </Text>
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Programme information will appear here
               when published by the temple administration.
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : (
           filtered.map((item) => (

@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -152,9 +153,9 @@ export default function EditProfileScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#6B1720" />
-          <Text style={styles.loadingText}>
+          <AutoTranslatedText style={styles.loadingText}>
             Loading your details...
-          </Text>
+          </AutoTranslatedText>
         </View>
       </SafeAreaView>
     );
@@ -174,16 +175,16 @@ export default function EditProfileScreen() {
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Text style={styles.backText}>‹ Back</Text>
+            <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
           </TouchableOpacity>
 
-          <Text style={styles.heading}>Edit Profile</Text>
-          <Text style={styles.subtitle}>
+          <AutoTranslatedText style={styles.heading}>Edit Profile</AutoTranslatedText>
+          <AutoTranslatedText style={styles.subtitle}>
             Update your devotee account information.
-          </Text>
+          </AutoTranslatedText>
 
           <View style={styles.card}>
-            <Text style={styles.label}>Full Name</Text>
+            <AutoTranslatedText style={styles.label}>Full Name</AutoTranslatedText>
             <TextInput
               style={styles.input}
               value={name}
@@ -193,18 +194,18 @@ export default function EditProfileScreen() {
               autoCapitalize="words"
             />
 
-            <Text style={styles.label}>Email Address</Text>
+            <AutoTranslatedText style={styles.label}>Email Address</AutoTranslatedText>
             <TextInput
               style={[styles.input, styles.readOnlyInput]}
               value={email}
               editable={false}
               selectTextOnFocus={false}
             />
-            <Text style={styles.hint}>
+            <AutoTranslatedText style={styles.hint}>
               Your registered email cannot be changed.
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.label}>Mobile Number</Text>
+            <AutoTranslatedText style={styles.label}>Mobile Number</AutoTranslatedText>
            <TextInput
   style={[styles.input, styles.readOnlyInput]}
   value={phone}
@@ -212,9 +213,9 @@ export default function EditProfileScreen() {
   selectTextOnFocus={false}
 />
 
-<Text style={styles.hint}>
+<AutoTranslatedText style={styles.hint}>
   Mobile number changes will require OTP verification.
-</Text>
+</AutoTranslatedText>
           </View>
 
           <TouchableOpacity
@@ -229,9 +230,9 @@ export default function EditProfileScreen() {
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveText}>
+              <AutoTranslatedText style={styles.saveText}>
                 Save Changes
-              </Text>
+              </AutoTranslatedText>
             )}
           </TouchableOpacity>
         </ScrollView>

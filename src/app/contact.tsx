@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -253,9 +254,9 @@ export default function ContactScreen() {
 
             <View style={styles.heroTag}>
               <View style={styles.statusDot} />
-              <Text style={styles.heroTagText}>
+              <AutoTranslatedText style={styles.heroTagText}>
                 OFFICIAL CONTACT
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
 
@@ -269,20 +270,20 @@ export default function ContactScreen() {
             Sreemath
           </Text>
 
-          <Text style={styles.heroSubtitle}>
+          <AutoTranslatedText style={styles.heroSubtitle}>
             Reach us for temple services, accommodation,
             branch information and devotee assistance.
-          </Text>
+          </AutoTranslatedText>
 
           <View style={styles.heroBottom}>
             <View>
-              <Text style={styles.heroLocationLabel}>
+              <AutoTranslatedText style={styles.heroLocationLabel}>
                 MAIN LOCATION
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.heroLocation}>
+              <AutoTranslatedText style={styles.heroLocation}>
                 Hariharapura • Karnataka
-              </Text>
+              </AutoTranslatedText>
             </View>
 
             <TouchableOpacity
@@ -294,9 +295,9 @@ export default function ContactScreen() {
                 ⌖
               </Text>
 
-              <Text style={styles.heroMapText}>
+              <AutoTranslatedText style={styles.heroMapText}>
                 MAP
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         </View>
@@ -320,9 +321,9 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <Text style={styles.quickText}>
+            <AutoTranslatedText style={styles.quickText}>
               Call
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -341,9 +342,9 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <Text style={styles.quickText}>
+            <AutoTranslatedText style={styles.quickText}>
               Guest House
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -362,9 +363,9 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <Text style={styles.quickText}>
+            <AutoTranslatedText style={styles.quickText}>
               Email
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -383,9 +384,9 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <Text style={styles.quickText}>
+            <AutoTranslatedText style={styles.quickText}>
               Directions
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
 
@@ -393,13 +394,13 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>
+            <AutoTranslatedText style={styles.sectionEyebrow}>
               GET IN TOUCH
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               Contact Sreemath
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <View style={styles.sectionLine} />
@@ -448,13 +449,13 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>
+            <AutoTranslatedText style={styles.sectionEyebrow}>
               VISIT US
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               Sreemath Address
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <View style={styles.sectionLine} />
@@ -472,13 +473,13 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.addressHeading}>
-              <Text style={styles.addressLabel}>
+              <AutoTranslatedText style={styles.addressLabel}>
                 HARIHARAPURA
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.addressSmall}>
+              <AutoTranslatedText style={styles.addressSmall}>
                 Chikmagalur District
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
 
@@ -500,13 +501,13 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.directionContent}>
-              <Text style={styles.directionTitle}>
+              <AutoTranslatedText style={styles.directionTitle}>
                 Get Directions
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.directionSubtitle}>
+              <AutoTranslatedText style={styles.directionSubtitle}>
                 Open this location in Google Maps
-              </Text>
+              </AutoTranslatedText>
             </View>
 
             <Text style={styles.directionArrow}>
@@ -519,13 +520,13 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>
+            <AutoTranslatedText style={styles.sectionEyebrow}>
               CITY BRANCH
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               Bengaluru Office
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <View style={styles.sectionLine} />
@@ -540,16 +541,16 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.branchHeading}>
-              <Text style={styles.branchName}>
+              <AutoTranslatedText style={styles.branchName}>
                 Sreemath Bangalore Branch
-              </Text>
+              </AutoTranslatedText>
 
               <View style={styles.branchStatus}>
                 <View style={styles.branchStatusDot} />
 
-                <Text style={styles.branchStatusText}>
+                <AutoTranslatedText style={styles.branchStatusText}>
                   BENGALURU
-                </Text>
+                </AutoTranslatedText>
               </View>
             </View>
           </View>
@@ -589,13 +590,13 @@ export default function ContactScreen() {
           </View>
 
           <View style={styles.emailFeatureContent}>
-            <Text style={styles.emailFeatureEyebrow}>
+            <AutoTranslatedText style={styles.emailFeatureEyebrow}>
               WRITE TO US
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.emailFeatureTitle}>
+            <AutoTranslatedText style={styles.emailFeatureTitle}>
               hhPura Office
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.emailFeatureAddress}>
               {contact.email}
@@ -623,15 +624,15 @@ export default function ContactScreen() {
           </View>
 
           <View style={styles.noteContent}>
-            <Text style={styles.noteTitle}>
+            <AutoTranslatedText style={styles.noteTitle}>
               For Devotees
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.noteText}>
+            <AutoTranslatedText style={styles.noteText}>
               For temple visits, accommodation and other
               enquiries, please contact the appropriate
               number above.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
@@ -646,9 +647,9 @@ export default function ContactScreen() {
             ‹
           </Text>
 
-          <Text style={styles.homeButtonText}>
+          <AutoTranslatedText style={styles.homeButtonText}>
             Back to Home
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
         <Text style={styles.footerText}>

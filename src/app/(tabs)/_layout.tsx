@@ -1,4 +1,12 @@
+
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useTranslation } from 'react-i18next';
+
+import type { AppLanguage } from '@/localization/i18n';
+
+// ========================================
+// COLORS - EXISTING DESIGN
+// ========================================
 
 const COLORS = {
   background: '#FFFDF8',
@@ -11,7 +19,96 @@ const COLORS = {
   border: '#E8DCCB',
 };
 
+// ========================================
+// BOTTOM TAB TRANSLATIONS
+// ========================================
+
+const TAB_LABELS: Record<
+  AppLanguage,
+  {
+    home: string;
+    deities: string;
+    pooja: string;
+    activities: string;
+    menu: string;
+  }
+> = {
+  en: {
+    home: 'Home',
+    deities: 'Deities',
+    pooja: 'Pooja',
+    activities: 'Activities',
+    menu: 'Menu',
+  },
+
+  te: {
+    home: 'హోమ్',
+    deities: 'దేవతలు',
+    pooja: 'పూజ',
+    activities: 'కార్యక్రమాలు',
+    menu: 'మెనూ',
+  },
+
+  kn: {
+    home: 'ಮುಖಪುಟ',
+    deities: 'ದೇವತೆಗಳು',
+    pooja: 'ಪೂಜೆ',
+    activities: 'ಚಟುವಟಿಕೆಗಳು',
+    menu: 'ಮೆನು',
+  },
+
+  hi: {
+    home: 'होम',
+    deities: 'देवता',
+    pooja: 'पूजा',
+    activities: 'गतिविधियाँ',
+    menu: 'मेनू',
+  },
+
+  ta: {
+    home: 'முகப்பு',
+    deities: 'தெய்வங்கள்',
+    pooja: 'பூஜை',
+    activities: 'செயல்பாடுகள்',
+    menu: 'மெனு',
+  },
+};
+
+// ========================================
+// NORMALIZE LANGUAGE
+// ========================================
+
+function getAppLanguage(language: string): AppLanguage {
+  const code = language.toLowerCase().split('-')[0];
+
+  if (
+    code === 'en' ||
+    code === 'te' ||
+    code === 'kn' ||
+    code === 'hi' ||
+    code === 'ta'
+  ) {
+    return code;
+  }
+
+  return 'en';
+}
+
+// ========================================
+// MAIN TAB NAVIGATION
+// ========================================
+
 export default function AppTabs() {
+  const { i18n } = useTranslation();
+
+  const language = getAppLanguage(
+    i18n.resolvedLanguage ||
+      i18n.language ||
+      'en'
+  );
+
+  const labels = TAB_LABELS[language];
+
   return (
     <NativeTabs
       backgroundColor={COLORS.background}
@@ -36,13 +133,11 @@ export default function AppTabs() {
       disableTransparentOnScrollEdge
       minimizeBehavior="never"
     >
-      {/* --------------------------------------------------------------- */}
-      {/* HOME                                                            */}
-      {/* --------------------------------------------------------------- */}
+      {/* HOME */}
 
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>
-          Home
+          {labels.home}
         </NativeTabs.Trigger.Label>
 
         <NativeTabs.Trigger.Icon
@@ -57,13 +152,11 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* --------------------------------------------------------------- */}
-      {/* DEITIES                                                         */}
-      {/* --------------------------------------------------------------- */}
+      {/* DEITIES */}
 
       <NativeTabs.Trigger name="deities">
         <NativeTabs.Trigger.Label>
-          Deities
+          {labels.deities}
         </NativeTabs.Trigger.Label>
 
         <NativeTabs.Trigger.Icon
@@ -78,13 +171,11 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* --------------------------------------------------------------- */}
-      {/* POOJA                                                           */}
-      {/* --------------------------------------------------------------- */}
+      {/* POOJA */}
 
       <NativeTabs.Trigger name="pooja">
         <NativeTabs.Trigger.Label>
-          Pooja
+          {labels.pooja}
         </NativeTabs.Trigger.Label>
 
         <NativeTabs.Trigger.Icon
@@ -99,13 +190,11 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* --------------------------------------------------------------- */}
-      {/* ACTIVITIES                                                      */}
-      {/* --------------------------------------------------------------- */}
+      {/* ACTIVITIES */}
 
       <NativeTabs.Trigger name="activities">
         <NativeTabs.Trigger.Label>
-          Activities
+          {labels.activities}
         </NativeTabs.Trigger.Label>
 
         <NativeTabs.Trigger.Icon
@@ -120,13 +209,11 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* --------------------------------------------------------------- */}
-      {/* MENU                                                            */}
-      {/* --------------------------------------------------------------- */}
+      {/* MENU */}
 
       <NativeTabs.Trigger name="menu">
         <NativeTabs.Trigger.Label>
-          Menu
+          {labels.menu}
         </NativeTabs.Trigger.Label>
 
         <NativeTabs.Trigger.Icon

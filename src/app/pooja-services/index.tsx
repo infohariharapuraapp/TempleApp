@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import { useTranslation } from 'react-i18next';
 
@@ -175,9 +176,9 @@ export default function PoojaServicesScreen() {
           {t('poojaServices.templeRituals')}
         </Text>
 
-        <Text style={styles.title}>
+        <AutoTranslatedText style={styles.title}>
           Pooja Services
-        </Text>
+        </AutoTranslatedText>
 
         <Text style={styles.subtitle}>
           {t('poojaServices.subtitle')}

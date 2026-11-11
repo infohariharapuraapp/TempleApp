@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -300,9 +301,9 @@ switch (notificationType) {
             color="#B66A2C"
           />
 
-          <Text style={styles.loadingText}>
+          <AutoTranslatedText style={styles.loadingText}>
             Loading temple notifications...
-          </Text>
+          </AutoTranslatedText>
         </View>
       </SafeAreaView>
     );
@@ -323,18 +324,18 @@ switch (notificationType) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.label}>
+            <AutoTranslatedText style={styles.label}>
               TEMPLE UPDATES
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.title}>
+            <AutoTranslatedText style={styles.title}>
               Notifications
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.subtitle}>
+            <AutoTranslatedText style={styles.subtitle}>
               Stay updated with temple announcements,
               events and important information.
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <TouchableOpacity
@@ -372,9 +373,9 @@ switch (notificationType) {
               onPress={handleMarkAllRead}
               style={styles.markAllButton}
             >
-              <Text style={styles.markAllText}>
+              <AutoTranslatedText style={styles.markAllText}>
                 Mark all read
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           )}
         </View>
@@ -386,14 +387,14 @@ switch (notificationType) {
               🔔
             </Text>
 
-            <Text style={styles.emptyTitle}>
+            <AutoTranslatedText style={styles.emptyTitle}>
               No Notifications Yet
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.emptyText}>
+            <AutoTranslatedText style={styles.emptyText}>
               Temple announcements and updates
               will appear here.
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : (
           notifications.map((item) => (

@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -248,9 +249,9 @@ export default function PublicationDetailsScreen() {
           style={styles.backRow}
           onPress={() => router.back()}
         >
-          <Text style={styles.backText}>
+          <AutoTranslatedText style={styles.backText}>
             ‹ Back to Publications
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
         {loading && (
@@ -260,9 +261,9 @@ export default function PublicationDetailsScreen() {
               color="#B66A2C"
             />
 
-            <Text style={styles.message}>
+            <AutoTranslatedText style={styles.message}>
               Loading publication details...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
 
@@ -276,18 +277,18 @@ export default function PublicationDetailsScreen() {
               style={styles.retryButton}
               onPress={() => void loadPublication()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}
 
         {!loading && !error && publication && (
           <>
-            <Text style={styles.smallTitle}>
+            <AutoTranslatedText style={styles.smallTitle}>
               TEMPLE PUBLICATIONS
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.category}>
               {publication.category_name}
@@ -317,9 +318,9 @@ export default function PublicationDetailsScreen() {
 
             {!!publication.author && (
               <View style={styles.metadataRow}>
-                <Text style={styles.metadataLabel}>
+                <AutoTranslatedText style={styles.metadataLabel}>
                   Author
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.metadataValue}>
                   {publication.author}
@@ -331,9 +332,9 @@ export default function PublicationDetailsScreen() {
               publication.publication_date
             ) && (
               <View style={styles.metadataRow}>
-                <Text style={styles.metadataLabel}>
+                <AutoTranslatedText style={styles.metadataLabel}>
                   Published
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.metadataValue}>
                   {formatDate(
@@ -345,9 +346,9 @@ export default function PublicationDetailsScreen() {
 
             <View style={styles.divider} />
 
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               About This Publication
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.description}>
               {publication.description?.trim() ||
@@ -381,10 +382,10 @@ export default function PublicationDetailsScreen() {
 
             {!publication.document_url && (
               <View style={styles.noticeCard}>
-                <Text style={styles.noticeText}>
+                <AutoTranslatedText style={styles.noticeText}>
                   A digital document is not currently
                   available for this publication.
-                </Text>
+                </AutoTranslatedText>
               </View>
             )}
 
@@ -394,15 +395,15 @@ export default function PublicationDetailsScreen() {
               </Text>
 
               <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>
+                <AutoTranslatedText style={styles.infoTitle}>
                   Spiritual Knowledge
-                </Text>
+                </AutoTranslatedText>
 
-                <Text style={styles.infoText}>
+                <AutoTranslatedText style={styles.infoText}>
                   Explore devotional literature and
                   temple publications shared for
                   spiritual learning.
-                </Text>
+                </AutoTranslatedText>
               </View>
             </View>
           </>

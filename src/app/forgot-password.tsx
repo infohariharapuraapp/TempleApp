@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useState } from 'react';
 import {
@@ -223,16 +224,16 @@ export default function ForgotPasswordScreen() {
 
   const renderIdentifierStep = () => (
     <>
-      <Text style={styles.title}>Forgot Password</Text>
+      <AutoTranslatedText style={styles.title}>Forgot Password</AutoTranslatedText>
 
-      <Text style={styles.subtitle}>
+      <AutoTranslatedText style={styles.subtitle}>
         Enter your registered email address or mobile number.
         We will send a verification code to your registered email.
-      </Text>
+      </AutoTranslatedText>
 
-      <Text style={styles.inputLabel}>
+      <AutoTranslatedText style={styles.inputLabel}>
         Mobile Number or Email
-      </Text>
+      </AutoTranslatedText>
 
       <TextInput
         style={styles.input}
@@ -249,9 +250,9 @@ export default function ForgotPasswordScreen() {
         editable={!loading}
       />
 
-      <Text style={styles.helperText}>
+      <AutoTranslatedText style={styles.helperText}>
         OTP will be delivered only to your registered email.
-      </Text>
+      </AutoTranslatedText>
 
       <TouchableOpacity
         style={[
@@ -264,9 +265,9 @@ export default function ForgotPasswordScreen() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>
+          <AutoTranslatedText style={styles.primaryButtonText}>
             Send OTP
-          </Text>
+          </AutoTranslatedText>
         )}
       </TouchableOpacity>
     </>
@@ -274,16 +275,16 @@ export default function ForgotPasswordScreen() {
 
   const renderOtpStep = () => (
     <>
-      <Text style={styles.title}>Check Your Email</Text>
+      <AutoTranslatedText style={styles.title}>Check Your Email</AutoTranslatedText>
 
-      <Text style={styles.subtitle}>
+      <AutoTranslatedText style={styles.subtitle}>
         Enter the 6-digit verification code sent to the
         registered email address associated with your account.
-      </Text>
+      </AutoTranslatedText>
 
-      <Text style={styles.inputLabel}>
+      <AutoTranslatedText style={styles.inputLabel}>
         Verification Code
-      </Text>
+      </AutoTranslatedText>
 
       <TextInput
         style={[styles.input, styles.otpInput]}
@@ -298,9 +299,9 @@ export default function ForgotPasswordScreen() {
         editable={!loading}
       />
 
-      <Text style={styles.helperText}>
+      <AutoTranslatedText style={styles.helperText}>
         OTP expires after 5 minutes.
-      </Text>
+      </AutoTranslatedText>
 
       <TouchableOpacity
         style={[
@@ -313,9 +314,9 @@ export default function ForgotPasswordScreen() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>
+          <AutoTranslatedText style={styles.primaryButtonText}>
             Verify OTP
-          </Text>
+          </AutoTranslatedText>
         )}
       </TouchableOpacity>
 
@@ -328,9 +329,9 @@ export default function ForgotPasswordScreen() {
         }}
         disabled={loading}
       >
-        <Text style={styles.secondaryActionText}>
+        <AutoTranslatedText style={styles.secondaryActionText}>
           Change Email / Mobile Number
-        </Text>
+        </AutoTranslatedText>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -338,23 +339,23 @@ export default function ForgotPasswordScreen() {
         onPress={handleSendOtp}
         disabled={loading}
       >
-        <Text style={styles.secondaryActionText}>
+        <AutoTranslatedText style={styles.secondaryActionText}>
           Resend OTP
-        </Text>
+        </AutoTranslatedText>
       </TouchableOpacity>
     </>
   );
 
   const renderPasswordStep = () => (
     <>
-      <Text style={styles.title}>Create New Password</Text>
+      <AutoTranslatedText style={styles.title}>Create New Password</AutoTranslatedText>
 
-      <Text style={styles.subtitle}>
+      <AutoTranslatedText style={styles.subtitle}>
         Your OTP has been verified. Create a new password
         to secure your account.
-      </Text>
+      </AutoTranslatedText>
 
-      <Text style={styles.inputLabel}>New Password</Text>
+      <AutoTranslatedText style={styles.inputLabel}>New Password</AutoTranslatedText>
 
       <View style={styles.passwordContainer}>
         <TextInput
@@ -379,13 +380,13 @@ export default function ForgotPasswordScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.helperText}>
+      <AutoTranslatedText style={styles.helperText}>
         Use at least 8 characters.
-      </Text>
+      </AutoTranslatedText>
 
-      <Text style={styles.inputLabel}>
+      <AutoTranslatedText style={styles.inputLabel}>
         Confirm Password
-      </Text>
+      </AutoTranslatedText>
 
       <View style={styles.passwordContainer}>
         <TextInput
@@ -412,9 +413,9 @@ export default function ForgotPasswordScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.helperText}>
+      <AutoTranslatedText style={styles.helperText}>
         Re-enter the same password to confirm.
-      </Text>
+      </AutoTranslatedText>
 
       <TouchableOpacity
         style={[
@@ -427,9 +428,9 @@ export default function ForgotPasswordScreen() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>
+          <AutoTranslatedText style={styles.primaryButtonText}>
             Reset Password
-          </Text>
+          </AutoTranslatedText>
         )}
       </TouchableOpacity>
     </>
@@ -453,7 +454,7 @@ export default function ForgotPasswordScreen() {
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
           <View style={styles.form}>
-            <Text style={styles.label}>TEMPLE</Text>
+            <AutoTranslatedText style={styles.label}>TEMPLE</AutoTranslatedText>
 
             {step === 'identifier' && renderIdentifierStep()}
             {step === 'otp' && renderOtpStep()}
@@ -464,9 +465,9 @@ export default function ForgotPasswordScreen() {
               onPress={() => router.replace('/login')}
               disabled={loading}
             >
-              <Text style={styles.backButtonText}>
+              <AutoTranslatedText style={styles.backButtonText}>
                 Back to Login
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         </ScrollView>

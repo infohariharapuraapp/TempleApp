@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 
@@ -97,9 +98,9 @@ export default function ProfileScreen() {
             color="#6B1720"
           />
 
-          <Text style={styles.loadingText}>
+          <AutoTranslatedText style={styles.loadingText}>
             Loading your profile...
-          </Text>
+          </AutoTranslatedText>
         </View>
       </SafeAreaView>
     );
@@ -122,17 +123,17 @@ export default function ProfileScreen() {
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.smallText}>
+            <AutoTranslatedText style={styles.smallText}>
               TEMPLE ACCOUNT
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.title}>
+            <AutoTranslatedText style={styles.title}>
               My Profile
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.subtitle}>
+            <AutoTranslatedText style={styles.subtitle}>
               Your personal information and temple services
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <View style={styles.profileCircle}>
@@ -156,9 +157,9 @@ export default function ProfileScreen() {
               {displayName}
             </Text>
 
-            <Text style={styles.devoteeText}>
+            <AutoTranslatedText style={styles.devoteeText}>
               Temple Devotee
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <TouchableOpacity
@@ -166,17 +167,17 @@ export default function ProfileScreen() {
             onPress={() => router.push('/edit-profile')}
             activeOpacity={0.7}
           >
-            <Text style={styles.editText}>
+            <AutoTranslatedText style={styles.editText}>
               Edit
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
 
         {/* PROFILE DETAILS */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Profile Details
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.detailsCard}>
           <DetailRow
@@ -204,9 +205,9 @@ export default function ProfileScreen() {
 
         {/* MY TEMPLE ACTIVITIES */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           My Temple Activities
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.menuCard}>
           {/* MY BOOKINGS - EXISTING WEBVIEW */}
@@ -251,9 +252,9 @@ export default function ProfileScreen() {
 
         {/* TEMPLE INFORMATION */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Temple Information
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.menuCard}>
           <ProfileRow
@@ -278,9 +279,9 @@ export default function ProfileScreen() {
 
         {/* SETTINGS */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Settings
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.menuCard}>
           <ProfileRow
@@ -308,9 +309,9 @@ export default function ProfileScreen() {
 
         {/* FOOTER */}
 
-        <Text style={styles.footerText}>
+        <AutoTranslatedText style={styles.footerText}>
           May the divine blessings be with you always.
-        </Text>
+        </AutoTranslatedText>
       </ScrollView>
     </SafeAreaView>
   );

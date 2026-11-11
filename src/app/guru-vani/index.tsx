@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -130,9 +131,9 @@ export default function GuruVaniScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backText}>
+          <AutoTranslatedText style={styles.backText}>
             ← Back
-          </Text>
+          </AutoTranslatedText>
         </Pressable>
 
         {/* HERO */}
@@ -145,31 +146,31 @@ export default function GuruVaniScreen() {
             ॐ
           </Text>
 
-          <Text style={styles.heroEyebrow}>
+          <AutoTranslatedText style={styles.heroEyebrow}>
             SPIRITUAL WISDOM
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.heroTitle}>
+          <AutoTranslatedText style={styles.heroTitle}>
             Guru Vani
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.heroSubtitle}>
+          <AutoTranslatedText style={styles.heroSubtitle}>
             Sacred teachings and timeless wisdom
             to inspire your spiritual journey.
-          </Text>
+          </AutoTranslatedText>
         </LinearGradient>
 
         {/* SECTION TITLE */}
 
         <View style={styles.headingRow}>
           <View>
-            <Text style={styles.sectionEyebrow}>
+            <AutoTranslatedText style={styles.sectionEyebrow}>
               DIVINE TEACHINGS
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.sectionTitle}>
+            <AutoTranslatedText style={styles.sectionTitle}>
               Explore Guru Vani
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           {!loading && !error && (
@@ -188,9 +189,9 @@ export default function GuruVaniScreen() {
               color={COLORS.maroon}
             />
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Loading Guru Vani...
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : error ? (
           <View style={styles.stateCard}>
@@ -198,17 +199,17 @@ export default function GuruVaniScreen() {
               ⚠️
             </Text>
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               Unable to load Guru Vani.
-            </Text>
+            </AutoTranslatedText>
 
             <Pressable
               style={styles.retryButton}
               onPress={() => void loadGuruVani()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </Pressable>
           </View>
         ) : items.length === 0 ? (
@@ -217,10 +218,10 @@ export default function GuruVaniScreen() {
               🙏
             </Text>
 
-            <Text style={styles.stateText}>
+            <AutoTranslatedText style={styles.stateText}>
               No Guru Vani slokas are
               available yet.
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : (
           items.map((item, index) => (
@@ -274,9 +275,9 @@ export default function GuruVaniScreen() {
               ) : null}
 
               <View style={styles.cardFooter}>
-                <Text style={styles.readMore}>
+                <AutoTranslatedText style={styles.readMore}>
                   Read Teaching
-                </Text>
+                </AutoTranslatedText>
 
                 <Text style={styles.arrow}>
                   →

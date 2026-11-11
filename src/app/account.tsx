@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useCallback, useState } from 'react';
 import { notifyAuthChanged } from '@/services/authSession';
@@ -145,17 +146,17 @@ export default function AccountScreen() {
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.label}>
+            <AutoTranslatedText style={styles.label}>
               TEMPLE ACCOUNT
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.title}>
+            <AutoTranslatedText style={styles.title}>
               My Account
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.subtitle}>
+            <AutoTranslatedText style={styles.subtitle}>
               Your personal information and temple services
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <View style={styles.headerIcon}>
@@ -179,9 +180,9 @@ export default function AccountScreen() {
               {loading ? 'Loading...' : displayName}
             </Text>
 
-            <Text style={styles.profileSubtitle}>
+            <AutoTranslatedText style={styles.profileSubtitle}>
               Temple Devotee
-            </Text>
+            </AutoTranslatedText>
           </View>
 
           <TouchableOpacity
@@ -189,17 +190,17 @@ export default function AccountScreen() {
             onPress={() => router.push('/edit-profile')}
             activeOpacity={0.7}
           >
-            <Text style={styles.editButtonText}>
+            <AutoTranslatedText style={styles.editButtonText}>
               Edit
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
         </View>
 
         {/* PROFILE DETAILS */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Profile Details
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.detailsCard}>
           {loading ? (
@@ -209,9 +210,9 @@ export default function AccountScreen() {
                 color="#6B1720"
               />
 
-              <Text style={styles.loadingText}>
+              <AutoTranslatedText style={styles.loadingText}>
                 Loading your details...
-              </Text>
+              </AutoTranslatedText>
             </View>
           ) : (
             <>
@@ -242,9 +243,9 @@ export default function AccountScreen() {
 
         {/* ACCOUNT OPTIONS */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Account
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.card}>
           <AccountItem
@@ -273,15 +274,15 @@ export default function AccountScreen() {
           </Text>
 
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>
+            <AutoTranslatedText style={styles.infoTitle}>
               Your Spiritual Journey
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.infoText}>
+            <AutoTranslatedText style={styles.infoText}>
               Stay connected with the temple through
               your bookings, prayers and devotional
               activities.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
@@ -296,9 +297,9 @@ export default function AccountScreen() {
             ↪
           </Text>
 
-          <Text style={styles.logoutButtonText}>
+          <AutoTranslatedText style={styles.logoutButtonText}>
             Logout
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
 
@@ -309,9 +310,9 @@ export default function AccountScreen() {
   onPress={() => router.push('/delete-account' as any)}
   activeOpacity={0.8}
 >
-  <Text style={styles.deleteAccountButtonText}>
+  <AutoTranslatedText style={styles.deleteAccountButtonText}>
     Delete My Account
-  </Text>
+  </AutoTranslatedText>
 </TouchableOpacity>
 
 
@@ -324,9 +325,9 @@ export default function AccountScreen() {
           onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.8}
         >
-          <Text style={styles.homeButtonText}>
+          <AutoTranslatedText style={styles.homeButtonText}>
             Back to Home
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
       </ScrollView>

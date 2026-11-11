@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useState } from 'react';
 
@@ -250,14 +251,14 @@ export default function PoliciesScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.header}>
-          <Text style={styles.label}>SREEMATH HARIHARAPURA</Text>
+          <AutoTranslatedText style={styles.label}>SREEMATH HARIHARAPURA</AutoTranslatedText>
 
-          <Text style={styles.title}>Temple Policies</Text>
+          <AutoTranslatedText style={styles.title}>Temple Policies</AutoTranslatedText>
 
-          <Text style={styles.subtitle}>
+          <AutoTranslatedText style={styles.subtitle}>
             Please review our policies before using temple
             bookings, accommodation and other services.
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         {policies.map((policy, index) => {
@@ -312,9 +313,9 @@ export default function PoliciesScreen() {
         })}
 
         <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>
+          <AutoTranslatedText style={styles.noticeTitle}>
             Important Booking Notice
-          </Text>
+          </AutoTranslatedText>
 
           <Text style={styles.noticeText}>
             Room and guest-house bookings are strictly
@@ -325,15 +326,15 @@ export default function PoliciesScreen() {
         </View>
 
         <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>
+          <AutoTranslatedText style={styles.contactTitle}>
             Need Assistance?
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.contactDescription}>
+          <AutoTranslatedText style={styles.contactDescription}>
             For questions regarding privacy, bookings,
             refunds or temple services, please contact
             Sreemath Hariharapura.
-          </Text>
+          </AutoTranslatedText>
 
           <Text style={styles.phone}>
             +91 90199 77466
@@ -344,18 +345,18 @@ export default function PoliciesScreen() {
           style={styles.contactButton}
           onPress={() => router.push('/contact')}
         >
-          <Text style={styles.contactButtonText}>
+          <AutoTranslatedText style={styles.contactButtonText}>
             Contact Temple
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.homeButton}
           onPress={() => router.replace('/(tabs)')}
         >
-          <Text style={styles.homeButtonText}>
+          <AutoTranslatedText style={styles.homeButtonText}>
             Back to Home
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
         <Text style={styles.footer}>

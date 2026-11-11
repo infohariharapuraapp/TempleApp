@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -195,23 +196,23 @@ export default function PublicationCategoryScreen() {
           style={styles.backRow}
           onPress={() => router.back()}
         >
-          <Text style={styles.backText}>
+          <AutoTranslatedText style={styles.backText}>
             ‹ Back to Publications
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
 
-        <Text style={styles.smallTitle}>
+        <AutoTranslatedText style={styles.smallTitle}>
           TEMPLE RESOURCES
-        </Text>
+        </AutoTranslatedText>
 
         <Text style={styles.title}>
           {categoryName}
         </Text>
 
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.subtitle}>
           Explore spiritual publications and
           devotional reading material.
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.banner}>
           <Text style={styles.bannerIcon}>
@@ -223,10 +224,10 @@ export default function PublicationCategoryScreen() {
               {categoryName}
             </Text>
 
-            <Text style={styles.bannerText}>
+            <AutoTranslatedText style={styles.bannerText}>
               Discover resources shared by
               the temple administration.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
@@ -243,9 +244,9 @@ export default function PublicationCategoryScreen() {
               color="#B66A2C"
             />
 
-            <Text style={styles.message}>
+            <AutoTranslatedText style={styles.message}>
               Loading publications...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
 
@@ -259,9 +260,9 @@ export default function PublicationCategoryScreen() {
               style={styles.retryButton}
               onPress={() => void loadPublications()}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}
@@ -274,14 +275,14 @@ export default function PublicationCategoryScreen() {
                 📖
               </Text>
 
-              <Text style={styles.emptyTitle}>
+              <AutoTranslatedText style={styles.emptyTitle}>
                 No Publications Yet
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.message}>
+              <AutoTranslatedText style={styles.message}>
                 There are currently no publications
                 available in this category.
-              </Text>
+              </AutoTranslatedText>
             </View>
           )}
 
@@ -343,9 +344,9 @@ export default function PublicationCategoryScreen() {
                     </Text>
                   )}
 
-                  <Text style={styles.viewText}>
+                  <AutoTranslatedText style={styles.viewText}>
                     View Details ›
-                  </Text>
+                  </AutoTranslatedText>
                 </View>
               </TouchableOpacity>
             ))}

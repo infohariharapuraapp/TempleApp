@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -374,13 +375,13 @@ export default function DharmaScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerText}>
-          <Text style={styles.headerEyebrow}>
+          <AutoTranslatedText style={styles.headerEyebrow}>
             DEVOTEE COMMUNITY
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.headerTitle}>
+          <AutoTranslatedText style={styles.headerTitle}>
             Dharma Sandeham
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         <View style={styles.omCircle}>
@@ -407,9 +408,9 @@ export default function DharmaScreen() {
         ListHeaderComponent={
           <View>
             <View style={styles.introCard}>
-              <Text style={styles.introTitle}>
+              <AutoTranslatedText style={styles.introTitle}>
                 Ask. Learn. Share Dharma.
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.introDescription}>
                 Ask questions about temple traditions,
@@ -449,9 +450,9 @@ export default function DharmaScreen() {
               )}
             </View>
 
-            <Text style={styles.sectionLabel}>
+            <AutoTranslatedText style={styles.sectionLabel}>
               CATEGORIES
-            </Text>
+            </AutoTranslatedText>
 
             <FlatList
               data={[
@@ -522,9 +523,9 @@ export default function DharmaScreen() {
             </View>
 
             <View style={styles.listHeadingRow}>
-              <Text style={styles.listHeading}>
+              <AutoTranslatedText style={styles.listHeading}>
                 Community Questions
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.questionCount}>
                 {questions.length} shown
@@ -539,9 +540,9 @@ export default function DharmaScreen() {
                 size="large"
                 color={COLORS.maroon}
               />
-              <Text style={styles.emptyDescription}>
+              <AutoTranslatedText style={styles.emptyDescription}>
                 Loading questions...
-              </Text>
+              </AutoTranslatedText>
             </View>
           ) : error ? (
             <View style={styles.emptyState}>
@@ -551,9 +552,9 @@ export default function DharmaScreen() {
                 color={COLORS.gold}
               />
 
-              <Text style={styles.emptyTitle}>
+              <AutoTranslatedText style={styles.emptyTitle}>
                 Unable to load questions
-              </Text>
+              </AutoTranslatedText>
 
               <Text style={styles.emptyDescription}>
                 {error}
@@ -563,9 +564,9 @@ export default function DharmaScreen() {
                 style={styles.retryButton}
                 onPress={() => loadQuestions(1)}
               >
-                <Text style={styles.retryText}>
+                <AutoTranslatedText style={styles.retryText}>
                   Try Again
-                </Text>
+                </AutoTranslatedText>
               </TouchableOpacity>
             </View>
           ) : (
@@ -576,14 +577,14 @@ export default function DharmaScreen() {
                 color={COLORS.gold}
               />
 
-              <Text style={styles.emptyTitle}>
+              <AutoTranslatedText style={styles.emptyTitle}>
                 No questions found
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.emptyDescription}>
+              <AutoTranslatedText style={styles.emptyDescription}>
                 Try a different search or category,
                 or be the first to ask a question.
-              </Text>
+              </AutoTranslatedText>
             </View>
           )
         }
@@ -598,9 +599,9 @@ export default function DharmaScreen() {
               style={styles.loadMoreButton}
               onPress={loadMore}
             >
-              <Text style={styles.loadMoreText}>
+              <AutoTranslatedText style={styles.loadMoreText}>
                 Load more questions
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           ) : null
         }
@@ -620,9 +621,9 @@ export default function DharmaScreen() {
             color={COLORS.white}
           />
 
-          <Text style={styles.askButtonText}>
+          <AutoTranslatedText style={styles.askButtonText}>
             Ask a Question
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

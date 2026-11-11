@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -336,10 +337,10 @@ export default function AboutScreen() {
             style={styles.swamijiImage}
           />
 
-          <Text style={styles.subTitle}>
+          <AutoTranslatedText style={styles.subTitle}>
             Parama Poojya Sri Sri Swayamprakasha
             Sachidananda Saraswati Mahaswamiji
-          </Text>
+          </AutoTranslatedText>
 
           <Text style={styles.bodyText}>
             {t('aboutDetails.text040')}
@@ -535,9 +536,9 @@ export default function AboutScreen() {
             {t('aboutDetails.text062')}
           </Text>
 
-          <Text style={styles.bottomPrayer}>
+          <AutoTranslatedText style={styles.bottomPrayer}>
             🙏 Om Tat Sat 🙏
-          </Text>
+          </AutoTranslatedText>
 
         </View>
 

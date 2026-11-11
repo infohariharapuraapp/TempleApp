@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useRef, useState } from 'react';
 import {
@@ -190,21 +191,21 @@ export default function RegisterScreen() {
                 <Text style={styles.templeEmoji}>🙏</Text>
               </View>
 
-              <Text style={styles.label}>
+              <AutoTranslatedText style={styles.label}>
                 HARIHARIPURA TEMPLE
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={[
+              <AutoTranslatedText style={[
                 styles.title,
                 small && { fontSize: 25 },
               ]}>
                 Create Account
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.subtitle}>
+              <AutoTranslatedText style={styles.subtitle}>
                 Join our devotee community and stay
                 connected with temple services and activities.
-              </Text>
+              </AutoTranslatedText>
             </View>
 
             <Text style={styles.inputLabel}>
@@ -293,9 +294,9 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.passwordHint}>
+            <AutoTranslatedText style={styles.passwordHint}>
               Use at least 8 characters.
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.inputLabel}>
               Confirm Password{' '}
@@ -337,10 +338,10 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
+              <AutoTranslatedText style={styles.infoText}>
                 Fields marked * are required. Your email
                 address is used for password recovery.
-              </Text>
+              </AutoTranslatedText>
             </View>
 
             <TouchableOpacity
@@ -356,28 +357,28 @@ export default function RegisterScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.registerButtonText}>
+                <AutoTranslatedText style={styles.registerButtonText}>
                   Create Account
-                </Text>
+                </AutoTranslatedText>
               )}
             </TouchableOpacity>
 
             <View style={styles.loginRow}>
-              <Text style={styles.loginText}>
+              <AutoTranslatedText style={styles.loginText}>
                 Already have an account?
-              </Text>
+              </AutoTranslatedText>
               <TouchableOpacity
                 onPress={() => router.replace('/login')}
                 disabled={loading}
               >
-                <Text style={styles.loginLink}> Login</Text>
+                <AutoTranslatedText style={styles.loginLink}> Login</AutoTranslatedText>
               </TouchableOpacity>
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>
+              <AutoTranslatedText style={styles.footerText}>
                 🙏 Stay connected with Hariharipura Temple
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
         </ScrollView>

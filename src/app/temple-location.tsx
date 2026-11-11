@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import { router } from 'expo-router';
 import { Linking, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,22 +34,22 @@ export default function TempleLocationScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>
+            <AutoTranslatedText style={styles.headerTitle}>
               Temple Location
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.headerSubtitle}>
+            <AutoTranslatedText style={styles.headerSubtitle}>
               Divyakshetra Hariharapura
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
         {/* ================= TEMPLE ADDRESS ================= */}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
+          <AutoTranslatedText style={styles.sectionTitle}>
             Temple Address
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         <View style={styles.addressCard}>
@@ -59,30 +60,30 @@ export default function TempleLocationScreen() {
           </View>
 
           <View style={styles.addressContent}>
-            <Text style={styles.addressTitle}>
+            <AutoTranslatedText style={styles.addressTitle}>
               Temple Address
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.addressLine}>
+            <AutoTranslatedText style={styles.addressLine}>
               Hariharapura, Chikmagalur District,
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.addressLine}>
+            <AutoTranslatedText style={styles.addressLine}>
               Karnataka, India - 577120
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.addressLine}>
+            <AutoTranslatedText style={styles.addressLine}>
               Hariharapura, Karnataka 577120
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
         {/* ================= TEMPLE LOCATION ================= */}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
+          <AutoTranslatedText style={styles.sectionTitle}>
             Temple Location
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         <View style={styles.googleMapsCard}>
@@ -93,23 +94,23 @@ export default function TempleLocationScreen() {
             </Text>
           </View>
 
-          <Text style={styles.googleMapsTitle}>
+          <AutoTranslatedText style={styles.googleMapsTitle}>
             Find Us on Google Maps
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.googleMapsSubtitle}>
+          <AutoTranslatedText style={styles.googleMapsSubtitle}>
             Open the temple location and get directions
             from your current location.
-          </Text>
+          </AutoTranslatedText>
 
           <TouchableOpacity
             style={styles.googleMapsButton}
             onPress={openDirections}
             activeOpacity={0.85}
           >
-            <Text style={styles.googleMapsButtonText}>
+            <AutoTranslatedText style={styles.googleMapsButtonText}>
               Open Google Maps
-            </Text>
+            </AutoTranslatedText>
           </TouchableOpacity>
 
         </View>
@@ -117,13 +118,13 @@ export default function TempleLocationScreen() {
         {/* ================= HOW TO REACH ================= */}
 
         <View style={styles.howToReachHeader}>
-          <Text style={styles.howToReachTitle}>
+          <AutoTranslatedText style={styles.howToReachTitle}>
             How to Reach
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.howToReachSubtitle}>
+          <AutoTranslatedText style={styles.howToReachSubtitle}>
             Plan your journey to Divyakshetra Hariharapura
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         {/* ================= BY AIR ================= */}
@@ -141,9 +142,9 @@ export default function TempleLocationScreen() {
           </View>
 
           <View style={styles.travelContent}>
-            <Text style={styles.travelTitle}>
+            <AutoTranslatedText style={styles.travelTitle}>
               By Air
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.travelText}>
               The closest major airports are Bangalore,
@@ -170,26 +171,26 @@ export default function TempleLocationScreen() {
           </View>
 
           <View style={styles.travelContent}>
-            <Text style={styles.travelTitle}>
+            <AutoTranslatedText style={styles.travelTitle}>
               By Road
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.travelText}>
+            <AutoTranslatedText style={styles.travelText}>
               Bangalore is about 280 Kms and Mangalore
               is about 125 Kms from Divyakshetra
               Hariharapura.
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.travelText}>
+            <AutoTranslatedText style={styles.travelText}>
               Buses, private or state, run day and night
               with regular frequency from both these
               cities.
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.travelText}>
+            <AutoTranslatedText style={styles.travelText}>
               There are also night sleeper buses
               operating from Bangalore to Hariharapura.
-            </Text>
+            </AutoTranslatedText>
           </View>
 
         </View>
@@ -209,15 +210,15 @@ export default function TempleLocationScreen() {
           </View>
 
           <View style={styles.travelContent}>
-            <Text style={styles.travelTitle}>
+            <AutoTranslatedText style={styles.travelTitle}>
               By Train
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.travelText}>
+            <AutoTranslatedText style={styles.travelText}>
               Disembark at Shimoga if traveling from
               Bangalore. It is a 3-hour bus trip from
               there.
-            </Text>
+            </AutoTranslatedText>
 
             <Text style={styles.travelText}>
               If traveling from Mumbai by Konkan Rail,
@@ -242,22 +243,22 @@ export default function TempleLocationScreen() {
             </View>
 
             <View style={styles.nearbyHeaderContent}>
-              <Text style={styles.nearbyTitle}>
+              <AutoTranslatedText style={styles.nearbyTitle}>
                 Places Close By
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.nearbySubtitle}>
+              <AutoTranslatedText style={styles.nearbySubtitle}>
                 Nearby pilgrim centres
-              </Text>
+              </AutoTranslatedText>
             </View>
 
           </View>
 
-          <Text style={styles.nearbyDescription}>
+          <AutoTranslatedText style={styles.nearbyDescription}>
             The famous pilgrim centres of Sringeri and
             Shakatapura are located close to
             Divyakshetra Hariharapura.
-          </Text>
+          </AutoTranslatedText>
 
           {/* SRINGERI */}
 
@@ -265,13 +266,13 @@ export default function TempleLocationScreen() {
             <View style={styles.placeDot} />
 
             <View style={styles.placeTextContainer}>
-              <Text style={styles.placeName}>
+              <AutoTranslatedText style={styles.placeName}>
                 Sringeri
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.placeDistance}>
+              <AutoTranslatedText style={styles.placeDistance}>
                 20 Kms
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
 
@@ -281,13 +282,13 @@ export default function TempleLocationScreen() {
             <View style={styles.placeDot} />
 
             <View style={styles.placeTextContainer}>
-              <Text style={styles.placeName}>
+              <AutoTranslatedText style={styles.placeName}>
                 Shakatapura
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.placeDistance}>
+              <AutoTranslatedText style={styles.placeDistance}>
                 8 Kms
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
 
@@ -297,13 +298,13 @@ export default function TempleLocationScreen() {
             <View style={styles.placeDot} />
 
             <View style={styles.placeTextContainer}>
-              <Text style={styles.placeName}>
+              <AutoTranslatedText style={styles.placeName}>
                 Koppa
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.placeDistance}>
+              <AutoTranslatedText style={styles.placeDistance}>
                 About 15 mins to Hariharapura
-              </Text>
+              </AutoTranslatedText>
             </View>
           </View>
 

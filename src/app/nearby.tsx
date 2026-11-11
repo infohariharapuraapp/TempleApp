@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -292,18 +293,18 @@ export default function NearbyScreen() {
           />
         }
       >
-        <Text style={styles.label}>
+        <AutoTranslatedText style={styles.label}>
           TRAVEL INFORMATION
-        </Text>
+        </AutoTranslatedText>
 
-        <Text style={styles.title}>
+        <AutoTranslatedText style={styles.title}>
           Nearby Places
-        </Text>
+        </AutoTranslatedText>
 
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.subtitle}>
           Helpful places and services around
           the temple.
-        </Text>
+        </AutoTranslatedText>
 
         {/* TEMPLE LOCATION */}
 
@@ -315,22 +316,22 @@ export default function NearbyScreen() {
           </View>
 
           <View style={styles.locationContent}>
-            <Text style={styles.locationTitle}>
+            <AutoTranslatedText style={styles.locationTitle}>
               Temple Location
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.locationText}>
+            <AutoTranslatedText style={styles.locationText}>
               Explore useful places and services
               near the temple.
-            </Text>
+            </AutoTranslatedText>
           </View>
         </View>
 
         {/* CATEGORIES */}
 
-        <Text style={styles.sectionTitle}>
+        <AutoTranslatedText style={styles.sectionTitle}>
           Explore Nearby
-        </Text>
+        </AutoTranslatedText>
 
         {loading ? (
           <View style={styles.centerBox}>
@@ -339,9 +340,9 @@ export default function NearbyScreen() {
               color="#B66A2C"
             />
 
-            <Text style={styles.helperText}>
+            <AutoTranslatedText style={styles.helperText}>
               Loading nearby categories...
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : error ? (
           <View style={styles.centerBox}>
@@ -356,9 +357,9 @@ export default function NearbyScreen() {
                 void loadCategories();
               }}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Try Again
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         ) : categories.length === 0 ? (
@@ -367,14 +368,14 @@ export default function NearbyScreen() {
               📍
             </Text>
 
-            <Text style={styles.emptyTitle}>
+            <AutoTranslatedText style={styles.emptyTitle}>
               No Nearby Categories
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.helperText}>
+            <AutoTranslatedText style={styles.helperText}>
               Nearby places will appear here
               when added by the temple.
-            </Text>
+            </AutoTranslatedText>
           </View>
         ) : (
           <View style={styles.card}>
@@ -447,9 +448,9 @@ export default function NearbyScreen() {
                   setPlacesError('');
                 }}
               >
-                <Text style={styles.closeText}>
+                <AutoTranslatedText style={styles.closeText}>
                   Close
-                </Text>
+                </AutoTranslatedText>
               </TouchableOpacity>
             </View>
 
@@ -460,9 +461,9 @@ export default function NearbyScreen() {
                   size="large"
                 />
 
-                <Text style={styles.helperText}>
+                <AutoTranslatedText style={styles.helperText}>
                   Loading places...
-                </Text>
+                </AutoTranslatedText>
               </View>
             ) : placesError ? (
               <View style={styles.centerBox}>
@@ -478,9 +479,9 @@ export default function NearbyScreen() {
                     )
                   }
                 >
-                  <Text style={styles.retryText}>
+                  <AutoTranslatedText style={styles.retryText}>
                     Retry
-                  </Text>
+                  </AutoTranslatedText>
                 </TouchableOpacity>
               </View>
             ) : places.length === 0 ? (
@@ -489,14 +490,14 @@ export default function NearbyScreen() {
                   🗺️
                 </Text>
 
-                <Text style={styles.emptyTitle}>
+                <AutoTranslatedText style={styles.emptyTitle}>
                   No Places Available
-                </Text>
+                </AutoTranslatedText>
 
-                <Text style={styles.helperText}>
+                <AutoTranslatedText style={styles.helperText}>
                   Places in this category will
                   be added soon.
-                </Text>
+                </AutoTranslatedText>
               </View>
             ) : (
               places.map((place) => (
@@ -564,13 +565,13 @@ export default function NearbyScreen() {
                         )
                       }
                     >
-                      <Text
+                      <AutoTranslatedText
                         style={
                           styles.primaryButtonText
                         }
                       >
                         🗺️ Get Directions
-                      </Text>
+                      </AutoTranslatedText>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -587,9 +588,9 @@ export default function NearbyScreen() {
             router.replace('/(tabs)')
           }
         >
-          <Text style={styles.homeButtonText}>
+          <AutoTranslatedText style={styles.homeButtonText}>
             Back to Home
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

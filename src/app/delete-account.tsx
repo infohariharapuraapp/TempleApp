@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, { useState } from 'react';
 import {
@@ -103,33 +104,33 @@ export default function DeleteAccountScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.label}>ACCOUNT SETTINGS</Text>
+        <AutoTranslatedText style={styles.label}>ACCOUNT SETTINGS</AutoTranslatedText>
 
-        <Text style={styles.title}>Delete My Account</Text>
+        <AutoTranslatedText style={styles.title}>Delete My Account</AutoTranslatedText>
 
         <View style={styles.warningCard}>
-          <Text style={styles.warningTitle}>
+          <AutoTranslatedText style={styles.warningTitle}>
             Permanent Account Deletion
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.warningText}>
+          <AutoTranslatedText style={styles.warningText}>
             Deleting your account is permanent and cannot be undone.
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.warningText}>
+          <AutoTranslatedText style={styles.warningText}>
             Your temple app profile and login credentials will be removed.
             Some community contributions may remain without your name.
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.warningText}>
+          <AutoTranslatedText style={styles.warningText}>
             Room and seva bookings made through the separate temple website
             are managed by that website.
-          </Text>
+          </AutoTranslatedText>
         </View>
 
-        <Text style={styles.inputLabel}>
+        <AutoTranslatedText style={styles.inputLabel}>
           Confirm your password
-        </Text>
+        </AutoTranslatedText>
 
         <TextInput
           style={styles.input}
@@ -153,9 +154,9 @@ export default function DeleteAccountScreen() {
           {deleting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.deleteButtonText}>
+            <AutoTranslatedText style={styles.deleteButtonText}>
               Delete My Account Permanently
-            </Text>
+            </AutoTranslatedText>
           )}
         </TouchableOpacity>
 
@@ -164,9 +165,9 @@ export default function DeleteAccountScreen() {
           onPress={() => router.back()}
           disabled={deleting}
         >
-          <Text style={styles.cancelButtonText}>
+          <AutoTranslatedText style={styles.cancelButtonText}>
             Cancel — Keep My Account
-          </Text>
+          </AutoTranslatedText>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

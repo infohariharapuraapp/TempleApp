@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useCallback,
@@ -114,13 +115,13 @@ export default function PoojaBookingScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>
+          <AutoTranslatedText style={styles.headerTitle}>
             Online Pooja Booking
-          </Text>
+          </AutoTranslatedText>
 
-          <Text style={styles.headerSubtitle}>
+          <AutoTranslatedText style={styles.headerSubtitle}>
             Official Temple Website
-          </Text>
+          </AutoTranslatedText>
         </View>
 
         <TouchableOpacity
@@ -187,14 +188,14 @@ export default function PoojaBookingScreen() {
                 color={COLORS.maroon}
               />
 
-              <Text style={styles.loadingText}>
+              <AutoTranslatedText style={styles.loadingText}>
                 Connecting to temple booking...
-              </Text>
+              </AutoTranslatedText>
 
-              <Text style={styles.loadingHint}>
+              <AutoTranslatedText style={styles.loadingHint}>
                 The official website may take a
                 little time to load.
-              </Text>
+              </AutoTranslatedText>
             </View>
           )}
         />
@@ -211,9 +212,9 @@ export default function PoojaBookingScreen() {
               color={COLORS.maroon}
             />
 
-            <Text style={styles.loadingText}>
+            <AutoTranslatedText style={styles.loadingText}>
               Loading Pooja Booking...
-            </Text>
+            </AutoTranslatedText>
           </View>
         )}
 
@@ -223,23 +224,23 @@ export default function PoojaBookingScreen() {
           <View style={styles.errorContainer}>
             <Text style={styles.errorIcon}>🛕</Text>
 
-            <Text style={styles.errorTitle}>
+            <AutoTranslatedText style={styles.errorTitle}>
               Booking Page Unavailable
-            </Text>
+            </AutoTranslatedText>
 
-            <Text style={styles.errorText}>
+            <AutoTranslatedText style={styles.errorText}>
               We couldn't load the official
               temple booking website.
               Please try again.
-            </Text>
+            </AutoTranslatedText>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={reloadPage}
             >
-              <Text style={styles.retryText}>
+              <AutoTranslatedText style={styles.retryText}>
                 Retry
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -248,9 +249,9 @@ export default function PoojaBookingScreen() {
                 void openInBrowser();
               }}
             >
-              <Text style={styles.externalText}>
+              <AutoTranslatedText style={styles.externalText}>
                 Open in Browser ↗
-              </Text>
+              </AutoTranslatedText>
             </TouchableOpacity>
           </View>
         )}
@@ -259,10 +260,10 @@ export default function PoojaBookingScreen() {
       {/* FOOTER */}
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
+        <AutoTranslatedText style={styles.footerText}>
           🔒 Booking and payment are managed
           by the official temple website.
-        </Text>
+        </AutoTranslatedText>
       </View>
     </SafeAreaView>
   );

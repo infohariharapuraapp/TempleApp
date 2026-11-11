@@ -1,3 +1,4 @@
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -124,11 +125,11 @@ export default function AdminSevaRegistrationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>ADMIN • TEMPLE OPERATIONS</Text>
-        <Text style={styles.title}>Seva Registrations</Text>
-        <Text style={styles.subtitle}>
+        <AutoTranslatedText style={styles.eyebrow}>ADMIN • TEMPLE OPERATIONS</AutoTranslatedText>
+        <AutoTranslatedText style={styles.title}>Seva Registrations</AutoTranslatedText>
+        <AutoTranslatedText style={styles.subtitle}>
           Review registrations and assign the seva after the devotee completes registration.
-        </Text>
+        </AutoTranslatedText>
 
         <View style={styles.summaryRow}>
           <Summary value={String(pending).padStart(2, '0')} label="Pending" />
@@ -186,7 +187,7 @@ export default function AdminSevaRegistrationsScreen() {
                 style={styles.assignButton}
                 onPress={() => setAssigningId(item.id)}
               >
-                <Text style={styles.assignButtonText}>Assign Seva</Text>
+                <AutoTranslatedText style={styles.assignButtonText}>Assign Seva</AutoTranslatedText>
               </TouchableOpacity>
             )}
 
@@ -196,27 +197,27 @@ export default function AdminSevaRegistrationsScreen() {
                   style={styles.changeButton}
                   onPress={() => setAssigningId(item.id)}
                 >
-                  <Text style={styles.changeButtonText}>Change Seva</Text>
+                  <AutoTranslatedText style={styles.changeButtonText}>Change Seva</AutoTranslatedText>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.completeButton}
                   onPress={() => markCompleted(item.id)}
                 >
-                  <Text style={styles.completeButtonText}>Mark Completed</Text>
+                  <AutoTranslatedText style={styles.completeButtonText}>Mark Completed</AutoTranslatedText>
                 </TouchableOpacity>
               </View>
             )}
 
             {item.status === 'Completed' && (
               <View style={styles.completedBox}>
-                <Text style={styles.completedText}>✓ Seva Completed</Text>
+                <AutoTranslatedText style={styles.completedText}>✓ Seva Completed</AutoTranslatedText>
               </View>
             )}
           </View>
         ))}
 
-        <Text style={styles.note}>MOCK DATA • ADMIN UI PREVIEW</Text>
+        <AutoTranslatedText style={styles.note}>MOCK DATA • ADMIN UI PREVIEW</AutoTranslatedText>
       </ScrollView>
 
       <Modal
@@ -228,15 +229,15 @@ export default function AdminSevaRegistrationsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Assign Seva</Text>
+              <AutoTranslatedText style={styles.modalTitle}>Assign Seva</AutoTranslatedText>
               <TouchableOpacity onPress={() => setAssigningId(null)}>
                 <Text style={styles.modalClose}>×</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalHint}>
+            <AutoTranslatedText style={styles.modalHint}>
               Select the seva to assign to this registration.
-            </Text>
+            </AutoTranslatedText>
 
             {SEVAS.map((seva) => (
               <TouchableOpacity

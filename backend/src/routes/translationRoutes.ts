@@ -1,7 +1,14 @@
 
-import { Router, Request, Response, NextFunction } from 'express';
+import {
+  Router,
+  Response,
+  NextFunction,
+} from 'express';
 
-import { translateContent } from '../controllers/translationController';
+import {
+  translateContent,
+  translatePublicBatch,
+} from '../controllers/translationController';
 
 import {
   authenticateToken,
@@ -10,9 +17,10 @@ import {
 
 const router = Router();
 
-// Per-user rate limiting.
-// Suitable for initial local testing.
-// Production needs a shared limiter for multiple instances.
+// ======================================
+// EXISTING ADMIN TRANSLATION RATE LIMIT
+// ======================================
+
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_REQUESTS = 30;
 
@@ -65,9 +73,6 @@ function translationRateLimit(
   next();
 }
 
-// Restrict direct translation requests to admins.
-// Public mobile screens will receive translated content
-// through their normal backend content APIs.
 function requireTranslationAdmin(
   req: AuthRequest,
   res: Response,
@@ -83,6 +88,77 @@ function requireTranslationAdmin(
 
   next();
 }
+
+// ======================================
+// PUBLIC MOBILE APP TRANSLATION LIMIT
+// ======================================
+
+// Basic protection for a single backend instance.
+// Production should use shared rate limiting.
+const PUBLIC_WINDOW_MS = 60 * 1000;
+const PUBLIC_MAX_REQUESTS = 10;
+
+const publicRequests = new Map<
+  string,
+  {
+    count: number;
+    resetAt: number;
+  }
+>();
+
+function publicTranslationRateLimit(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const now = Date.now();
+  const key = req.ip || 'unknown';
+
+  // Remove expired entries periodically.
+  for (const [ip, entry] of publicRequests) {
+    if (now >= entry.resetAt) {
+      publicRequests.delete(ip);
+    }
+  }
+
+  const existing = publicRequests.get(key);
+
+  if (!existing) {
+    publicRequests.set(key, {
+      count: 1,
+      resetAt: now + PUBLIC_WINDOW_MS,
+    });
+
+    next();
+    return;
+  }
+
+  if (existing.count >= PUBLIC_MAX_REQUESTS) {
+    res.status(429).json({
+      success: false,
+      message:
+        'Too many translation requests. Please try again later.',
+    });
+    return;
+  }
+
+  existing.count += 1;
+  next();
+}
+
+// ======================================
+// PUBLIC BATCH TRANSLATION ENDPOINT
+// ======================================
+
+router.post(
+  '/public-batch',
+  publicTranslationRateLimit,
+  translatePublicBatch
+);
+
+// ======================================
+// EXISTING ADMIN TRANSLATION ENDPOINT
+// ======================================
 
 router.post(
   '/',
