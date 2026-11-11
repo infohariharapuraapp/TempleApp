@@ -71,14 +71,19 @@ type Guru = {
   is_active: boolean;
 };
 
+
 const QUICK_ACTIONS = [
   { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
   { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
- { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
-{ icon: '🪔', titleKey: 'home.quickSeva', route: '/seva-registration', comingSoon: true },
-
- {
+  { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
+  {
+    icon: '🪔',
+    titleKey: 'home.quickSeva',
+    route: '/seva-registration',
+    comingSoon: true,
+  },
+  {
     icon: '🛕',
     titleKey: 'home.poojaServices',
     route: '/pooja-services',
@@ -94,11 +99,17 @@ const QUICK_ACTIONS = [
     route: '/pravachanas',
   },
   {
-  icon: '📅',
-  titleKey: 'home.mahaswamijiProgrammes',
-  route: '/mahaswamiji-programmes',
-},
+    icon: '📅',
+    titleKey: 'home.mahaswamijiProgrammes',
+    route: '/mahaswamiji-programmes',
+  },
+  {
+    icon: '📢',
+    titleKey: 'home.divyakshetraUpdates',
+    route: '/announcements',
+  },
 ];
+
 
 type DarshanVideo = {
   id: number;
@@ -590,16 +601,20 @@ export default function HomeScreen() {
     const comingSoon =
       'comingSoon' in item && item.comingSoon;
 
-    const fallbackTitle =
-  item.titleKey === 'home.mahaswamijiProgrammes'
-    ? 'Mahaswamiji Programmes'
-    : item.titleKey === 'home.dailyPanchangam'
-      ? 'Daily Panchangam'
-      : item.titleKey === 'home.pravachanas'
-        ? 'Pravachana & Quotes'
-        : item.titleKey === 'home.poojaServices'
-          ? 'Pooja Services'
-          : item.titleKey;
+   
+const fallbackTitle =
+  item.titleKey === 'home.divyakshetraUpdates'
+    ? 'Divyakshetra Updates'
+    : item.titleKey === 'home.mahaswamijiProgrammes'
+      ? 'Mahaswamiji Programmes'
+      : item.titleKey === 'home.dailyPanchangam'
+        ? 'Daily Panchangam'
+        : item.titleKey === 'home.pravachanas'
+          ? 'Pravachana & Quotes'
+          : item.titleKey === 'home.poojaServices'
+            ? 'Pooja Services'
+            : item.titleKey;
+
           
 
     return (

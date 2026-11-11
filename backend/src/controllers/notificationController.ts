@@ -1,9 +1,14 @@
+
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { pool } from '../db';
 import {
   sendPushNotificationToUser,
 } from '../services/notificationService';
+
+// Notifications remain visible for 6 days.
+// Older records are retained in PostgreSQL.
+const NOTIFICATION_RETENTION_DAYS = 6;
 
 // ========================================
 // REGISTER DEVICE FOR PUSH NOTIFICATIONS
@@ -85,10 +90,7 @@ export const registerDevice = async (
       data: result.rows[0],
     });
   } catch (error) {
-    console.error(
-      'Register device error:',
-      error
-    );
+    console.error('Register device error:', error);
 
     return res.status(500).json({
       success: false,
@@ -96,10 +98,6 @@ export const registerDevice = async (
     });
   }
 };
-
-// ========================================
-// SEND TEST PUSH NOTIFICATION
-// ========================================
 
 // ========================================
 // SEND TEST PUSH NOTIFICATION
@@ -124,10 +122,6 @@ export const sendTestNotification = async (
       userId
     );
 
-    // ====================================
-    // SEND PUSH NOTIFICATION
-    // ====================================
-
     const result = await sendPushNotificationToUser(
       userId,
       'Temple App',
@@ -137,10 +131,6 @@ export const sendTestNotification = async (
         screen: '/(tabs)',
       }
     );
-
-    // ====================================
-    // NO DEVICE OR FAILED SUBMISSION
-    // ====================================
 
     if (!result.success || result.sent === 0) {
       console.warn(
@@ -162,10 +152,6 @@ export const sendTestNotification = async (
       });
     }
 
-    // ====================================
-    // EXPO ACCEPTED THE PUSH
-    // ====================================
-
     console.log(
       'Test notification accepted by Expo:',
       result
@@ -183,12 +169,8 @@ export const sendTestNotification = async (
             : null,
       },
     });
-
   } catch (error) {
-    console.error(
-      'Test notification error:',
-      error
-    );
+    console.error('Test notification error:', error);
 
     return res.status(500).json({
       success: false,
@@ -196,8 +178,10 @@ export const sendTestNotification = async (
     });
   }
 };
+
 // ========================================
 // GET MY NOTIFICATIONS
+// Only notifications from the last 6 days
 // ========================================
 
 export const getMyNotifications = async (
@@ -231,8 +215,11 @@ export const getMyNotifications = async (
       INNER JOIN notifications n
         ON n.id = nd.notification_id
       WHERE nd.user_id = $1
+        AND n.created_at >= (
+          CURRENT_TIMESTAMP - ($2::int * INTERVAL '1 day')
+        )
       ORDER BY n.created_at DESC`,
-      [userId]
+      [userId, NOTIFICATION_RETENTION_DAYS]
     );
 
     return res.status(200).json({
@@ -240,10 +227,7 @@ export const getMyNotifications = async (
       data: result.rows,
     });
   } catch (error) {
-    console.error(
-      'Get notifications error:',
-      error
-    );
+    console.error('Get notifications error:', error);
 
     return res.status(500).json({
       success: false,
@@ -254,6 +238,7 @@ export const getMyNotifications = async (
 
 // ========================================
 // GET UNREAD NOTIFICATION COUNT
+// Excludes notifications older than 6 days
 // ========================================
 
 export const getUnreadCount = async (
@@ -272,10 +257,15 @@ export const getUnreadCount = async (
 
     const result = await pool.query(
       `SELECT COUNT(*)::int AS unread_count
-       FROM notification_deliveries
-       WHERE user_id = $1
-       AND read_at IS NULL`,
-      [userId]
+       FROM notification_deliveries nd
+       INNER JOIN notifications n
+         ON n.id = nd.notification_id
+       WHERE nd.user_id = $1
+         AND nd.read_at IS NULL
+         AND n.created_at >= (
+           CURRENT_TIMESTAMP - ($2::int * INTERVAL '1 day')
+         )`,
+      [userId, NOTIFICATION_RETENTION_DAYS]
     );
 
     return res.status(200).json({
@@ -329,15 +319,24 @@ export const markNotificationAsRead = async (
     }
 
     const result = await pool.query(
-      `UPDATE notification_deliveries
+      `UPDATE notification_deliveries nd
        SET read_at = COALESCE(
-         read_at,
+         nd.read_at,
          CURRENT_TIMESTAMP
        )
-       WHERE user_id = $1
-       AND notification_id = $2
-       RETURNING read_at`,
-      [userId, notificationId]
+       FROM notifications n
+       WHERE nd.user_id = $1
+         AND nd.notification_id = $2
+         AND n.id = nd.notification_id
+         AND n.created_at >= (
+           CURRENT_TIMESTAMP - ($3::int * INTERVAL '1 day')
+         )
+       RETURNING nd.read_at`,
+      [
+        userId,
+        notificationId,
+        NOTIFICATION_RETENTION_DAYS,
+      ]
     );
 
     if (result.rows.length === 0) {
@@ -369,7 +368,7 @@ export const markNotificationAsRead = async (
 };
 
 // ========================================
-// MARK ALL NOTIFICATIONS AS READ
+// MARK ALL VISIBLE NOTIFICATIONS AS READ
 // ========================================
 
 export const markAllNotificationsAsRead = async (
@@ -387,12 +386,17 @@ export const markAllNotificationsAsRead = async (
     }
 
     const result = await pool.query(
-      `UPDATE notification_deliveries
+      `UPDATE notification_deliveries nd
        SET read_at = CURRENT_TIMESTAMP
-       WHERE user_id = $1
-       AND read_at IS NULL
-       RETURNING id`,
-      [userId]
+       FROM notifications n
+       WHERE nd.user_id = $1
+         AND nd.read_at IS NULL
+         AND n.id = nd.notification_id
+         AND n.created_at >= (
+           CURRENT_TIMESTAMP - ($2::int * INTERVAL '1 day')
+         )
+       RETURNING nd.id`,
+      [userId, NOTIFICATION_RETENTION_DAYS]
     );
 
     return res.status(200).json({

@@ -1,9 +1,210 @@
+
 import { Request, Response } from 'express';
 import { pool } from '../db';
 import {
   createNotification,
   sendNotificationRecord,
 } from '../services/notificationService';
+
+// ========================================
+// DIVYAKSHETRA UPDATES CONFIGURATION
+// ========================================
+
+const CATEGORIES = [
+  'General',
+  'Festivals',
+  'Poojas',
+  'Sevas',
+  'Important Notices',
+  'Special Events',
+] as const;
+
+const ANNOUNCEMENT_COLUMNS = `
+  id,
+  title,
+  message,
+  image_url,
+  category,
+  is_pinned,
+  expires_at,
+  attachment_url,
+  is_active,
+  publish_at,
+  created_at,
+  updated_at
+`;
+
+function validId(value: unknown): number | null {
+  const id = Number(value);
+
+  return Number.isSafeInteger(id) && id > 0
+    ? id
+    : null;
+}
+
+function parseOptionalDate(value: unknown): {
+  valid: boolean;
+  value: Date | null;
+} {
+  if (value === null || value === undefined || value === '') {
+    return { valid: true, value: null };
+  }
+
+  if (typeof value !== 'string') {
+    return { valid: false, value: null };
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return { valid: false, value: null };
+  }
+
+  return { valid: true, value: date };
+}
+
+function parseOptionalUrl(value: unknown): {
+  valid: boolean;
+  value: string | null;
+} {
+  if (value === null || value === undefined || value === '') {
+    return { valid: true, value: null };
+  }
+
+  if (typeof value !== 'string') {
+    return { valid: false, value: null };
+  }
+
+  try {
+    const url = new URL(value.trim());
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return { valid: false, value: null };
+    }
+
+    return { valid: true, value: url.toString() };
+  } catch {
+    return { valid: false, value: null };
+  }
+}
+
+function validateAnnouncement(
+  body: Record<string, unknown>
+): {
+  error?: string;
+  values?: {
+    title: string;
+    message: string;
+    imageUrl: string | null;
+    category: string;
+    isPinned: boolean;
+    expiresAt: Date | null;
+    attachmentUrl: string | null;
+    isActive: boolean;
+    publishAt: Date | null;
+  };
+} {
+  const {
+    title,
+    message,
+    image_url,
+    category,
+    is_pinned,
+    expires_at,
+    attachment_url,
+    is_active,
+    publish_at,
+  } = body;
+
+  if (typeof title !== 'string' || !title.trim()) {
+    return { error: 'Title is required' };
+  }
+
+  if (typeof message !== 'string' || !message.trim()) {
+    return { error: 'Message is required' };
+  }
+
+  const selectedCategory =
+    category === undefined || category === null || category === ''
+      ? 'General'
+      : category;
+
+  if (
+    typeof selectedCategory !== 'string' ||
+    !CATEGORIES.some(item => item === selectedCategory)
+  ) {
+    return { error: 'Invalid announcement category' };
+  }
+
+  if (
+    is_pinned !== undefined &&
+    typeof is_pinned !== 'boolean'
+  ) {
+    return { error: 'is_pinned must be a boolean' };
+  }
+
+  if (
+    is_active !== undefined &&
+    typeof is_active !== 'boolean'
+  ) {
+    return { error: 'is_active must be a boolean' };
+  }
+
+  const imageUrl = parseOptionalUrl(image_url);
+  const attachmentUrl = parseOptionalUrl(attachment_url);
+  const publishAt = parseOptionalDate(publish_at);
+  const expiresAt = parseOptionalDate(expires_at);
+
+  if (!imageUrl.valid) {
+    return { error: 'Invalid image URL' };
+  }
+
+  if (!attachmentUrl.valid) {
+    return { error: 'Invalid attachment URL' };
+  }
+
+  if (!publishAt.valid) {
+    return { error: 'Invalid publish date' };
+  }
+
+  if (!expiresAt.valid) {
+    return { error: 'Invalid expiry date' };
+  }
+
+  if (
+    expiresAt.value &&
+    publishAt.value &&
+    expiresAt.value <= publishAt.value
+  ) {
+    return {
+      error: 'Expiry date must be after publish date',
+    };
+  }
+
+  return {
+    values: {
+      title: title.trim(),
+      message: message.trim(),
+      imageUrl: imageUrl.value,
+      category: selectedCategory,
+      isPinned: is_pinned === true,
+      expiresAt: expiresAt.value,
+      attachmentUrl: attachmentUrl.value,
+      isActive: is_active === undefined ? true : is_active,
+      publishAt: publishAt.value,
+    },
+  };
+}
+
+function notificationData(announcement: any) {
+  return {
+    type: 'announcement',
+    announcementId: announcement.id,
+    screen: 'announcements',
+    imageUrl: announcement.image_url || null,
+  };
+}
+
 // ========================================
 // ADMIN: SEND ANNOUNCEMENT NOW
 // ========================================
@@ -13,42 +214,31 @@ export async function sendAnnouncementNow(
   res: Response
 ) {
   try {
-    const { id } = req.params;
-    const announcementId = Number(id);
+    const announcementId = validId(req.params.id);
 
-    if (
-      !Number.isInteger(announcementId) ||
-      announcementId <= 0
-    ) {
+    if (!announcementId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid announcement ID',
       });
     }
 
-    const announcementResult = await pool.query(
-      `
-      SELECT
-        id,
-        title,
-        message,
-        image_url,
-        is_active
-      FROM announcements
-      WHERE id = $1
-      LIMIT 1
-      `,
+    const result = await pool.query(
+      `SELECT ${ANNOUNCEMENT_COLUMNS}
+       FROM announcements
+       WHERE id = $1
+       LIMIT 1`,
       [announcementId]
     );
 
-    if (!announcementResult.rows.length) {
+    if (!result.rows.length) {
       return res.status(404).json({
         success: false,
         message: 'Announcement not found',
       });
     }
 
-    const announcement = announcementResult.rows[0];
+    const announcement = result.rows[0];
 
     if (!announcement.is_active) {
       return res.status(400).json({
@@ -57,32 +247,31 @@ export async function sendAnnouncementNow(
       });
     }
 
-    // Create notification record
+    if (
+      announcement.expires_at &&
+      new Date(announcement.expires_at) <= new Date()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot send an expired announcement',
+      });
+    }
+
     const notification = await createNotification({
       title: announcement.title,
       body: announcement.message,
       notificationType: 'announcement',
-      data: {
-        type: 'announcement',
-        announcementId: announcement.id,
-        screen: 'announcements',
-        imageUrl: announcement.image_url || null,
-      },
+      data: notificationData(announcement),
       targetType: 'all',
     });
 
-    // Send immediately
     await sendNotificationRecord(notification.id);
 
-    // Mark announcement as published now
     await pool.query(
-      `
-      UPDATE announcements
-      SET
-        publish_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      `,
+      `UPDATE announcements
+       SET publish_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
       [announcementId]
     );
 
@@ -95,10 +284,7 @@ export async function sendAnnouncementNow(
       },
     });
   } catch (error) {
-    console.error(
-      'Admin send announcement error:',
-      error
-    );
+    console.error('Admin send announcement error:', error);
 
     return res.status(500).json({
       success: false,
@@ -106,7 +292,6 @@ export async function sendAnnouncementNow(
     });
   }
 }
-
 
 // ========================================
 // ADMIN: SCHEDULE ANNOUNCEMENT
@@ -117,36 +302,25 @@ export async function scheduleAnnouncement(
   res: Response
 ) {
   try {
-    const { id } = req.params;
-    const { publish_at } = req.body;
+    const announcementId = validId(req.params.id);
 
-    const announcementId = Number(id);
-
-    if (
-      !Number.isInteger(announcementId) ||
-      announcementId <= 0
-    ) {
+    if (!announcementId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid announcement ID',
       });
     }
 
-    if (!publish_at) {
+    const scheduled = parseOptionalDate(req.body.publish_at);
+
+    if (!scheduled.valid || !scheduled.value) {
       return res.status(400).json({
         success: false,
-        message: 'publish_at is required',
+        message: 'Valid publish_at is required',
       });
     }
 
-    const scheduledTime = new Date(publish_at);
-
-    if (Number.isNaN(scheduledTime.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid publish_at date',
-      });
-    }
+    const scheduledTime = scheduled.value;
 
     if (scheduledTime <= new Date()) {
       return res.status(400).json({
@@ -155,29 +329,22 @@ export async function scheduleAnnouncement(
       });
     }
 
-    const announcementResult = await pool.query(
-      `
-      SELECT
-        id,
-        title,
-        message,
-        image_url,
-        is_active
-      FROM announcements
-      WHERE id = $1
-      LIMIT 1
-      `,
+    const result = await pool.query(
+      `SELECT ${ANNOUNCEMENT_COLUMNS}
+       FROM announcements
+       WHERE id = $1
+       LIMIT 1`,
       [announcementId]
     );
 
-    if (!announcementResult.rows.length) {
+    if (!result.rows.length) {
       return res.status(404).json({
         success: false,
         message: 'Announcement not found',
       });
     }
 
-    const announcement = announcementResult.rows[0];
+    const announcement = result.rows[0];
 
     if (!announcement.is_active) {
       return res.status(400).json({
@@ -186,29 +353,29 @@ export async function scheduleAnnouncement(
       });
     }
 
-    // Save scheduled time in announcements
+    if (
+      announcement.expires_at &&
+      new Date(announcement.expires_at) <= scheduledTime
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Expiry date must be after scheduled time',
+      });
+    }
+
     await pool.query(
-      `
-      UPDATE announcements
-      SET
-        publish_at = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      `,
+      `UPDATE announcements
+       SET publish_at = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
       [scheduledTime, announcementId]
     );
 
-    // Create scheduled notification
     const notification = await createNotification({
       title: announcement.title,
       body: announcement.message,
       notificationType: 'announcement',
-      data: {
-        type: 'announcement',
-        announcementId: announcement.id,
-        screen: 'announcements',
-        imageUrl: announcement.image_url || null,
-      },
+      data: notificationData(announcement),
       targetType: 'all',
       scheduledAt: scheduledTime,
     });
@@ -223,10 +390,7 @@ export async function scheduleAnnouncement(
       },
     });
   } catch (error) {
-    console.error(
-      'Admin schedule announcement error:',
-      error
-    );
+    console.error('Admin schedule announcement error:', error);
 
     return res.status(500).json({
       success: false,
@@ -245,21 +409,12 @@ export async function getAllAdminAnnouncements(
 ) {
   try {
     const result = await pool.query(
-      `
-      SELECT
-        id,
-        title,
-        message,
-        image_url,
-        is_active,
-        publish_at,
-        created_at,
-        updated_at
-      FROM announcements
-      ORDER BY
-        COALESCE(publish_at, created_at) DESC,
-        id DESC
-      `
+      `SELECT ${ANNOUNCEMENT_COLUMNS}
+       FROM announcements
+       ORDER BY
+         is_pinned DESC,
+         COALESCE(publish_at, created_at) DESC,
+         id DESC`
     );
 
     return res.status(200).json({
@@ -267,10 +422,7 @@ export async function getAllAdminAnnouncements(
       data: result.rows,
     });
   } catch (error) {
-    console.error(
-      'Admin get announcements error:',
-      error
-    );
+    console.error('Admin get announcements error:', error);
 
     return res.status(500).json({
       success: false,
@@ -278,6 +430,7 @@ export async function getAllAdminAnnouncements(
     });
   }
 }
+
 // ========================================
 // ADMIN: CREATE ANNOUNCEMENT
 // ========================================
@@ -287,62 +440,44 @@ export async function createAnnouncement(
   res: Response
 ) {
   try {
-    const {
-      title,
-      message,
-      image_url,
-      publish_at,
-    } = req.body;
+    const validation = validateAnnouncement(req.body);
 
-    // Validate required fields
-    if (
-      !title ||
-      typeof title !== 'string' ||
-      !title.trim()
-    ) {
+    if (validation.error || !validation.values) {
       return res.status(400).json({
         success: false,
-        message: 'Title is required',
+        message: validation.error || 'Invalid announcement',
       });
     }
 
-    if (
-      !message ||
-      typeof message !== 'string' ||
-      !message.trim()
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Message is required',
-      });
-    }
+    const v = validation.values;
 
-    // Create announcement
     const result = await pool.query(
-      `
-      INSERT INTO announcements (
+      `INSERT INTO announcements (
         title,
         message,
         image_url,
+        category,
+        is_pinned,
+        expires_at,
+        attachment_url,
         is_active,
         publish_at
       )
-      VALUES ($1, $2, $3, TRUE, $4)
-      RETURNING
-        id,
-        title,
-        message,
-        image_url,
-        is_active,
-        publish_at,
-        created_at,
-        updated_at
-      `,
+      VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8, $9
+      )
+      RETURNING ${ANNOUNCEMENT_COLUMNS}`,
       [
-        title.trim(),
-        message.trim(),
-        image_url || null,
-        publish_at || null,
+        v.title,
+        v.message,
+        v.imageUrl,
+        v.category,
+        v.isPinned,
+        v.expiresAt,
+        v.attachmentUrl,
+        v.isActive,
+        v.publishAt,
       ]
     );
 
@@ -352,17 +487,16 @@ export async function createAnnouncement(
       data: result.rows[0],
     });
   } catch (error) {
-    console.error(
-      'Admin create announcement error:',
-      error
-    );
+    console.error('Admin create announcement error:', error);
 
     return res.status(500).json({
       success: false,
       message: 'Failed to create announcement',
     });
   }
-}// ========================================
+}
+
+// ========================================
 // ADMIN: UPDATE ANNOUNCEMENT
 // ========================================
 
@@ -371,83 +505,85 @@ export async function updateAnnouncement(
   res: Response
 ) {
   try {
-    const { id } = req.params;
-    const announcementId = Number(id);
+    const announcementId = validId(req.params.id);
 
-    if (
-      !Number.isInteger(announcementId) ||
-      announcementId <= 0
-    ) {
+    if (!announcementId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid announcement ID',
       });
     }
 
-    const {
-      title,
-      message,
-      image_url,
-      publish_at,
-    } = req.body;
-
-    if (
-      !title ||
-      typeof title !== 'string' ||
-      !title.trim()
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title is required',
-      });
-    }
-
-    if (
-      !message ||
-      typeof message !== 'string' ||
-      !message.trim()
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Message is required',
-      });
-    }
-
-    const result = await pool.query(
-      `
-      UPDATE announcements
-      SET
-        title = $1,
-        message = $2,
-        image_url = $3,
-        publish_at = $4,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $5
-      RETURNING
-        id,
-        title,
-        message,
-        image_url,
-        is_active,
-        publish_at,
-        created_at,
-        updated_at
-      `,
-      [
-        title.trim(),
-        message.trim(),
-        image_url || null,
-        publish_at || null,
-        announcementId,
-      ]
+    const existing = await pool.query(
+      `SELECT ${ANNOUNCEMENT_COLUMNS}
+       FROM announcements
+       WHERE id = $1`,
+      [announcementId]
     );
 
-    if (!result.rows.length) {
+    if (!existing.rows.length) {
       return res.status(404).json({
         success: false,
         message: 'Announcement not found',
       });
     }
+
+    // Preserve existing values when optional fields
+    // are omitted by older admin dashboard versions.
+    const current = existing.rows[0];
+
+    const merged = {
+      ...current,
+      ...req.body,
+      title:
+        req.body.title === undefined
+          ? current.title
+          : req.body.title,
+      message:
+        req.body.message === undefined
+          ? current.message
+          : req.body.message,
+    };
+
+    const validation = validateAnnouncement(merged);
+
+    if (validation.error || !validation.values) {
+      return res.status(400).json({
+        success: false,
+        message: validation.error || 'Invalid announcement',
+      });
+    }
+
+    const v = validation.values;
+
+    const result = await pool.query(
+      `UPDATE announcements
+       SET
+         title = $1,
+         message = $2,
+         image_url = $3,
+         category = $4,
+         is_pinned = $5,
+         expires_at = $6,
+         attachment_url = $7,
+         is_active = $8,
+         publish_at = $9,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $10
+       RETURNING ${ANNOUNCEMENT_COLUMNS}`,
+      [
+        v.title,
+        v.message,
+        v.imageUrl,
+        v.category,
+        v.isPinned,
+        v.expiresAt,
+        v.attachmentUrl,
+        v.isActive,
+        v.publishAt,
+        announcementId,
+      ]
+    );
 
     return res.status(200).json({
       success: true,
@@ -455,10 +591,7 @@ export async function updateAnnouncement(
       data: result.rows[0],
     });
   } catch (error) {
-    console.error(
-      'Admin update announcement error:',
-      error
-    );
+    console.error('Admin update announcement error:', error);
 
     return res.status(500).json({
       success: false,
@@ -466,6 +599,7 @@ export async function updateAnnouncement(
     });
   }
 }
+
 // ========================================
 // ADMIN: TOGGLE ANNOUNCEMENT STATUS
 // ========================================
@@ -475,37 +609,46 @@ export async function toggleAnnouncementStatus(
   res: Response
 ) {
   try {
-    const { id } = req.params;
-    const announcementId = Number(id);
+    const announcementId = validId(req.params.id);
 
-    if (
-      !Number.isInteger(announcementId) ||
-      announcementId <= 0
-    ) {
+    if (!announcementId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid announcement ID',
       });
     }
 
+    // Supports both existing toggle calls and
+    // explicit is_active values from admin UI.
+    const requestedStatus = req.body?.is_active;
+
+    if (
+      requestedStatus !== undefined &&
+      typeof requestedStatus !== 'boolean'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'is_active must be a boolean',
+      });
+    }
+
     const result = await pool.query(
-      `
-      UPDATE announcements
-      SET
-        is_active = NOT is_active,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      RETURNING
-        id,
-        title,
-        message,
-        image_url,
-        is_active,
-        publish_at,
-        created_at,
-        updated_at
-      `,
-      [announcementId]
+      `UPDATE announcements
+       SET
+         is_active = CASE
+           WHEN $2::boolean IS NULL
+             THEN NOT is_active
+           ELSE $2::boolean
+         END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING ${ANNOUNCEMENT_COLUMNS}`,
+      [
+        announcementId,
+        requestedStatus === undefined
+          ? null
+          : requestedStatus,
+      ]
     );
 
     if (!result.rows.length) {

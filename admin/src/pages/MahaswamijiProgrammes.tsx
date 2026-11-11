@@ -51,6 +51,17 @@ const emptyForm: ProgrammeForm = {
 
 const optional = (value: string) => value.trim() || null;
 
+function optionalTime(value: string): string | null {
+  const time = value.trim();
+
+  if (!time || /^00:00(?::00)?$/.test(time)) {
+    return null;
+  }
+
+  return time;
+}
+
+
 function youtubeId(url: string): string | null {
   if (!url.trim()) return null;
 
@@ -348,9 +359,9 @@ export default function MahaswamijiProgrammes() {
             image_url: imageUrl,
             youtube_url: optional(editing.youtube_url),
             start_date: optional(editing.start_date),
-            start_time: optional(editing.start_time),
+     start_time: optionalTime(editing.start_time),
             end_date: optional(editing.end_date),
-            end_time: optional(editing.end_time),
+          end_time: optionalTime(editing.end_time),
             venue: optional(editing.venue),
             status: editing.status,
             is_published: editing.is_published,
@@ -614,27 +625,61 @@ export default function MahaswamijiProgrammes() {
               />
             </label>
 
-            <label>
-              Start Time (Optional)
-              <input
-                type="time"
-                value={editing.start_time}
-                onChange={(e) =>
-                  update('start_time', e.target.value)
-                }
-              />
-            </label>
+            
+<label>
+  Start Time (Optional)
 
-            <label>
-              End Date (Optional)
-              <input
-                type="date"
-                value={editing.end_date}
-                onChange={(e) =>
-                  update('end_date', e.target.value)
-                }
-              />
-            </label>
+  <input
+    type="time"
+    value={editing.start_time}
+    onChange={(e) =>
+      update('start_time', e.target.value)
+    }
+  />
+
+  <button
+    type="button"
+    disabled={busy || !editing.start_time}
+    onClick={() => update('start_time', '')}
+    style={{
+      marginTop: 8,
+      padding: '7px 12px',
+      alignSelf: 'flex-start',
+      cursor: 'pointer',
+    }}
+  >
+    ↺ Reset Start Time
+  </button>
+</label>
+
+
+           
+<label>
+  End Time (Optional)
+
+  <input
+    type="time"
+    value={editing.end_time}
+    onChange={(e) =>
+      update('end_time', e.target.value)
+    }
+  />
+
+  <button
+    type="button"
+    disabled={busy || !editing.end_time}
+    onClick={() => update('end_time', '')}
+    style={{
+      marginTop: 8,
+      padding: '7px 12px',
+      alignSelf: 'flex-start',
+      cursor: 'pointer',
+    }}
+  >
+    ↺ Reset End Time
+  </button>
+</label>
+
 
             <label>
               End Time (Optional)
@@ -920,11 +965,12 @@ export default function MahaswamijiProgrammes() {
                         {displayDate(item.start_date)}
                       </div>
 
-                      {item.start_time && (
-                        <small>
-                          {timeInput(item.start_time)}
-                        </small>
-                      )}
+                      {item.start_time &&
+  !/^00:00(?::00)?$/.test(item.start_time) && (
+    <small>
+      {timeInput(item.start_time)}
+    </small>
+  )}
 
                       {item.venue && (
                         <div>

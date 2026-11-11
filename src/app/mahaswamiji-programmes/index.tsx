@@ -91,6 +91,7 @@ function formatDate(date: string | null) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+
 function formatTime(time: string | null) {
   if (!time) return '';
 
@@ -99,7 +100,12 @@ function formatTime(time: string | null) {
   const minute = Number(parts[1]);
 
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
-    return time;
+    return '';
+  }
+
+  // Do not display 00:00 or 00:00:00.
+  if (hour === 0 && minute === 0) {
+    return '';
   }
 
   const suffix = hour >= 12 ? 'PM' : 'AM';
@@ -107,6 +113,7 @@ function formatTime(time: string | null) {
 
   return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
+
 
 // ========================================
 // PROGRAMME CARD
