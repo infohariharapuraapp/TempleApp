@@ -7,6 +7,7 @@ import cloudinary from '../config/cloudinary';
 import {
   getAllAdminAnnouncements,
   createAnnouncement,
+  deleteAnnouncement,
   updateAnnouncement,
   toggleAnnouncementStatus,
   sendAnnouncementNow,
@@ -174,6 +175,12 @@ router.put(
   '/:id',
   updateAnnouncement
 );
+
+ // Delete announcement permanently
+ router.delete(
+   '/:id',
+   deleteAnnouncement
+ );
 
 // Activate / deactivate
 router.patch(

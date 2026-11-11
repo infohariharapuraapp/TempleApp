@@ -245,6 +245,8 @@ export default function Announcements() {
 
   const [actionId, setActionId] =
     useState<number | null>(null);
+  const [deletingId, setDeletingId] =
+  useState<number | null>(null);
 
   const [showForm, setShowForm] = useState(false);
 
@@ -959,6 +961,76 @@ export default function Announcements() {
       setActionId(null);
     }
   }
+
+
+
+  // ========================================
+  // DELETE ANNOUNCEMENT
+  // ========================================
+
+  async function deleteAnnouncement(item: Announcement) {
+    if (actionId !== null || formBusy || deletingId !== null) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${item.title}"?\n\n` +
+      'This announcement will disappear from the temple app. ' +
+      'Any pending scheduled notifications will be cancelled.\n\n' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(item.id);
+      setActionId(item.id);
+      setError('');
+      setSuccess('');
+
+      const response = await apiRequest<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/admin/announcements/${item.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.message || 'Unable to delete announcement'
+        );
+      }
+
+      if (editingId === item.id) {
+        setShowForm(false);
+        setEditingId(null);
+        setForm(emptyForm);
+      }
+
+      setItems(previous =>
+        previous.filter(existing => existing.id !== item.id)
+      );
+
+      setSuccess(
+        `"${item.title}" was deleted successfully.`
+      );
+
+      await loadAnnouncements();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete announcement'
+      );
+    } finally {
+      setDeletingId(null);
+      setActionId(null);
+    }
+  }
+
 
   // ========================================
   // RENDER
@@ -2062,6 +2134,27 @@ export default function Announcements() {
                         ? 'Please wait...'
                         : 'Send Now'}
                     </button>
+
+<button
+  type="button"
+  disabled={busy || deletingId !== null}
+  onClick={() => void deleteAnnouncement(item)}
+  style={{
+    ...secondaryButton,
+    background: '#FFF1F0',
+    border: '1px solid #F2B8B5',
+    color: C.red,
+    opacity: busy || deletingId !== null ? 0.55 : 1,
+    cursor: busy || deletingId !== null
+      ? 'not-allowed'
+      : 'pointer',
+  }}
+>
+  {deletingId === item.id
+    ? 'Deleting...'
+    : '🗑 Delete'}
+</button>
+
                   </div>
                 </div>
               </article>

@@ -622,6 +622,16 @@ export async function sendNotificationRecord(
 
     const notification = result.rows[0];
 
+if (notification.status === 'cancelled') {
+  return {
+    success: false,
+    sent: 0,
+    notificationId,
+    message: 'Notification has been cancelled',
+  };
+}
+
+
     if (notification.status === 'sent') {
       return {
         success: true,

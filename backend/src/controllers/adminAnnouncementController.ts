@@ -677,3 +677,93 @@ export async function toggleAnnouncementStatus(
     });
   }
 }
+
+ // ========================================
+ // ADMIN: DELETE ANNOUNCEMENT
+ // ========================================
+
+
+export async function deleteAnnouncement(
+  req: Request,
+  res: Response
+) {
+  const client = await pool.connect();
+
+  try {
+    const announcementId = validId(req.params.id);
+
+    if (!announcementId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID',
+      });
+    }
+
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT id, title
+       FROM announcements
+       WHERE id = $1
+       FOR UPDATE`,
+      [announcementId]
+    );
+
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found',
+      });
+    }
+
+    // Cancel only notifications that have not
+    // started processing or been sent.
+    const cancelled = await client.query(
+      `UPDATE notifications
+       SET status = 'cancelled',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE notification_type = 'announcement'
+         AND data->>'announcementId' = $1
+         AND status IN ('scheduled', 'pending')
+       RETURNING id`,
+      [String(announcementId)]
+    );
+
+    const deleted = await client.query(
+      `DELETE FROM announcements
+       WHERE id = $1
+       RETURNING id, title`,
+      [announcementId]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Announcement deleted successfully',
+      data: {
+        ...deleted.rows[0],
+        cancelledNotifications: cancelled.rowCount ?? 0,
+      },
+    });
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Delete rollback error:', rollbackError);
+    }
+
+    console.error('Admin delete announcement error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete announcement',
+    });
+  } finally {
+    client.release();
+  }
+}
+
+
