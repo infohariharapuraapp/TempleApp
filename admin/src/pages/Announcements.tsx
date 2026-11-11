@@ -287,6 +287,14 @@ export default function Announcements() {
           'Failed to load announcements'
         );
       }
+      console.log(
+  'Saved PDF URLs:',
+  (response.data || []).map(item => ({
+    id: item.id,
+    title: item.title,
+    attachment_url: item.attachment_url,
+  }))
+);
 
       setItems(response.data || []);
     } catch (err) {
@@ -696,7 +704,9 @@ export default function Announcements() {
       return;
     }
 
+
     const payload = {
+      
       title: form.title.trim(),
       message: form.message.trim(),
       image_url: form.image_url.trim() || null,
@@ -710,6 +720,10 @@ export default function Announcements() {
       publish_at:
         publishAt?.toISOString() || null,
     };
+    console.log('Saving announcement:', {
+  editingId,
+  attachment_url: payload.attachment_url,
+});
 
     try {
       setSaving(true);

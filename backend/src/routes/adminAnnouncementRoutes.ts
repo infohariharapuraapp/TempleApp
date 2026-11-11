@@ -268,15 +268,15 @@ router.post(
             secure_url: string;
             public_id: string;
           }>((resolve, reject) => {
-            const stream =
-              cloudinary.uploader.upload_stream(
-                {
-                  folder:
-                    'temple-app/divyakshetra-updates/pdfs',
-                  resource_type: 'raw',
-                  use_filename: false,
-                  unique_filename: true,
-                },
+           const stream =
+  cloudinary.uploader.upload_stream(
+    {
+      folder:
+        'temple-app/divyakshetra-updates/pdfs',
+      resource_type: 'raw',
+      public_id: `announcement_${Date.now()}.pdf`,
+      overwrite: false,
+    },
                 (uploadError, uploadResult) => {
                   if (uploadError || !uploadResult) {
                     return reject(
