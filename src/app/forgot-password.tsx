@@ -1,8 +1,12 @@
+
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -10,290 +14,243 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { apiRequest } from '@/services/api';
 
-type Step = 'phone' | 'otp' | 'password';
+type Step = 'identifier' | 'otp' | 'password';
 
 export default function ForgotPasswordScreen() {
-  const [step, setStep] = useState<Step>('phone');
-
-  const [phone, setPhone] = useState('');
+  const [step, setStep] = useState<Step>('identifier');
+  const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
   const [loading, setLoading] = useState(false);
 
-  // =========================
-  // SEND OTP
-  // =========================
+  const cleanIdentifier = identifier.trim();
+  const isMobile = /^[6-9]\d{9}$/.test(cleanIdentifier);
+
+  const validIdentifier = () => {
+    if (!cleanIdentifier) {
+      Alert.alert(
+        'Required',
+        'Enter your registered email or mobile number.'
+      );
+      return false;
+    }
+
+    if (
+      !isMobile &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanIdentifier)
+    ) {
+      Alert.alert(
+        'Invalid Details',
+        'Enter a valid email address or 10-digit mobile number.'
+      );
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSendOtp = async () => {
-    const cleanPhone = phone.trim();
+    if (loading || !validIdentifier()) return;
 
-    // Empty mobile number
-    if (!cleanPhone) {
-      Alert.alert(
-        'Mobile Number Required',
-        'Please enter your registered 10-digit mobile number.'
-      );
-      return;
-    }
-
-    // Less than 10 digits
-    if (cleanPhone.length < 10) {
-      Alert.alert(
-        'Invalid Mobile Number',
-        'Please enter a correct 10-digit mobile number.'
-      );
-      return;
-    }
-
-    // Final validation
-    if (!/^\d{10}$/.test(cleanPhone)) {
-      Alert.alert(
-        'Invalid Mobile Number',
-        'Please enter a valid 10-digit mobile number.'
-      );
-      return;
-    }
+    Keyboard.dismiss();
+    setLoading(true);
 
     try {
-      setLoading(true);
-
-      const response = await apiRequest(
-        '/auth/forgot-password',
-        {
-          method: 'POST',
-          body: {
-            phone: cleanPhone,
-          },
-        }
-      );
+      const response = await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: {
+          identifier: cleanIdentifier,
+        },
+      });
 
       if (response.success) {
-        Alert.alert(
-          'OTP Sent',
-          'OTP has been generated successfully. Please enter the 6-digit OTP.'
-        );
-
+        setOtp('');
+        setResetToken('');
         setStep('otp');
-        return;
-      }
 
-      Alert.alert(
-        'Unable to Send OTP',
-        response.message ||
-          'Please try again.'
-      );
+        Alert.alert(
+          'Check Your Email',
+          'If your account has a registered email address, a 6-digit password reset OTP will be sent there.'
+        );
+      } else {
+        Alert.alert(
+          'Unable to Send OTP',
+          response.message || 'Please try again.'
+        );
+      }
     } catch (error: any) {
       Alert.alert(
         'Unable to Send OTP',
-        error?.message ||
-          'Unable to connect to the server.'
+        error?.message || 'Unable to connect to the server.'
       );
     } finally {
       setLoading(false);
     }
   };
-
-  // =========================
-  // VERIFY OTP
-  // =========================
 
   const handleVerifyOtp = async () => {
-    const cleanOtp = otp.trim();
+    if (loading) return;
 
-    if (!cleanOtp) {
-      Alert.alert(
-        'OTP Required',
-        'Please enter the 6-digit OTP.'
-      );
-      return;
-    }
-
-    if (cleanOtp.length !== 6) {
+    if (!/^\d{6}$/.test(otp.trim())) {
       Alert.alert(
         'Invalid OTP',
-        'Please enter the complete 6-digit OTP.'
+        'Enter the complete 6-digit OTP.'
       );
       return;
     }
 
-    if (!/^\d{6}$/.test(cleanOtp)) {
-      Alert.alert(
-        'Invalid OTP',
-        'OTP must contain only numbers.'
-      );
-      return;
-    }
+    Keyboard.dismiss();
+    setLoading(true);
 
     try {
-      setLoading(true);
+      const response = await apiRequest('/auth/verify-reset-otp', {
+        method: 'POST',
+        body: {
+          identifier: cleanIdentifier,
+          otp: otp.trim(),
+        },
+      });
 
-      const response = await apiRequest(
-        '/auth/verify-reset-otp',
-        {
-          method: 'POST',
-          body: {
-            phone: phone.trim(),
-            otp: cleanOtp,
-          },
-        }
-      );
-
-      if (response.success) {
+      if (
+        response.success &&
+        typeof response.data?.resetToken === 'string' &&
+        response.data.resetToken
+      ) {
+        setResetToken(response.data.resetToken);
         setStep('password');
-        return;
+      } else {
+        Alert.alert(
+          'Verification Failed',
+          response.message ||
+            'Invalid or expired OTP. Please request a new OTP.'
+        );
       }
-
-      Alert.alert(
-        'OTP Verification Failed',
-        response.message ||
-          'Invalid or expired OTP.'
-      );
     } catch (error: any) {
       Alert.alert(
-        'OTP Verification Failed',
-        error?.message ||
-          'Unable to connect to the server.'
+        'Verification Failed',
+        error?.message || 'Unable to verify OTP.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================
-  // RESET PASSWORD
-  // =========================
-
   const handleResetPassword = async () => {
-    if (!newPassword) {
-      Alert.alert(
-        'Password Required',
-        'Please enter your new password.'
-      );
-      return;
-    }
+    if (loading) return;
 
-    if (newPassword.length < 6) {
+    if (
+      newPassword.length < 8 ||
+      new TextEncoder().encode(newPassword).length > 72
+    ) {
       Alert.alert(
-        'Password Too Short',
-        'Password must be at least 6 characters.'
-      );
-      return;
-    }
-
-    if (!confirmPassword) {
-      Alert.alert(
-        'Confirm Password Required',
-        'Please enter your new password again.'
+        'Invalid Password',
+        'Use at least 8 characters and no more than 72 UTF-8 bytes.'
       );
       return;
     }
 
     if (newPassword !== confirmPassword) {
       Alert.alert(
-        'Passwords Do Not Match',
-        'New password and confirm password must match.'
+        'Password Mismatch',
+        'Both passwords must match.'
       );
       return;
     }
 
-    try {
-      setLoading(true);
-
-      const response = await apiRequest(
-        '/auth/reset-password',
-        {
-          method: 'POST',
-          body: {
-            phone: phone.trim(),
-            newPassword,
-          },
-        }
+    if (!resetToken) {
+      Alert.alert(
+        'Session Expired',
+        'Please verify a new OTP.'
       );
+      setStep('identifier');
+      return;
+    }
+
+    Keyboard.dismiss();
+    setLoading(true);
+
+    try {
+      const response = await apiRequest('/auth/reset-password', {
+        method: 'POST',
+        body: {
+          identifier: cleanIdentifier,
+          resetToken,
+          newPassword,
+        },
+      });
 
       if (response.success) {
-        // Clear sensitive values
         setOtp('');
+        setResetToken('');
         setNewPassword('');
         setConfirmPassword('');
 
         Alert.alert(
           'Password Reset Successful',
-          'Your password has been reset successfully. You can now login using your new password.',
+          'Your password has been changed. Login with your new password.',
           [
             {
               text: 'Go to Login',
-              onPress: () => {
-                router.replace('/login');
-              },
+              onPress: () => router.replace('/login'),
             },
           ],
-          {
-            cancelable: false,
-          }
+          { cancelable: false }
         );
-
-        return;
+      } else {
+        Alert.alert(
+          'Reset Failed',
+          response.message || 'Unable to reset password.'
+        );
       }
-
-      Alert.alert(
-        'Password Reset Failed',
-        response.message ||
-          'Unable to reset password.'
-      );
     } catch (error: any) {
       Alert.alert(
-        'Password Reset Failed',
-        error?.message ||
-          'Unable to connect to the server.'
+        'Reset Failed',
+        error?.message || 'Unable to reset password.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================
-  // PHONE STEP
-  // =========================
-
-  const renderPhoneStep = () => (
+  const renderIdentifierStep = () => (
     <>
-      <Text style={styles.title}>
-        Forgot Password
-      </Text>
+      <Text style={styles.title}>Forgot Password</Text>
 
       <Text style={styles.subtitle}>
-        Enter your registered 10-digit mobile number.
-        We will send you an OTP to verify your account.
+        Enter your registered email address or mobile number.
+        We will send a verification code to your registered email.
       </Text>
 
       <Text style={styles.inputLabel}>
-        Mobile Number
+        Mobile Number or Email
       </Text>
 
       <TextInput
         style={styles.input}
-        value={phone}
-        onChangeText={(value) =>
-          setPhone(
-            value
-              .replace(/[^0-9]/g, '')
-              .slice(0, 10)
-          )
-        }
-        placeholder="Enter 10-digit mobile number"
+        value={identifier}
+        onChangeText={setIdentifier}
+        placeholder="Enter mobile number or email"
         placeholderTextColor="#999"
-        keyboardType="phone-pad"
-        maxLength={10}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="username"
+        returnKeyType="done"
+        onSubmitEditing={handleSendOtp}
         editable={!loading}
       />
 
       <Text style={styles.helperText}>
-        Mobile number must contain exactly 10 digits.
+        OTP will be delivered only to your registered email.
       </Text>
 
       <TouchableOpacity
@@ -304,46 +261,35 @@ export default function ForgotPasswordScreen() {
         onPress={handleSendOtp}
         disabled={loading}
       >
-        <Text style={styles.primaryButtonText}>
-          {loading
-            ? 'Sending...'
-            : 'Send OTP'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            Send OTP
+          </Text>
+        )}
       </TouchableOpacity>
     </>
   );
 
-  // =========================
-  // OTP STEP
-  // =========================
-
   const renderOtpStep = () => (
     <>
-      <Text style={styles.title}>
-        Verify OTP
-      </Text>
+      <Text style={styles.title}>Check Your Email</Text>
 
       <Text style={styles.subtitle}>
-        Enter the 6-digit OTP sent to your registered
-        mobile number ending in {phone.slice(-4)}.
+        Enter the 6-digit verification code sent to the
+        registered email address associated with your account.
       </Text>
 
       <Text style={styles.inputLabel}>
-        OTP
+        Verification Code
       </Text>
 
       <TextInput
-        style={[
-          styles.input,
-          styles.otpInput,
-        ]}
+        style={[styles.input, styles.otpInput]}
         value={otp}
         onChangeText={(value) =>
-          setOtp(
-            value
-              .replace(/[^0-9]/g, '')
-              .slice(0, 6)
-          )
+          setOtp(value.replace(/\D/g, '').slice(0, 6))
         }
         placeholder="000000"
         placeholderTextColor="#999"
@@ -353,7 +299,7 @@ export default function ForgotPasswordScreen() {
       />
 
       <Text style={styles.helperText}>
-        Enter the complete 6-digit OTP.
+        OTP expires after 5 minutes.
       </Text>
 
       <TouchableOpacity
@@ -364,76 +310,107 @@ export default function ForgotPasswordScreen() {
         onPress={handleVerifyOtp}
         disabled={loading}
       >
-        <Text style={styles.primaryButtonText}>
-          {loading
-            ? 'Verifying...'
-            : 'Verify OTP'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            Verify OTP
+          </Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.secondaryAction}
         onPress={() => {
           setOtp('');
-          setStep('phone');
+          setResetToken('');
+          setStep('identifier');
         }}
         disabled={loading}
       >
         <Text style={styles.secondaryActionText}>
-          Change Mobile Number
+          Change Email / Mobile Number
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.secondaryAction}
+        onPress={handleSendOtp}
+        disabled={loading}
+      >
+        <Text style={styles.secondaryActionText}>
+          Resend OTP
         </Text>
       </TouchableOpacity>
     </>
   );
 
-  // =========================
-  // PASSWORD STEP
-  // =========================
-
   const renderPasswordStep = () => (
     <>
-      <Text style={styles.title}>
-        Create New Password
-      </Text>
+      <Text style={styles.title}>Create New Password</Text>
 
       <Text style={styles.subtitle}>
-        Your mobile number has been verified.
-        Create a new password for your account.
+        Your OTP has been verified. Create a new password
+        to secure your account.
       </Text>
 
-      <Text style={styles.inputLabel}>
-        New Password
-      </Text>
+      <Text style={styles.inputLabel}>New Password</Text>
 
-      <TextInput
-        style={styles.input}
-        value={newPassword}
-        onChangeText={setNewPassword}
-        placeholder="Enter new password"
-        placeholderTextColor="#999"
-        secureTextEntry
-        autoCapitalize="none"
-        editable={!loading}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={styles.passwordInput}
+          value={newPassword}
+          onChangeText={setNewPassword}
+          placeholder="Minimum 8 characters"
+          placeholderTextColor="#999"
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoComplete="new-password"
+          editable={!loading}
+        />
+
+        <TouchableOpacity
+          style={styles.showButton}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Text style={styles.showText}>
+            {showPassword ? 'Hide' : 'Show'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.helperText}>
-        Password must contain at least 6 characters.
+        Use at least 8 characters.
       </Text>
 
       <Text style={styles.inputLabel}>
         Confirm Password
       </Text>
 
-      <TextInput
-        style={styles.input}
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        placeholder="Enter password again"
-        placeholderTextColor="#999"
-        secureTextEntry
-        autoCapitalize="none"
-        editable={!loading}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={styles.passwordInput}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder="Re-enter your new password"
+          placeholderTextColor="#999"
+          secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
+          autoComplete="new-password"
+          editable={!loading}
+        />
+
+        <TouchableOpacity
+          style={styles.showButton}
+          onPress={() =>
+            setShowConfirmPassword(!showConfirmPassword)
+          }
+        >
+          <Text style={styles.showText}>
+            {showConfirmPassword ? 'Hide' : 'Show'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.helperText}>
         Re-enter the same password to confirm.
@@ -447,70 +424,76 @@ export default function ForgotPasswordScreen() {
         onPress={handleResetPassword}
         disabled={loading}
       >
-        <Text style={styles.primaryButtonText}>
-          {loading
-            ? 'Resetting...'
-            : 'Reset Password'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            Reset Password
+          </Text>
+        )}
       </TouchableOpacity>
     </>
   );
 
-  // =========================
-  // SCREEN
-  // =========================
-
   return (
-    <KeyboardAvoidingView
+    <SafeAreaView
       style={styles.container}
-      behavior={
-        Platform.OS === 'ios'
-          ? 'padding'
-          : undefined
-      }
+      edges={['top', 'bottom']}
     >
-      <View style={styles.content}>
-        <Text style={styles.label}>
-          TEMPLE
-        </Text>
-
-        {step === 'phone' &&
-          renderPhoneStep()}
-
-        {step === 'otp' &&
-          renderOtpStep()}
-
-        {step === 'password' &&
-          renderPasswordStep()}
-
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() =>
-            router.replace('/login')
-          }
-          disabled={loading}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
-          <Text style={styles.backButtonText}>
-            Back to Login
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.form}>
+            <Text style={styles.label}>TEMPLE</Text>
+
+            {step === 'identifier' && renderIdentifierStep()}
+            {step === 'otp' && renderOtpStep()}
+            {step === 'password' && renderPasswordStep()}
+
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.replace('/login')}
+              disabled={loading}
+            >
+              <Text style={styles.backButtonText}>
+                Back to Login
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
   },
-
   content: {
-    flex: 1,
-    padding: 24,
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     justifyContent: 'center',
   },
-
+  form: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+  },
   label: {
     fontSize: 10,
     fontWeight: '700',
@@ -518,13 +501,11 @@ const styles = StyleSheet.create({
     color: '#B66A2C',
     marginBottom: 6,
   },
-
   title: {
     fontSize: 30,
     fontWeight: '700',
     color: '#4A2C18',
   },
-
   subtitle: {
     fontSize: 12,
     lineHeight: 18,
@@ -532,14 +513,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 30,
   },
-
   inputLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#4A2C18',
     marginBottom: 7,
   },
-
   input: {
     height: 50,
     backgroundColor: '#FFFFFF',
@@ -551,21 +530,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEE3D8',
   },
-
   helperText: {
     fontSize: 11,
     color: '#777',
     marginBottom: 18,
     marginLeft: 3,
   },
-
   otpInput: {
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 8,
     textAlign: 'center',
   },
-
+  passwordContainer: {
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EEE3D8',
+    marginBottom: 6,
+  },
+  passwordInput: {
+    flex: 1,
+    minWidth: 0,
+    height: '100%',
+    paddingHorizontal: 15,
+    fontSize: 13,
+    color: '#333',
+  },
+  showButton: {
+    paddingHorizontal: 15,
+    height: '100%',
+    justifyContent: 'center',
+  },
+  showText: {
+    color: '#B66A2C',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   primaryButton: {
     height: 50,
     borderRadius: 15,
@@ -574,36 +578,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 5,
   },
-
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
-
   disabledButton: {
     opacity: 0.6,
   },
-
   secondaryAction: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
-
   secondaryActionText: {
     color: '#B66A2C',
     fontSize: 12,
     fontWeight: '700',
   },
-
   backButton: {
     height: 45,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
   },
-
   backButtonText: {
     color: '#B66A2C',
     fontSize: 13,

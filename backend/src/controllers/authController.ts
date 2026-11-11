@@ -61,15 +61,19 @@ export const register = async (
       });
     }
 
-    if (
-      cleanEmail &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Enter a valid email address.',
-      });
-    }
+ if (!cleanEmail) {
+  return res.status(400).json({
+    success: false,
+    message: 'Email address is required.',
+  });
+}
+
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+  return res.status(400).json({
+    success: false,
+    message: 'Enter a valid email address.',
+  });
+}
 
     if (
       typeof password !== 'string' ||
@@ -91,7 +95,7 @@ export const register = async (
        LIMIT 1`,
       [
         cleanPhone,
-        cleanEmail || null,
+       cleanEmail,
       ]
     );
 
@@ -441,310 +445,403 @@ export const updateProfile = async (
 // FORGOT PASSWORD
 // =========================
 
+
 export const forgotPassword = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const { phone } = req.body;
+    const identifier =
+      typeof req.body?.identifier === 'string'
+        ? req.body.identifier.trim().toLowerCase()
+        : '';
 
-    if (!phone) {
+    const isPhone = /^[6-9]\d{9}$/.test(identifier);
+    const isEmail =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+
+    if (!isPhone && !isEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Mobile number is required',
+        message: 'Enter a valid email or mobile number.',
       });
     }
 
-    // Find user by mobile number
-   const userResult = await pool.query(
-  `SELECT id, full_name, phone, email
-   FROM users
-   WHERE phone = $1`,
-  [phone]
-);
+    const userResult = await pool.query(
+      `SELECT id, email
+       FROM users
+       WHERE phone = $1 OR LOWER(email) = $1
+       LIMIT 1`,
+      [identifier]
+    );
+
+    const genericMessage =
+      'If your account has a registered email, a password reset OTP will be sent there.';
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with this mobile number',
+      return res.json({
+        success: true,
+        message: genericMessage,
       });
     }
 
-   const user = userResult.rows[0];
+    const user = userResult.rows[0];
 
-if (!user.email) {
-  return res.status(400).json({
-    success: false,
-    message:
-      'No email address is registered with this account. Please contact temple support.',
-  });
-}
+    if (!user.email) {
+      return res.json({
+        success: true,
+        message: genericMessage,
+      });
+    }
 
-// Generate secure six-digit OTP
-const otp = randomInt(100000, 1000000).toString();
+    // Limit OTP requests to once every 60 seconds.
+    const recent = await pool.query(
+      `SELECT id
+       FROM password_reset_otps
+       WHERE user_id = $1
+         AND created_at > NOW() - INTERVAL '60 seconds'
+       LIMIT 1`,
+      [user.id]
+    );
 
-    // Generate 6-digit OTP
-   //const otp = crypto
-  //.randomInt(100000, 1000000)
-  //toString();
-    // Hash OTP before storing
+    if (recent.rows.length > 0) {
+      return res.json({
+        success: true,
+        message: genericMessage,
+      });
+    }
+
+    const otp = randomInt(100000, 1000000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
 
-    // OTP valid for 5 minutes
     const expiresAt = new Date(
       Date.now() + 5 * 60 * 1000
     );
 
-    // Remove previous password reset OTPs for this user
     await pool.query(
       `DELETE FROM password_reset_otps
        WHERE user_id = $1`,
       [user.id]
     );
 
-    // Store new OTP
-    await pool.query(
-      `INSERT INTO password_reset_otps (
-        user_id,
-        otp_hash,
-        expires_at
-      )
-      VALUES ($1, $2, $3)`,
-      [
-        user.id,
-        otpHash,
-        expiresAt,
-      ]
+    const inserted = await pool.query(
+      `INSERT INTO password_reset_otps
+       (user_id, otp_hash, expires_at)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [user.id, otpHash, expiresAt]
     );
 
     try {
-  await sendPasswordResetOTP(
-    user.email,
-    otp
-  );
-} catch (emailError) {
-  console.error(
-    'Password reset email delivery failed:',
-    emailError
-  );
+      await sendPasswordResetOTP(user.email, otp);
+    } catch (emailError) {
+      console.error(
+        'Password reset email error:',
+        emailError
+      );
 
-  await pool.query(
-    `DELETE FROM password_reset_otps
-     WHERE user_id = $1`,
-    [user.id]
-  );
+      await pool.query(
+        `DELETE FROM password_reset_otps
+         WHERE id = $1`,
+        [inserted.rows[0].id]
+      );
 
-  return res.status(503).json({
-    success: false,
-    message:
-      'Unable to send OTP email. Please try again later.',
-  });
-}
+      return res.status(503).json({
+        success: false,
+        message:
+          'Email service is temporarily unavailable. Please try again later.',
+      });
+    }
 
-return res.json({
-  success: true,
-  message:
-    'Password reset OTP sent to your registered email address.',
-}); 
+    return res.json({
+      success: true,
+      message: genericMessage,
+    });
   } catch (error) {
-    console.error(
-      'Forgot password error:',
-      error
-    );
+    console.error('Forgot password error:', error);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to generate OTP',
+      message: 'Unable to process password reset.',
     });
   }
 };
+
 // =========================
 // VERIFY RESET OTP
 // =========================
+
 
 export const verifyResetOtp = async (
   req: Request,
   res: Response
 ) => {
+  const identifier =
+    typeof req.body?.identifier === 'string'
+      ? req.body.identifier.trim().toLowerCase()
+      : '';
+
+  const otp = String(req.body?.otp ?? '').trim();
+
+  if (
+    !identifier ||
+    !/^\d{6}$/.test(otp)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid email, mobile number or OTP.',
+    });
+  }
+
+  const client = await pool.connect();
+
   try {
-    const { phone, otp } = req.body;
+    await client.query('BEGIN');
 
-    if (!phone || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mobile number and OTP are required',
-      });
-    }
-
-    const userResult = await pool.query(
-      `SELECT id
-       FROM users
-       WHERE phone = $1`,
-      [phone]
+    const userResult = await client.query(
+      `SELECT id FROM users
+       WHERE phone = $1 OR LOWER(email) = $1
+       LIMIT 1`,
+      [identifier]
     );
 
     if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired OTP',
+        message: 'Invalid or expired OTP.',
       });
     }
 
     const userId = userResult.rows[0].id;
 
-    const otpResult = await pool.query(
+    const otpResult = await client.query(
       `SELECT id, otp_hash, expires_at, attempt_count
        FROM password_reset_otps
-       WHERE user_id = $1
-       AND verified = FALSE
+       WHERE user_id = $1 AND verified = FALSE
        ORDER BY created_at DESC
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [userId]
     );
 
     if (otpResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired OTP',
+        message: 'Invalid or expired OTP.',
       });
     }
 
-    const otpRecord = otpResult.rows[0];
+    const record = otpResult.rows[0];
 
-    // Maximum 5 verification attempts
-    if (otpRecord.attempt_count >= 5) {
+    if (record.attempt_count >= 5) {
+      await client.query('ROLLBACK');
       return res.status(429).json({
         success: false,
-        message: 'Too many OTP attempts. Request a new OTP.',
+        message:
+          'Too many attempts. Request a new OTP.',
       });
     }
 
-    // Check expiry
-    if (new Date() > new Date(otpRecord.expires_at)) {
-      await pool.query(
-        `DELETE FROM password_reset_otps
-         WHERE id = $1`,
-        [otpRecord.id]
+    if (new Date(record.expires_at).getTime() <= Date.now()) {
+      await client.query(
+        `DELETE FROM password_reset_otps WHERE id = $1`,
+        [record.id]
       );
+      await client.query('COMMIT');
 
       return res.status(400).json({
         success: false,
-        message: 'OTP has expired. Request a new OTP.',
+        message: 'OTP expired. Request a new OTP.',
       });
     }
 
-    const isValidOtp = await bcrypt.compare(
-      String(otp),
-      otpRecord.otp_hash
+    const valid = await bcrypt.compare(
+      otp,
+      record.otp_hash
     );
 
-    if (!isValidOtp) {
-      await pool.query(
+    if (!valid) {
+      await client.query(
         `UPDATE password_reset_otps
          SET attempt_count = attempt_count + 1
          WHERE id = $1`,
-        [otpRecord.id]
+        [record.id]
       );
+
+      await client.query('COMMIT');
 
       return res.status(400).json({
         success: false,
-        message: 'Invalid OTP',
+        message: 'Invalid OTP.',
       });
     }
 
-    await pool.query(
+    const resetToken = crypto
+      .randomBytes(32)
+      .toString('hex');
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Reuse otp_hash for the reset-token hash.
+    // A verified OTP cannot be verified again.
+    await client.query(
       `UPDATE password_reset_otps
-       SET verified = TRUE
-       WHERE id = $1`,
-      [otpRecord.id]
+       SET verified = TRUE, otp_hash = $1
+       WHERE id = $2`,
+      [tokenHash, record.id]
     );
+
+    await client.query('COMMIT');
 
     return res.json({
       success: true,
-      message: 'OTP verified successfully',
+      message: 'OTP verified successfully.',
+      data: {
+        resetToken,
+      },
     });
   } catch (error) {
-    console.error(
-      'Verify reset OTP error:',
-      error
-    );
+    try {
+      await client.query('ROLLBACK');
+    } catch {}
+
+    console.error('Verify OTP error:', error);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to verify OTP',
+      message: 'Unable to verify OTP.',
     });
+  } finally {
+    client.release();
   }
 };
+
 // =========================
 // RESET PASSWORD
 // =========================
+
 
 export const resetPassword = async (
   req: Request,
   res: Response
 ) => {
+  const identifier =
+    typeof req.body?.identifier === 'string'
+      ? req.body.identifier.trim().toLowerCase()
+      : '';
+
+  const resetToken = req.body?.resetToken;
+  const newPassword = req.body?.newPassword;
+
+  if (
+    !identifier ||
+    typeof resetToken !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(resetToken)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'Invalid reset session. Please verify OTP again.',
+    });
+  }
+
+  if (
+    typeof newPassword !== 'string' ||
+    newPassword.length < 8 ||
+    Buffer.byteLength(newPassword, 'utf8') > 72
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        'Password must be at least 8 characters and no more than 72 UTF-8 bytes.',
+    });
+  }
+
+  const client = await pool.connect();
+
   try {
-    const { phone, newPassword } = req.body;
+    await client.query('BEGIN');
 
-    if (!phone || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mobile number and new password are required',
-      });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters',
-      });
-    }
-
-    const userResult = await pool.query(
-      `SELECT id
-       FROM users
-       WHERE phone = $1`,
-      [phone]
+    const userResult = await client.query(
+      `SELECT id FROM users
+       WHERE phone = $1 OR LOWER(email) = $1
+       LIMIT 1`,
+      [identifier]
     );
 
     if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'Unable to reset password',
+        message: 'Invalid or expired reset session.',
       });
     }
 
     const userId = userResult.rows[0].id;
 
-    const otpResult = await pool.query(
-      `SELECT id, expires_at
+    const tokenResult = await client.query(
+      `SELECT id, otp_hash, expires_at
        FROM password_reset_otps
-       WHERE user_id = $1
-       AND verified = TRUE
+       WHERE user_id = $1 AND verified = TRUE
        ORDER BY created_at DESC
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [userId]
     );
 
-    if (otpResult.rows.length === 0) {
+    if (tokenResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'OTP verification required',
+        message: 'OTP verification required.',
       });
     }
 
-    const otpRecord = otpResult.rows[0];
+    const record = tokenResult.rows[0];
 
-    if (new Date() > new Date(otpRecord.expires_at)) {
-      await pool.query(
-        `DELETE FROM password_reset_otps
-         WHERE id = $1`,
-        [otpRecord.id]
+    if (
+      new Date(record.expires_at).getTime() <= Date.now()
+    ) {
+      await client.query(
+        `DELETE FROM password_reset_otps WHERE id = $1`,
+        [record.id]
       );
+
+      await client.query('COMMIT');
 
       return res.status(400).json({
         success: false,
-        message: 'Password reset session has expired',
+        message: 'Reset session expired.',
+      });
+    }
+
+    const suppliedHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest();
+
+    const storedHash = Buffer.from(
+      record.otp_hash,
+      'hex'
+    );
+
+    const validToken =
+      storedHash.length === suppliedHash.length &&
+      crypto.timingSafeEqual(
+        storedHash,
+        suppliedHash
+      );
+
+    if (!validToken) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset session.',
       });
     }
 
@@ -753,36 +850,42 @@ export const resetPassword = async (
       10
     );
 
-    await pool.query(
+    await client.query(
       `UPDATE users
        SET password_hash = $1
        WHERE id = $2`,
       [passwordHash, userId]
     );
 
-    // OTP can never be reused after password reset
-    await pool.query(
+    // Consume all password-reset sessions.
+    await client.query(
       `DELETE FROM password_reset_otps
        WHERE user_id = $1`,
       [userId]
     );
 
+    await client.query('COMMIT');
+
     return res.json({
       success: true,
-      message: 'Password reset successfully',
+      message: 'Password reset successfully.',
     });
   } catch (error) {
-    console.error(
-      'Reset password error:',
-      error
-    );
+    try {
+      await client.query('ROLLBACK');
+    } catch {}
+
+    console.error('Reset password error:', error);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to reset password',
+      message: 'Unable to reset password.',
     });
+  } finally {
+    client.release();
   }
 };
+
 
 
  // ========================================

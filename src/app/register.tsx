@@ -1,10 +1,5 @@
 
-import React, {
-  useRef,
-  useState,
-  useEffect,
-} from 'react';
-
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,85 +14,45 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { apiRequest } from '@/services/api';
-
-// ========================================
-// REGISTER SCREEN
-// ========================================
 
 export default function RegisterScreen() {
   const { width } = useWindowDimensions();
-
-  const isSmallScreen = width < 360;
+  const small = width < 360;
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
-
   const [loading, setLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
-
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
-  // ========================================
-  // KEYBOARD HANDLING
-  // ========================================
-
-  useEffect(() => {
-    const showListener = Keyboard.addListener(
+  React.useEffect(() => {
+    const show = Keyboard.addListener(
       'keyboardDidShow',
       () => setKeyboardVisible(true)
     );
-
-    const hideListener = Keyboard.addListener(
+    const hide = Keyboard.addListener(
       'keyboardDidHide',
       () => setKeyboardVisible(false)
     );
-
     return () => {
-      showListener.remove();
-      hideListener.remove();
-
-      if (scrollTimer.current) {
-        clearTimeout(scrollTimer.current);
-      }
+      show.remove();
+      hide.remove();
     };
   }, []);
-
-  const scrollToConfirmPassword = () => {
-    if (scrollTimer.current) {
-      clearTimeout(scrollTimer.current);
-    }
-
-    scrollTimer.current = setTimeout(() => {
-      scrollRef.current?.scrollToEnd({
-        animated: true,
-      });
-    }, 350);
-  };
-
-  // ========================================
-  // REGISTER DEVOTEE
-  // ========================================
 
   const handleRegister = async () => {
     if (loading) return;
@@ -122,29 +77,29 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (
-      emailAddress &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)
-    ) {
+    if (!emailAddress) {
+      Alert.alert(
+        'Email Required',
+        'Please enter your email address. It is required for password recovery.'
+      );
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) {
       Alert.alert(
         'Invalid Email',
-        'Enter a valid email address or leave it blank.'
+        'Please enter a valid email address.'
       );
       return;
     }
 
-    if (password.length < 8) {
+    if (
+      password.length < 8 ||
+      new TextEncoder().encode(password).length > 72
+    ) {
       Alert.alert(
         'Invalid Password',
-        'Password must contain at least 8 characters.'
-      );
-      return;
-    }
-
-    if (new TextEncoder().encode(password).length > 72) {
-      Alert.alert(
-        'Invalid Password',
-        'Password must not exceed 72 UTF-8 bytes.'
+        'Password must be at least 8 characters and no more than 72 UTF-8 bytes.'
       );
       return;
     }
@@ -167,7 +122,7 @@ export default function RegisterScreen() {
         body: {
           full_name: name,
           phone: mobile,
-          email: emailAddress || null,
+          email: emailAddress,
           password,
         },
       });
@@ -176,14 +131,11 @@ export default function RegisterScreen() {
         Alert.alert(
           'Registration Successful',
           'Your devotee account has been created. Please login to continue.',
-          [
-            {
-              text: 'Login',
-              onPress: () => router.replace('/login'),
-            },
-          ]
+          [{
+            text: 'Login',
+            onPress: () => router.replace('/login'),
+          }]
         );
-
         return;
       }
 
@@ -201,9 +153,11 @@ export default function RegisterScreen() {
     }
   };
 
-  // ========================================
-  // SCREEN
-  // ========================================
+  const focusNext = (
+    ref: React.RefObject<TextInput | null>
+  ) => {
+    ref.current?.focus();
+  };
 
   return (
     <SafeAreaView
@@ -219,7 +173,7 @@ export default function RegisterScreen() {
           style={styles.flex}
           contentContainerStyle={[
             styles.content,
-            isSmallScreen && styles.smallScreenContent,
+            small && styles.smallContent,
             keyboardVisible && styles.keyboardContent,
           ]}
           keyboardShouldPersistTaps="handled"
@@ -227,31 +181,23 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
-          <View
-            style={[
-              styles.form,
-              isSmallScreen && styles.smallScreenForm,
-            ]}
-          >
-            {/* HEADER */}
-
+          <View style={[
+            styles.form,
+            small && styles.smallForm,
+          ]}>
             <View style={styles.header}>
               <View style={styles.templeIcon}>
-                <Text style={styles.templeEmoji}>
-                  🙏
-                </Text>
+                <Text style={styles.templeEmoji}>🙏</Text>
               </View>
 
               <Text style={styles.label}>
                 HARIHARIPURA TEMPLE
               </Text>
 
-              <Text
-                style={[
-                  styles.title,
-                  isSmallScreen && styles.smallTitle,
-                ]}
-              >
+              <Text style={[
+                styles.title,
+                small && { fontSize: 25 },
+              ]}>
                 Create Account
               </Text>
 
@@ -261,12 +207,9 @@ export default function RegisterScreen() {
               </Text>
             </View>
 
-            {/* FULL NAME */}
-
             <Text style={styles.inputLabel}>
               Full Name <Text style={styles.required}>*</Text>
             </Text>
-
             <TextInput
               style={styles.input}
               value={fullName}
@@ -277,16 +220,13 @@ export default function RegisterScreen() {
               autoCorrect={false}
               autoComplete="name"
               returnKeyType="next"
-              onSubmitEditing={() => phoneRef.current?.focus()}
+              onSubmitEditing={() => focusNext(phoneRef)}
               editable={!loading}
             />
-
-            {/* MOBILE NUMBER */}
 
             <Text style={styles.inputLabel}>
               Mobile Number <Text style={styles.required}>*</Text>
             </Text>
-
             <TextInput
               ref={phoneRef}
               style={styles.input}
@@ -300,13 +240,9 @@ export default function RegisterScreen() {
               editable={!loading}
             />
 
-            {/* EMAIL */}
-
             <Text style={styles.inputLabel}>
-              Email Address
-              <Text style={styles.optional}> (Optional)</Text>
+              Email Address <Text style={styles.required}>*</Text>
             </Text>
-
             <TextInput
               ref={emailRef}
               style={styles.input}
@@ -319,16 +255,13 @@ export default function RegisterScreen() {
               autoCorrect={false}
               autoComplete="email"
               returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
+              onSubmitEditing={() => focusNext(passwordRef)}
               editable={!loading}
             />
-
-            {/* PASSWORD */}
 
             <Text style={styles.inputLabel}>
               Password <Text style={styles.required}>*</Text>
             </Text>
-
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={passwordRef}
@@ -342,10 +275,9 @@ export default function RegisterScreen() {
                 autoCorrect={false}
                 autoComplete="new-password"
                 returnKeyType="next"
-                onSubmitEditing={() => confirmRef.current?.focus()}
+                onSubmitEditing={() => focusNext(confirmRef)}
                 editable={!loading}
               />
-
               <TouchableOpacity
                 style={styles.showButton}
                 onPress={() => setShowPassword(!showPassword)}
@@ -365,13 +297,10 @@ export default function RegisterScreen() {
               Use at least 8 characters.
             </Text>
 
-            {/* CONFIRM PASSWORD */}
-
             <Text style={styles.inputLabel}>
               Confirm Password{' '}
               <Text style={styles.required}>*</Text>
             </Text>
-
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={confirmRef}
@@ -385,11 +314,9 @@ export default function RegisterScreen() {
                 autoCorrect={false}
                 autoComplete="new-password"
                 returnKeyType="done"
-                onFocus={scrollToConfirmPassword}
                 onSubmitEditing={handleRegister}
                 editable={!loading}
               />
-
               <TouchableOpacity
                 style={styles.showButton}
                 onPress={() =>
@@ -409,16 +336,12 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* INFORMATION */}
-
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                Fields marked * are required. Email is optional,
-                but currently needed for password recovery.
+                Fields marked * are required. Your email
+                address is used for password recovery.
               </Text>
             </View>
-
-            {/* REGISTER BUTTON */}
 
             <TouchableOpacity
               style={[
@@ -439,25 +362,17 @@ export default function RegisterScreen() {
               )}
             </TouchableOpacity>
 
-            {/* LOGIN */}
-
             <View style={styles.loginRow}>
               <Text style={styles.loginText}>
                 Already have an account?
               </Text>
-
               <TouchableOpacity
                 onPress={() => router.replace('/login')}
                 disabled={loading}
-                accessibilityRole="button"
               >
-                <Text style={styles.loginLink}>
-                  {' '}Login
-                </Text>
+                <Text style={styles.loginLink}> Login</Text>
               </TouchableOpacity>
             </View>
-
-            {/* FOOTER */}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>
@@ -471,20 +386,12 @@ export default function RegisterScreen() {
   );
 }
 
-// ========================================
-// STYLES
-// ========================================
-
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-
+  flex: { flex: 1 },
   container: {
     flex: 1,
     backgroundColor: '#FFFDF8',
   },
-
   content: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -492,18 +399,15 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     justifyContent: 'center',
   },
-
-  smallScreenContent: {
+  smallContent: {
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 24,
   },
-
   keyboardContent: {
     justifyContent: 'flex-start',
-    paddingBottom: 150,
+    paddingBottom: 90,
   },
-
   form: {
     width: '100%',
     maxWidth: 440,
@@ -514,19 +418,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8DCCB',
   },
-
-  smallScreenForm: {
+  smallForm: {
     padding: 15,
     borderRadius: 16,
   },
-
-  // HEADER
-
   header: {
     alignItems: 'center',
     marginBottom: 24,
   },
-
   templeIcon: {
     width: 62,
     height: 62,
@@ -536,11 +435,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 14,
   },
-
-  templeEmoji: {
-    fontSize: 30,
-  },
-
+  templeEmoji: { fontSize: 30 },
   label: {
     fontSize: 11,
     fontWeight: '700',
@@ -549,18 +444,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#6B1720',
     textAlign: 'center',
   },
-
-  smallTitle: {
-    fontSize: 25,
-  },
-
   subtitle: {
     fontSize: 13,
     lineHeight: 20,
@@ -568,26 +457,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-
-  // INPUTS
-
   inputLabel: {
     fontSize: 13,
     fontWeight: '700',
     color: '#4A2C18',
     marginBottom: 8,
   },
-
-  required: {
-    color: '#B42318',
-  },
-
-  optional: {
-    color: '#8E8175',
-    fontWeight: '400',
-    fontSize: 12,
-  },
-
+  required: { color: '#B42318' },
   input: {
     width: '100%',
     minHeight: 52,
@@ -601,9 +477,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8DCCB',
   },
-
-  // PASSWORD
-
   passwordContainer: {
     width: '100%',
     minHeight: 52,
@@ -615,7 +488,6 @@ const styles = StyleSheet.create({
     borderColor: '#E8DCCB',
     marginBottom: 16,
   },
-
   passwordInput: {
     flex: 1,
     minWidth: 0,
@@ -625,29 +497,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333333',
   },
-
   showButton: {
     minHeight: 48,
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   showText: {
     color: '#6B1720',
     fontSize: 12,
     fontWeight: '700',
   },
-
   passwordHint: {
     fontSize: 11,
     color: '#8E8175',
     marginTop: -8,
     marginBottom: 18,
   },
-
-  // INFORMATION
-
   infoBox: {
     backgroundColor: '#F7EBD7',
     borderRadius: 12,
@@ -655,15 +521,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 22,
   },
-
   infoText: {
     fontSize: 11,
     lineHeight: 17,
     color: '#6B5440',
   },
-
-  // REGISTER BUTTON
-
   registerButton: {
     width: '100%',
     minHeight: 54,
@@ -673,20 +535,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
+  disabledButton: { opacity: 0.6 },
   registerButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
   },
-
-  // LOGIN
-
   loginRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -694,20 +549,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-
   loginText: {
     color: '#8E8175',
     fontSize: 13,
   },
-
   loginLink: {
     color: '#6B1720',
     fontSize: 13,
     fontWeight: '700',
   },
-
-  // FOOTER
-
   footer: {
     marginTop: 26,
     paddingTop: 16,
@@ -715,7 +565,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0E7DD',
     alignItems: 'center',
   },
-
   footerText: {
     fontSize: 11,
     color: '#8E8175',

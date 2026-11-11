@@ -2229,20 +2229,23 @@ const styles = StyleSheet.create({
     marginBottom: 23,
   },
 
-  guruCard: {
-    width: 244,
-    backgroundColor: COLORS.white,
-    borderRadius: 25,
-    overflow: 'hidden',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: '#E8D8C4',
-    shadowColor: COLORS.brown,
-    shadowOffset: { width: 0, height: 9 },
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    elevation: 5,
-  },
+  
+guruCard: {
+  width: 244,
+  height: 440,
+  backgroundColor: COLORS.white,
+  borderRadius: 25,
+  overflow: 'hidden',
+  marginRight: 14,
+  borderWidth: 1,
+  borderColor: '#E8D8C4',
+  shadowColor: COLORS.brown,
+  shadowOffset: { width: 0, height: 9 },
+  shadowOpacity: 0.10,
+  shadowRadius: 16,
+  elevation: 5,
+},
+
 
   guruImage: {
     width: '100%',
@@ -2279,9 +2282,13 @@ const styles = StyleSheet.create({
     color: COLORS.darkBrown,
   },
 
-  guruBody: {
-    padding: 15,
-  },
+  
+guruBody: {
+  padding: 15,
+  height: 280,
+  justifyContent: 'flex-start',
+},
+
 
   guruTitle: {
     fontFamily: FONTS.medium,
@@ -2324,11 +2331,14 @@ const styles = StyleSheet.create({
     minHeight: 51,
   },
 
-  guruReadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 11,
-  },
+ 
+guruReadRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 'auto',
+  paddingTop: 10,
+},
+
 
   guruRead: {
     fontFamily: FONTS.medium,

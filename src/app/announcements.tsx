@@ -4,7 +4,7 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-
+import { Image as ExpoImage } from 'expo-image';
 import {
   ActivityIndicator,
   Image,
