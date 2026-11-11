@@ -27,6 +27,9 @@ import { getTempleContact } from './controllers/templeContactController';
 
 import welcomeSlokamRoutes from './routes/welcomeSlokamRoutes';
 
+import translationRoutes from './routes/translationRoutes';
+
+
 import adminWelcomeSlokamRoutes from './routes/adminWelcomeSlokamRoutes';
 
 import quotesRoutes from './routes/quotesRoutes';
@@ -271,7 +274,7 @@ app.use(
   announcementRoutes
 );
 
-
+app.use('/api/translate', translationRoutes);
 
 
 app.use(
