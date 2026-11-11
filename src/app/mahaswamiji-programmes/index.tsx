@@ -13,7 +13,6 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { WebView } from 'react-native-webview';
 import { apiRequest } from '@/services/api';
 
 type Status = 'upcoming' | 'ongoing' | 'completed';
@@ -109,14 +108,18 @@ function formatTime(time: string | null) {
   return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
+// ========================================
+// PROGRAMME CARD
+// ========================================
+
 function ProgrammeCard({ item }: { item: Programme }) {
   const [expanded, setExpanded] = useState(false);
-  const [playVideo, setPlayVideo] = useState(false);
 
   const videoId = getYouTubeId(item.youtube_url);
 
+  // Uploaded image has priority over YouTube thumbnail.
   const thumbnail =
-    item.image_url ||
+    item.image_url?.trim() ||
     (videoId
       ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
       : null);
@@ -127,25 +130,40 @@ function ProgrammeCard({ item }: { item: Programme }) {
     item.end_date ||
     item.end_time;
 
+  const openDetails = () => {
+    router.push({
+      pathname: '/mahaswamiji-programmes/[id]',
+      params: { id: String(item.id) },
+    });
+  };
+
   return (
     <View style={styles.card}>
-      {thumbnail ? (
-        <Image
-          source={{ uri: thumbnail }}
-          style={styles.poster}
-          resizeMode="cover"
-        />
-      ) : (
-        <LinearGradient
-          colors={['#6B1720', '#9B4B1E']}
-          style={styles.posterPlaceholder}
-        >
-          <Text style={styles.placeholderOm}>ॐ</Text>
-          <Text style={styles.placeholderText}>
-            MAHASWAMIJI PROGRAMMES
-          </Text>
-        </LinearGradient>
-      )}
+      {/* Clickable programme poster */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={openDetails}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${item.title} details`}
+      >
+        {thumbnail ? (
+          <Image
+            source={{ uri: thumbnail }}
+            style={styles.poster}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={['#6B1720', '#9B4B1E']}
+            style={styles.posterPlaceholder}
+          >
+            <Text style={styles.placeholderOm}>ॐ</Text>
+            <Text style={styles.placeholderText}>
+              MAHASWAMIJI PROGRAMMES
+            </Text>
+          </LinearGradient>
+        )}
+      </TouchableOpacity>
 
       <View style={styles.cardBody}>
         <View style={styles.badgeRow}>
@@ -154,9 +172,24 @@ function ProgrammeCard({ item }: { item: Programme }) {
               {item.status.toUpperCase()}
             </Text>
           </View>
+
+          {videoId && (
+            <View style={styles.videoBadge}>
+              <Text style={styles.videoBadgeText}>
+                ▶ VIDEO
+              </Text>
+            </View>
+          )}
         </View>
 
-        <Text style={styles.cardTitle}>{item.title}</Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={openDetails}
+        >
+          <Text style={styles.cardTitle}>
+            {item.title}
+          </Text>
+        </TouchableOpacity>
 
         <Text
           style={styles.description}
@@ -185,13 +218,19 @@ function ProgrammeCard({ item }: { item: Programme }) {
             {(item.start_date || item.start_time) && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>📅</Text>
+
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Starts</Text>
+                  <Text style={styles.infoLabel}>
+                    Starts
+                  </Text>
+
                   <Text style={styles.infoValue}>
                     {[
                       formatDate(item.start_date),
                       formatTime(item.start_time),
-                    ].filter(Boolean).join(' • ')}
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
                   </Text>
                 </View>
               </View>
@@ -200,13 +239,19 @@ function ProgrammeCard({ item }: { item: Programme }) {
             {(item.end_date || item.end_time) && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>🕒</Text>
+
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Ends</Text>
+                  <Text style={styles.infoLabel}>
+                    Ends
+                  </Text>
+
                   <Text style={styles.infoValue}>
                     {[
                       formatDate(item.end_date),
                       formatTime(item.end_time),
-                    ].filter(Boolean).join(' • ')}
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
                   </Text>
                 </View>
               </View>
@@ -217,101 +262,101 @@ function ProgrammeCard({ item }: { item: Programme }) {
         {item.venue && (
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>📍</Text>
+
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Venue</Text>
-              <Text style={styles.infoValue}>{item.venue}</Text>
+              <Text style={styles.infoLabel}>
+                Venue
+              </Text>
+
+              <Text style={styles.infoValue}>
+                {item.venue}
+              </Text>
             </View>
           </View>
         )}
 
-        {videoId && (
-          <View style={styles.videoSection}>
-            <Text style={styles.infoHeading}>
-              PROGRAMME VIDEO
+        {/* Every programme opens the details screen */}
+        <View style={styles.detailsSection}>
+          <TouchableOpacity
+            style={styles.videoButton}
+            onPress={openDetails}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Text style={styles.videoButtonText}>
+              View Programme Details
             </Text>
 
-            {playVideo ? (
-              <View style={styles.videoWrap}>
-                <WebView
-                  source={{
-                    uri: `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0`,
-                  }}
-                  style={styles.video}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  allowsFullscreenVideo
-                  allowsInlineMediaPlayback
-                  mediaPlaybackRequiresUserAction
-                />
+            <Text style={styles.buttonArrow}>
+              →
+            </Text>
+          </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => setPlayVideo(false)}
-                  style={styles.closeVideo}
-                >
-                  <Text style={styles.closeVideoText}>
-                    Close Video
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.videoButton}
-                onPress={() => setPlayVideo(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.videoButtonText}>
-                  ▶ Watch Programme Video
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+          {videoId && (
+            <Text style={styles.videoHint}>
+              Programme video available in details
+            </Text>
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
+// ========================================
+// MAIN SCREEN
+// ========================================
+
 export default function MahaswamijiProgrammesScreen() {
   const [items, setItems] = useState<Programme[]>([]);
-  const [activeTab, setActiveTab] = useState<Status>('upcoming');
+  const [activeTab, setActiveTab] =
+    useState<Status>('upcoming');
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  const loadProgrammes = useCallback(async (
-    isRefresh = false
-  ) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+  const loadProgrammes = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        setError(false);
+
+        const response = await apiRequest<{
+          success: boolean;
+          data: Programme[];
+        }>('/mahaswamiji-programmes');
+
+        if (
+          !response.success ||
+          !Array.isArray(response.data)
+        ) {
+          throw new Error('Invalid programme response');
+        }
+
+        setItems(
+          response.data.filter(
+            (item) => item.is_published
+          )
+        );
+      } catch (err) {
+        console.error(
+          'Mahaswamiji Programmes error:',
+          err
+        );
+        setError(true);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      setError(false);
-
-      const response = await apiRequest<{
-        success: boolean;
-        data: Programme[];
-      }>('/mahaswamiji-programmes');
-
-      if (!response.success || !Array.isArray(response.data)) {
-        throw new Error('Invalid programme response');
-      }
-
-      setItems(
-        response.data.filter(
-          (item) => item.is_published
-        )
-      );
-    } catch (err) {
-      console.error('Mahaswamiji Programmes error:', err);
-      setError(true);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -345,7 +390,9 @@ export default function MahaswamijiProgrammesScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void loadProgrammes(true)}
+            onRefresh={() =>
+              void loadProgrammes(true)
+            }
             colors={[COLORS.maroon]}
             tintColor={COLORS.maroon}
           />
@@ -355,28 +402,36 @@ export default function MahaswamijiProgrammesScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>
+            ← Back
+          </Text>
         </TouchableOpacity>
 
+        {/* Hero banner */}
         <LinearGradient
           colors={['#6B1720', '#9B4B1E']}
           style={styles.hero}
         >
           <Text style={styles.heroIcon}>ॐ</Text>
+
           <Text style={styles.heroEyebrow}>
             DIVINE PROGRAMMES
           </Text>
+
           <Text style={styles.heroTitle}>
             Mahaswamiji{'\n'}Programmes
           </Text>
+
           <Text style={styles.heroSubtitle}>
             Stay connected with sacred gatherings,
             spiritual discourses and programmes
             of Mahaswamiji.
           </Text>
+
           <View style={styles.heroLine} />
         </LinearGradient>
 
+        {/* Programme status tabs */}
         <View style={styles.tabs}>
           {TABS.map((tab) => (
             <TouchableOpacity
@@ -384,13 +439,15 @@ export default function MahaswamijiProgrammesScreen() {
               onPress={() => setActiveTab(tab.key)}
               style={[
                 styles.tab,
-                activeTab === tab.key && styles.activeTab,
+                activeTab === tab.key &&
+                  styles.activeTab,
               ]}
             >
               <Text
                 style={[
                   styles.tabText,
-                  activeTab === tab.key && styles.activeTabText,
+                  activeTab === tab.key &&
+                    styles.activeTabText,
                 ]}
               >
                 {tab.title}
@@ -404,9 +461,12 @@ export default function MahaswamijiProgrammesScreen() {
             <Text style={styles.sectionEyebrow}>
               SPIRITUAL GATHERINGS
             </Text>
+
             <Text style={styles.sectionTitle}>
-              {TABS.find((tab) => tab.key === activeTab)?.title}
-              {' '}Programmes
+              {TABS.find(
+                (tab) => tab.key === activeTab
+              )?.title}{' '}
+              Programmes
             </Text>
           </View>
 
@@ -423,30 +483,43 @@ export default function MahaswamijiProgrammesScreen() {
               size="large"
               color={COLORS.maroon}
             />
+
             <Text style={styles.stateText}>
               Loading programmes...
             </Text>
           </View>
         ) : error ? (
           <View style={styles.stateCard}>
-            <Text style={styles.stateIcon}>⚠️</Text>
+            <Text style={styles.stateIcon}>
+              ⚠️
+            </Text>
+
             <Text style={styles.stateText}>
               Unable to load programmes.
               Please try again.
             </Text>
+
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={() => void loadProgrammes()}
+              onPress={() =>
+                void loadProgrammes()
+              }
             >
-              <Text style={styles.retryText}>Try Again</Text>
+              <Text style={styles.retryText}>
+                Try Again
+              </Text>
             </TouchableOpacity>
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.stateCard}>
-            <Text style={styles.stateIcon}>🙏</Text>
+            <Text style={styles.stateIcon}>
+              🙏
+            </Text>
+
             <Text style={styles.emptyTitle}>
               No {activeTab} programmes
             </Text>
+
             <Text style={styles.stateText}>
               Programme information will appear here
               when published by the temple administration.
@@ -454,13 +527,20 @@ export default function MahaswamijiProgrammesScreen() {
           </View>
         ) : (
           filtered.map((item) => (
-            <ProgrammeCard key={item.id} item={item} />
+            <ProgrammeCard
+              key={item.id}
+              item={item}
+            />
           ))
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
   container: {
@@ -599,7 +679,10 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   statusBadge: {
     backgroundColor: COLORS.cream,
@@ -612,6 +695,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     color: COLORS.maroon,
+  },
+  videoBadge: {
+    backgroundColor: '#FDEAE8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  videoBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#B52B2B',
+    letterSpacing: 0.5,
   },
   cardTitle: {
     fontSize: 20,
@@ -671,7 +766,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     lineHeight: 20,
   },
-  videoSection: {
+  detailsSection: {
     marginTop: 12,
     paddingTop: 15,
     borderTopWidth: 1,
@@ -679,31 +774,29 @@ const styles = StyleSheet.create({
   },
   videoButton: {
     backgroundColor: COLORS.maroon,
-    paddingVertical: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
     borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
   videoButtonText: {
     color: COLORS.white,
     fontWeight: '800',
-    fontSize: 12,
+    fontSize: 13,
   },
-  videoWrap: {
-    marginTop: 5,
-  },
-  video: {
-    width: '100%',
-    height: 210,
-    backgroundColor: '#000',
-    borderRadius: 12,
-  },
-  closeVideo: {
-    alignSelf: 'center',
-    padding: 12,
-  },
-  closeVideoText: {
-    color: COLORS.maroon,
+  buttonArrow: {
+    color: COLORS.white,
+    fontSize: 20,
     fontWeight: '700',
+  },
+  videoHint: {
+    fontSize: 11,
+    color: COLORS.muted,
+    textAlign: 'center',
+    marginTop: 10,
   },
   stateCard: {
     backgroundColor: COLORS.white,

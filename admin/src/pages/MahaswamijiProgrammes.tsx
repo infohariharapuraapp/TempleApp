@@ -49,7 +49,11 @@ const emptyForm: ProgrammeForm = {
   is_published: false,
 };
 
+const optional = (value: string) => value.trim() || null;
+
 function youtubeId(url: string): string | null {
+  if (!url.trim()) return null;
+
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
@@ -77,34 +81,47 @@ function youtubeId(url: string): string | null {
   }
 }
 
-function dateInput(value: string | null): string {
-  if (!value) return '';
-  return value.slice(0, 10);
+function getPoster(
+  imageUrl: string | null,
+  videoUrl: string | null
+) {
+  if (imageUrl?.trim()) return imageUrl.trim();
+
+  const id = youtubeId(videoUrl || '');
+
+  return id
+    ? `https://img.youtube.com/vi/${id}/hqdefault.jpg`
+    : null;
 }
 
-function timeInput(value: string | null): string {
-  if (!value) return '';
-  return value.slice(0, 5);
+function dateInput(value: string | null) {
+  return value?.slice(0, 10) || '';
 }
 
-function displayDate(value: string | null): string {
+function timeInput(value: string | null) {
+  return value?.slice(0, 5) || '';
+}
+
+function displayDate(value: string | null) {
   if (!value) return 'Not specified';
 
-  const date = value.slice(0, 10);
-  const parts = date.split('-');
+  const parts = value.slice(0, 10).split('-');
 
-  if (parts.length !== 3) return date;
-
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return parts.length === 3
+    ? `${parts[2]}/${parts[1]}/${parts[0]}`
+    : value;
 }
-
-const optional = (value: string) =>
-  value.trim() || null;
 
 export default function MahaswamijiProgrammes() {
   const [items, setItems] = useState<Programme[]>([]);
   const [editing, setEditing] =
     useState<ProgrammeForm | null>(null);
+
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
+
+  const [previewUrl, setPreviewUrl] =
+    useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -113,6 +130,18 @@ export default function MahaswamijiProgrammes() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] =
     useState<'all' | Status>('all');
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
 
   async function load() {
     try {
@@ -142,6 +171,7 @@ export default function MahaswamijiProgrammes() {
 
   function add() {
     setEditing({ ...emptyForm });
+    setSelectedFile(null);
     setError('');
     setSuccess('');
   }
@@ -162,9 +192,14 @@ export default function MahaswamijiProgrammes() {
       is_published: item.is_published,
     });
 
+    setSelectedFile(null);
     setError('');
     setSuccess('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
   }
 
   function update<K extends keyof ProgrammeForm>(
@@ -176,8 +211,44 @@ export default function MahaswamijiProgrammes() {
     );
   }
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  function handleFileChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const allowed = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ];
+
+    if (!allowed.includes(file.type)) {
+      setError('Select a JPG, PNG or WebP image.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    setSelectedFile(file);
+    setError('');
+    setSuccess('');
+  }
+
+  function removePoster() {
+    setSelectedFile(null);
+    update('image_url', '');
+    setError('');
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
 
     if (!editing || busy) return;
 
@@ -238,6 +309,31 @@ export default function MahaswamijiProgrammes() {
     setSuccess('');
 
     try {
+      let imageUrl = editing.image_url.trim() || null;
+
+      // Upload selected poster before saving programme.
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+
+        const uploaded = await apiRequest<{
+          success: boolean;
+          data: {
+            image_url: string;
+            public_id: string;
+          };
+        }>('/admin/mahaswamiji-programmes/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploaded.success || !uploaded.data?.image_url) {
+          throw new Error('Image upload failed');
+        }
+
+        imageUrl = uploaded.data.image_url;
+      }
+
       const isEdit = editing.id !== undefined;
 
       await apiRequest(
@@ -249,7 +345,7 @@ export default function MahaswamijiProgrammes() {
           body: JSON.stringify({
             title: editing.title.trim(),
             description: editing.description.trim(),
-            image_url: optional(editing.image_url),
+            image_url: imageUrl,
             youtube_url: optional(editing.youtube_url),
             start_date: optional(editing.start_date),
             start_time: optional(editing.start_time),
@@ -263,6 +359,8 @@ export default function MahaswamijiProgrammes() {
       );
 
       setEditing(null);
+      setSelectedFile(null);
+
       await load();
 
       setSuccess(
@@ -391,6 +489,11 @@ export default function MahaswamijiProgrammes() {
     ).length,
   };
 
+  const posterPreview = editing
+    ? previewUrl ||
+      getPoster(editing.image_url, editing.youtube_url)
+    : null;
+
   return (
     <main className="content">
       <div className="page-head">
@@ -478,10 +581,7 @@ export default function MahaswamijiProgrammes() {
               <select
                 value={editing.status}
                 onChange={(e) =>
-                  update(
-                    'status',
-                    e.target.value as Status
-                  )
+                  update('status', e.target.value as Status)
                 }
               >
                 <option value="upcoming">Upcoming</option>
@@ -548,34 +648,88 @@ export default function MahaswamijiProgrammes() {
             </label>
           </div>
 
-          <label>
-            Programme Poster / Image URL (Optional)
-            <input
-              type="url"
-              value={editing.image_url}
-              placeholder="https://example.com/programme.jpg"
-              onChange={(e) =>
-                update('image_url', e.target.value)
-              }
-            />
-          </label>
+          <div
+            className="panel"
+            style={{ marginTop: 20, marginBottom: 20 }}
+          >
+            <h3>Programme Poster</h3>
 
-          {editing.image_url.trim() && (
-            <div className="panel">
-              <strong>Image Preview</strong>
-              <div style={{ marginTop: 12 }}>
-                <img
-                  src={editing.image_url}
-                  alt="Programme preview"
-                  style={{
-                    width: '100%',
-                    maxWidth: 360,
-                    borderRadius: 12,
-                  }}
-                />
+            <p style={{ fontSize: 13 }}>
+              Upload a poster or enter an image URL.
+              If neither is provided, the YouTube
+              thumbnail will be displayed automatically.
+            </p>
+
+            <label>
+              Upload Image (Optional)
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                disabled={busy}
+                onChange={handleFileChange}
+              />
+              <small>
+                JPG, PNG or WebP. Maximum 5 MB.
+              </small>
+            </label>
+
+            {selectedFile && (
+              <p style={{ fontSize: 13 }}>
+                Selected: {selectedFile.name}
+              </p>
+            )}
+
+            <label>
+              Or Enter Image URL (Optional)
+              <input
+                type="url"
+                value={editing.image_url}
+                placeholder="https://example.com/poster.jpg"
+                disabled={busy}
+                onChange={(e) => {
+                  update('image_url', e.target.value);
+                  setSelectedFile(null);
+                }}
+              />
+            </label>
+
+            {posterPreview ? (
+              <div style={{ marginTop: 16 }}>
+                <strong>Programme Poster Preview</strong>
+
+                <div style={{ marginTop: 12 }}>
+                  <img
+                    src={posterPreview}
+                    alt="Programme poster preview"
+                    style={{
+                      width: '100%',
+                      maxWidth: 420,
+                      aspectRatio: '16 / 9',
+                      objectFit: 'cover',
+                      borderRadius: 14,
+                      border: '1px solid #E8DCCB',
+                    }}
+                  />
+                </div>
+
+                {(selectedFile || editing.image_url) && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={removePoster}
+                    style={{ marginTop: 12 }}
+                  >
+                    Remove Poster
+                  </button>
+                )}
               </div>
-            </div>
-          )}
+            ) : (
+              <p style={{ marginTop: 12 }}>
+                No poster selected. A devotional
+                placeholder will be shown.
+              </p>
+            )}
+          </div>
 
           <label>
             YouTube Video URL (Optional)
@@ -592,6 +746,7 @@ export default function MahaswamijiProgrammes() {
           {youtubeId(editing.youtube_url) && (
             <div className="panel">
               <strong>YouTube Video Preview</strong>
+
               <div style={{ marginTop: 12 }}>
                 <img
                   src={`https://img.youtube.com/vi/${youtubeId(
@@ -605,6 +760,11 @@ export default function MahaswamijiProgrammes() {
                   }}
                 />
               </div>
+
+              <p style={{ fontSize: 13 }}>
+                This thumbnail will be used as the
+                programme poster if no image is saved.
+              </p>
             </div>
           )}
 
@@ -613,6 +773,7 @@ export default function MahaswamijiProgrammes() {
               display: 'flex',
               alignItems: 'center',
               gap: 10,
+              marginTop: 20,
             }}
           >
             <input
@@ -629,7 +790,10 @@ export default function MahaswamijiProgrammes() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => setEditing(null)}
+              onClick={() => {
+                setEditing(null);
+                setSelectedFile(null);
+              }}
             >
               Cancel
             </button>
@@ -640,7 +804,7 @@ export default function MahaswamijiProgrammes() {
               disabled={busy}
             >
               {busy
-                ? 'Saving...'
+                ? 'Uploading / Saving...'
                 : editing.id
                   ? 'Save Changes'
                   : 'Create Programme'}
@@ -704,14 +868,10 @@ export default function MahaswamijiProgrammes() {
 
             <tbody>
               {filtered.map((item) => {
-                const video = item.youtube_url
-                  ? youtubeId(item.youtube_url)
-                  : null;
-
-                const thumbnail = item.image_url ||
-                  (video
-                    ? `https://img.youtube.com/vi/${video}/mqdefault.jpg`
-                    : null);
+                const thumbnail = getPoster(
+                  item.image_url,
+                  item.youtube_url
+                );
 
                 return (
                   <tr key={item.id}>
