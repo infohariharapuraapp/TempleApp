@@ -49,6 +49,7 @@ import darshanRoutes from './routes/darshanRoutes';
 import darshanVideosRoutes from './routes/darshanVideos';
 import notificationRoutes from './routes/notificationRoutes';
 import announcementRoutes from './routes/announcementRoutes';
+import adminAnnouncementRoutes from './routes/adminAnnouncementRoutes';
 import adminGalleryAlbumRoutes from './routes/adminGalleryAlbumRoutes';
 import dharmaRoutes from './routes/dharmaRoutes';
 import adminDharmaRoutes from './routes/adminDharmaRoutes';
@@ -271,6 +272,12 @@ app.use(
 );
 
 
+
+
+app.use(
+  '/api/admin/announcements',
+  adminAnnouncementRoutes
+);
 
 
 app.get('/', (_req, res) => {
