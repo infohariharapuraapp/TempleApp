@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 
 import {
@@ -5,6 +6,7 @@ import {
   createGuruVani,
   updateGuruVani,
   updateGuruVaniStatus,
+  deleteGuruVani,
 } from '../controllers/guruVaniController';
 
 import {
@@ -17,19 +19,41 @@ import {
 
 const router = Router();
 
-// Protect every route in this router
+// ========================================
+// PROTECT ALL ADMIN GURU VANI ROUTES
+// ========================================
+
 router.use(authenticateToken, requireAdmin);
 
-// Get all slokas including inactive
+// ========================================
+// GET ALL GURU VANI
+// Including active and inactive slokas
+// ========================================
+
 router.get('/', getAdminGuruVani);
 
-// Create a new sloka
+// ========================================
+// CREATE NEW GURU VANI
+// ========================================
+
 router.post('/', createGuruVani);
 
-// Update sloka details
+// ========================================
+// UPDATE GURU VANI DETAILS
+// ========================================
+
 router.put('/:id', updateGuruVani);
 
-// Activate or deactivate sloka
+// ========================================
+// ACTIVATE / DEACTIVATE GURU VANI
+// ========================================
+
 router.patch('/:id/status', updateGuruVaniStatus);
+
+// ========================================
+// PERMANENTLY DELETE GURU VANI
+// ========================================
+
+router.delete('/:id', deleteGuruVani);
 
 export default router;

@@ -35,17 +35,24 @@ const emptyForm: GuruVaniForm = {
 export default function GuruVani() {
   const [items, setItems] = useState<GuruVaniItem[]>([]);
   const [editing, setEditing] = useState<GuruVaniForm | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
+
   const [filter, setFilter] =
     useState<'all' | 'active' | 'inactive'>('all');
+
+  const isProcessing = busy || deletingId !== null;
 
   async function load() {
     try {
       setLoading(true);
+
       const response = await apiRequest<{
         success: boolean;
         data: GuruVaniItem[];
@@ -69,12 +76,16 @@ export default function GuruVani() {
   }, []);
 
   function openAdd() {
+    if (isProcessing) return;
+
     setEditing({ ...emptyForm });
     setError('');
     setSuccess('');
   }
 
   function openEdit(item: GuruVaniItem) {
+    if (isProcessing) return;
+
     setEditing({
       id: item.id,
       title: item.title,
@@ -84,13 +95,20 @@ export default function GuruVani() {
       guru_name: item.guru_name || '',
       is_active: item.is_active,
     });
+
     setError('');
     setSuccess('');
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!editing || busy) return;
+
+    if (!editing || isProcessing) return;
 
     if (!editing.title.trim() || !editing.sloka.trim()) {
       setError('Title and sloka are required.');
@@ -124,10 +142,10 @@ export default function GuruVani() {
         }
       );
 
-      // Existing update API does not update active status.
+      // Preserve the existing separate status API.
       if (isEdit) {
         const original = items.find(
-          (item) => item.id === editing.id
+          item => item.id === editing.id
         );
 
         if (
@@ -148,6 +166,7 @@ export default function GuruVani() {
 
       setEditing(null);
       await load();
+
       setSuccess(
         isEdit
           ? 'Guru Vani updated successfully.'
@@ -165,19 +184,17 @@ export default function GuruVani() {
   }
 
   async function changeStatus(item: GuruVaniItem) {
-    if (busy) return;
+    if (isProcessing) return;
 
     const action = item.is_active
       ? 'deactivate'
       : 'activate';
 
-    if (
-      !window.confirm(
-        `Do you want to ${action} "${item.title}"?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = window.confirm(
+      `Do you want to ${action} "${item.title}"?`
+    );
+
+    if (!confirmed) return;
 
     setBusy(true);
     setError('');
@@ -195,25 +212,85 @@ export default function GuruVani() {
       );
 
       await load();
-      setSuccess('Guru Vani status updated.');
+
+      setSuccess(
+        `Guru Vani ${item.is_active ? 'deactivated' : 'activated'} successfully.`
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Failed to update status'
+          : 'Failed to update Guru Vani status'
       );
     } finally {
       setBusy(false);
     }
   }
 
-  const filtered = items
-    .filter((item) => {
-      if (filter === 'active' && !item.is_active)
-        return false;
+  // ==========================================
+  // PERMANENT DELETE
+  // ==========================================
 
-      if (filter === 'inactive' && item.is_active)
+  async function deleteGuruVani(item: GuruVaniItem) {
+    if (isProcessing) return;
+
+    const confirmed = window.confirm(
+      `Permanently delete "${item.title}"?\n\n` +
+      'This will remove the Guru Vani entry from the database.\n' +
+      'This action cannot be undone.\n\n' +
+      'Click OK to delete or Cancel to keep it.'
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await apiRequest(
+        `/admin/guru-vani/${item.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      // Remove from UI only after backend confirms success.
+      setItems(previous =>
+        previous.filter(entry => entry.id !== item.id)
+      );
+
+      if (editing?.id === item.id) {
+        setEditing(null);
+      }
+
+      setSuccess(
+        `"${item.title}" deleted successfully.`
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete Guru Vani'
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // ==========================================
+  // SEARCH AND FILTER
+  // ==========================================
+
+  const filtered = items
+    .filter(item => {
+      if (filter === 'active' && !item.is_active) {
         return false;
+      }
+
+      if (filter === 'inactive' && item.is_active) {
+        return false;
+      }
 
       const q = search.trim().toLowerCase();
 
@@ -225,7 +302,7 @@ export default function GuruVani() {
           item.transliteration,
           item.guru_name,
           item.meaning,
-        ].some((value) =>
+        ].some(value =>
           (value || '').toLowerCase().includes(q)
         )
       );
@@ -252,7 +329,7 @@ export default function GuruVani() {
           type="button"
           className="primary"
           onClick={openAdd}
-          disabled={busy}
+          disabled={isProcessing}
         >
           + Add Guru Vani
         </button>
@@ -270,6 +347,8 @@ export default function GuruVani() {
         </div>
       )}
 
+      {/* ADD / EDIT FORM */}
+
       {editing && (
         <form className="form-card" onSubmit={save}>
           <h3>
@@ -285,7 +364,7 @@ export default function GuruVani() {
               maxLength={255}
               value={editing.title}
               placeholder="Guru Stotram"
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   title: e.target.value,
@@ -301,7 +380,7 @@ export default function GuruVani() {
               rows={5}
               value={editing.sloka}
               placeholder="Enter the original sloka"
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   sloka: e.target.value,
@@ -316,7 +395,7 @@ export default function GuruVani() {
               rows={3}
               value={editing.transliteration}
               placeholder="Enter pronunciation in English letters"
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   transliteration: e.target.value,
@@ -331,7 +410,7 @@ export default function GuruVani() {
               rows={4}
               value={editing.meaning}
               placeholder="Enter meaning if available"
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   meaning: e.target.value,
@@ -346,7 +425,7 @@ export default function GuruVani() {
               maxLength={255}
               value={editing.guru_name}
               placeholder="Guru name"
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   guru_name: e.target.value,
@@ -365,7 +444,7 @@ export default function GuruVani() {
             <input
               type="checkbox"
               checked={editing.is_active}
-              onChange={(e) =>
+              onChange={e =>
                 setEditing({
                   ...editing,
                   is_active: e.target.checked,
@@ -378,7 +457,7 @@ export default function GuruVani() {
           <div className="actions">
             <button
               type="button"
-              disabled={busy}
+              disabled={isProcessing}
               onClick={() => setEditing(null)}
             >
               Cancel
@@ -387,7 +466,7 @@ export default function GuruVani() {
             <button
               type="submit"
               className="primary"
-              disabled={busy}
+              disabled={isProcessing}
             >
               {busy
                 ? 'Saving...'
@@ -398,6 +477,8 @@ export default function GuruVani() {
           </div>
         </form>
       )}
+
+      {/* SEARCH AND FILTER */}
 
       <div className="panel">
         <div
@@ -411,12 +492,12 @@ export default function GuruVani() {
             value={search}
             placeholder="Search Guru Vani"
             aria-label="Search Guru Vani"
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
           />
 
           <select
             value={filter}
-            onChange={(e) =>
+            onChange={e =>
               setFilter(
                 e.target.value as typeof filter
               )
@@ -430,6 +511,8 @@ export default function GuruVani() {
           <span>{filtered.length} slokas</span>
         </div>
       </div>
+
+      {/* GURU VANI TABLE */}
 
       {loading ? (
         <div className="panel">
@@ -453,10 +536,11 @@ export default function GuruVani() {
             </thead>
 
             <tbody>
-              {filtered.map((item) => (
+              {filtered.map(item => (
                 <tr key={item.id}>
                   <td>
                     <strong>{item.title}</strong>
+
                     <div>
                       <small>
                         {item.sloka.length > 110
@@ -464,6 +548,7 @@ export default function GuruVani() {
                           : item.sloka}
                       </small>
                     </div>
+
                     {item.guru_name && (
                       <small>{item.guru_name}</small>
                     )}
@@ -498,7 +583,7 @@ export default function GuruVani() {
                     >
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={isProcessing}
                         onClick={() => openEdit(item)}
                       >
                         Edit
@@ -506,7 +591,7 @@ export default function GuruVani() {
 
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={isProcessing}
                         className={
                           item.is_active ? 'danger' : ''
                         }
@@ -517,6 +602,19 @@ export default function GuruVani() {
                         {item.is_active
                           ? 'Deactivate'
                           : 'Activate'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="danger"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          void deleteGuruVani(item)
+                        }
+                      >
+                        {deletingId === item.id
+                          ? 'Deleting...'
+                          : 'Delete'}
                       </button>
                     </div>
                   </td>

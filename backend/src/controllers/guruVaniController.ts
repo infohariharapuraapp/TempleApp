@@ -348,3 +348,61 @@ export const updateGuruVaniStatus = async (
     });
   }
 };
+
+ // ========================================
+ // ADMIN - PERMANENTLY DELETE GURU VANI
+ // ========================================
+
+export const deleteGuruVani = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { id } = req.params;
+
+    const guruVaniId = Number(id);
+
+    // Validate ID
+    if (
+      !Number.isSafeInteger(guruVaniId) ||
+      guruVaniId <= 0
+    ) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid Guru Vani ID',
+      });
+      return;
+    }
+
+    // Permanently delete the record
+    const result = await pool.query(
+      `DELETE FROM guru_vani
+       WHERE id = $1
+       RETURNING id, title`,
+      [guruVaniId]
+    );
+
+    // Record not found
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Guru Vani not found',
+      });
+      return;
+    }
+
+    // Successfully deleted
+    res.status(200).json({
+      success: true,
+      message: 'Guru Vani deleted successfully',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Delete Guru Vani error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete Guru Vani',
+    });
+  }
+};
