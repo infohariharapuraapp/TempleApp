@@ -61,6 +61,29 @@ import dharmaRoutes from './routes/dharmaRoutes';
 import adminDharmaRoutes from './routes/adminDharmaRoutes';
 import guruVaniRoutes from './routes/guruVaniRoutes';
 
+
+
+
+import nearbyPlaceImageUploadRoutes from './routes/nearbyPlaceImageUploadRoutes';
+
+import {
+  getNearbyPlaceImages,
+    getAdminNearbyPlaceImages,
+  addNearbyPlaceImage,
+  updateNearbyPlaceImage,
+  deleteNearbyPlaceImage,
+} from './controllers/nearbyPlaceImageController';
+
+import {
+  authenticateToken,
+} from './middleware/authMiddleware';
+
+import {
+  requireAdmin,
+} from './middleware/adminMiddleware';
+
+
+
 import {
   checkPushReceipts,
 } from './services/notificationService';
@@ -127,6 +150,54 @@ app.use(
   '/api/mahaswamiji-programmes',
   mahaswamijiProgrammeRoutes
 );
+
+
+
+// Register before your 404/error handlers.
+// Use each path only once.
+
+app.get(
+  '/api/nearby/places/:placeId/images',
+  getNearbyPlaceImages
+);
+
+app.post(
+  '/api/admin/nearby/places/:placeId/images',
+  authenticateToken,
+  requireAdmin,
+  addNearbyPlaceImage
+);
+
+
+
+
+app.get(
+  '/api/admin/nearby/places/:placeId/images',
+  authenticateToken,
+  requireAdmin,
+  getAdminNearbyPlaceImages
+);
+
+
+app.put(
+  '/api/admin/nearby/places/:placeId/images/:imageId',
+  authenticateToken,
+  requireAdmin,
+  updateNearbyPlaceImage
+);
+
+app.delete(
+  '/api/admin/nearby/places/:placeId/images/:imageId',
+  authenticateToken,
+  requireAdmin,
+  deleteNearbyPlaceImage
+);
+
+app.use(
+  '/api/admin/nearby/places',
+  nearbyPlaceImageUploadRoutes
+);
+
 
 // Protected - Admin Dashboard
 app.use(

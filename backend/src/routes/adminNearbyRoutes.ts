@@ -13,22 +13,26 @@ import {
   getAdminNearbyCategories,
   createNearbyCategory,
   updateNearbyCategory,
+  deleteNearbyCategory,
 } from '../controllers/nearbyCategoryController';
 
 import {
   getAdminNearbyPlaces,
   createNearbyPlace,
   updateNearbyPlace,
+  deleteNearbyPlace,
 } from '../controllers/nearbyPlaceController';
 
 const router = Router();
 
-// Protect every route in this module
+// Protect all admin nearby routes
 router.use(authenticateToken, requireAdmin);
 
-// ========================================
-// CATEGORY MANAGEMENT
-// ========================================
+/*
+|--------------------------------------------------------------------------
+| CATEGORY MANAGEMENT
+|--------------------------------------------------------------------------
+*/
 
 router.get(
   '/categories',
@@ -45,9 +49,16 @@ router.put(
   updateNearbyCategory
 );
 
-// ========================================
-// PLACE MANAGEMENT
-// ========================================
+router.delete(
+  '/categories/:id',
+  deleteNearbyCategory
+);
+
+/*
+|--------------------------------------------------------------------------
+| PLACE MANAGEMENT
+|--------------------------------------------------------------------------
+*/
 
 router.get(
   '/places',
@@ -62,6 +73,11 @@ router.post(
 router.put(
   '/places/:id',
   updateNearbyPlace
+);
+
+router.delete(
+  '/places/:id',
+  deleteNearbyPlace
 );
 
 export default router;

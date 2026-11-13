@@ -58,8 +58,17 @@ export const getNearbyPlaces = async (
          p.address,
          p.phone,
          p.google_maps_url,
-         p.image_url,
-         p.display_order
+       COALESCE(
+  NULLIF(p.image_url, ''),
+  (
+    SELECT i.image_url
+    FROM nearby_place_images i
+    WHERE i.place_id = p.id
+    ORDER BY i.display_order ASC, i.id ASC
+    LIMIT 1
+  )
+) AS image_url,
+p.display_order
        FROM nearby_places p
        JOIN nearby_place_categories c
          ON c.id = p.category_id
@@ -352,6 +361,71 @@ export const updateNearbyPlace = async (
     return res.status(500).json({
       success: false,
       message: 'Failed to update nearby place',
+    });
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN - PERMANENTLY DELETE PLACE
+|--------------------------------------------------------------------------
+| Deletes the place and its gallery database records.
+| Cloudinary images are not deleted from cloud storage.
+*/
+
+export const deleteNearbyPlace = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const id = String(req.params.id);
+
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid place ID',
+      });
+    }
+
+    const result = await pool.query(
+      `
+      DELETE FROM nearby_places
+      WHERE id = $1
+      RETURNING id, name
+      `,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Place not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Place permanently deleted',
+      data: result.rows[0],
+    });
+  } catch (error: unknown) {
+    console.error('Delete nearby place:', error);
+
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === '23503'
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: 'Place is referenced by existing records',
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete place',
     });
   }
 };
