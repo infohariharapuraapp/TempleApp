@@ -326,17 +326,29 @@ export default function HomeScreen() {
     i18n.resolvedLanguage || i18n.language || 'en'
   ).split('-')[0];
   const contentRequestId = useRef(0);
+  const loadedContentLanguage = useRef<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      const requestId = ++contentRequestId.current;
-      let active = true;
-      const isCurrent = () => active && contentRequestId.current === requestId;
-      const lang = encodeURIComponent(currentLanguage);
+ useFocusEffect(
+  useCallback(() => {
+    const requestId = ++contentRequestId.current;
+    let active = true;
 
+    const isCurrent = () =>
+      active && contentRequestId.current === requestId;
+
+    const lang = encodeURIComponent(currentLanguage);
+
+    // Show loading placeholders only for the initial load
+    // or when the app language changes.
+    const shouldShowLoading =
+      loadedContentLanguage.current !== currentLanguage;
+
+    loadedContentLanguage.current = currentLanguage;
       const loadGurus = async () => {
         try {
-          setGurusLoading(true);
+       if (shouldShowLoading) {
+  setGurusLoading(true);
+}
           const response = await apiRequest<{
             success: boolean;
             data: Guru[];
@@ -346,7 +358,9 @@ export default function HomeScreen() {
         } catch (error) {
           if (isCurrent()) {
             console.error('Home Guru Parampara error:', error);
-            setGurus([]);
+            if (shouldShowLoading) {
+  setGurus([]);
+}
           }
         } finally {
           if (isCurrent()) setGurusLoading(false);
@@ -355,7 +369,9 @@ export default function HomeScreen() {
 
       const loadEvents = async () => {
         try {
-          setEventsLoading(true);
+        if (shouldShowLoading) {
+  setEventsLoading(true);
+}
           const response = await apiRequest<{ success: boolean; data: any[] }>(
             `/events?lang=${lang}`
           );
@@ -366,7 +382,9 @@ export default function HomeScreen() {
         } catch (error) {
           if (isCurrent()) {
             console.error('Home events error:', error);
-            setEvents([]);
+           if (shouldShowLoading) {
+  setEvents([]);
+}
           }
         } finally {
           if (isCurrent()) setEventsLoading(false);
@@ -386,7 +404,7 @@ export default function HomeScreen() {
         } catch (error) {
           if (isCurrent()) {
             console.error('Home Darshan Videos error:', error);
-            setDarshanVideos([]);
+           // Keep the previously loaded videos if refresh fails.
           }
         }
       };
@@ -991,36 +1009,45 @@ const fallbackTitle =
           </AnimatedTouchable>
 
           {/* Temple Services */}
-          <SectionHeading
-            title={t('home.templeServices')}
-            subtitle={t('home.servicesSubtitle')}
-          />
+        
+<View style={styles.serviceCard}>
+  {/* POOJA SERVICES */}
+  <ServiceRow
+    icon="🙏"
+    title={t('home.poojaServices')}
+    subtitle={t('home.poojaServicesSubtitle')}
+    onPress={() => router.push('/pooja-services' as any)}
+  />
 
-          <View style={styles.serviceCard}>
-          
-            
-            {/* POOJA SERVICES */}
+  {/* TEMPLE LOCATION */}
+  <ServiceRow
+    icon="📍"
+    title={t('home.templeLocation')}
+    subtitle={t('home.planJourney')}
+    onPress={() => router.push('/temple-location')}
+  />
 
-<ServiceRow
-  icon="🙏"
-  title={t('home.poojaServices')}
-  subtitle={t('home.poojaServicesSubtitle')}
-  onPress={() => router.push('/pooja-services' as any)}
-/>
-            <ServiceRow
-              icon="📍"
-              title={t('home.templeLocation')}
-              subtitle={t('home.planJourney')}
-              onPress={() => router.push('/temple-location')}
-            />
-            <ServiceRow
-              icon="☎️"
-              title={t('home.contactTemple')}
-              subtitle={t('home.reachTeam')}
-              onPress={() => router.push('/contact')}
-              last
-            />
-          </View>
+  {/* NEARBY PLACES */}
+  <ServiceRow
+    icon="🗺️"
+    title={t('home.nearbyPlaces', {
+      defaultValue: 'Nearby Places',
+    })}
+    subtitle={t('home.exploreNearby', {
+      defaultValue: 'Explore places and services near the temple',
+    })}
+    onPress={() => router.push('/nearby')}
+  />
+
+  {/* CONTACT TEMPLE */}
+  <ServiceRow
+    icon="☎️"
+    title={t('home.contactTemple')}
+    subtitle={t('home.reachTeam')}
+    onPress={() => router.push('/contact')}
+    last
+  />
+</View>
 
           <View style={styles.footerBlessing}>
             <View style={styles.footerLine} />

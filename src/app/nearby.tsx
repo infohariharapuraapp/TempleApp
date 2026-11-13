@@ -2,11 +2,12 @@
 import AutoTranslatedText from '@/components/AutoTranslatedText';
 import { apiRequest } from '@/services/api';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState,  useEffect, } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+    BackHandler,
   Image,
   Linking,
   RefreshControl,
@@ -341,6 +342,36 @@ export default function NearbyScreen() {
       router.back();
     }
   };
+  useEffect(() => {
+  if (mode === 'categories') {
+    return;
+  }
+
+  const subscription = BackHandler.addEventListener(
+    'hardwareBackPress',
+    () => {
+      if (mode === 'details') {
+        galleryRequestId.current++;
+        setPlace(null);
+        setGallery([]);
+        setMode('places');
+        return true;
+      }
+
+      if (mode === 'places') {
+        requestId.current++;
+        setCategory(null);
+        setPlaces([]);
+        setMode('categories');
+        return true;
+      }
+
+      return false;
+    }
+  );
+
+  return () => subscription.remove();
+}, [mode]);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -641,7 +641,7 @@ export default function ContactScreen() {
         <TouchableOpacity
           activeOpacity={0.86}
           style={styles.homeButton}
-          onPress={() => router.replace('/(tabs)')}
+        onPress={() => router.dismissTo('/(tabs)')}
         >
           <Text style={styles.homeButtonIcon}>
             ‹
