@@ -7,11 +7,15 @@ import {
 } from 'expo-router';
 
 import '@/localization/i18n';
+
 import { StatusBar } from 'expo-status-bar';
 
 import {
-  View,
+  ActivityIndicator,
   StyleSheet,
+  View,
+  StatusBar as AndroidStatusBar,
+  Platform,
 } from 'react-native';
 
 import {
@@ -21,6 +25,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -29,7 +34,7 @@ import {
 import Constants from 'expo-constants';
 
 import {
-  AnimatedSplashOverlay,
+  AnimatedIcon,
 } from '@/components/animated-icon';
 
 import DynamicWelcomeScreen from '@/components/DynamicWelcomeScreen';
@@ -41,6 +46,7 @@ import {
 
 import {
   apiRequest,
+  ApiError,
 } from '@/services/api';
 
 import {
@@ -54,9 +60,45 @@ import {
   handleInitialNotification,
 } from '@/services/notifications';
 
+// ========================================
+// CONFIGURATION
+// ========================================
+
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
-type AuthStatus = 'checking' | 'authenticated' | 'guest';
+const LANGUAGE_TIMEOUT_MS = 3000;
+const SESSION_TIMEOUT_MS = 8000;
+
+type AuthStatus =
+  | 'checking'
+  | 'authenticated'
+  | 'guest';
+
+// ========================================
+// TIMEOUT HELPER
+// ========================================
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  milliseconds: number
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error('Startup operation timed out'));
+        }, milliseconds);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
 
 // ========================================
 // ROOT LAYOUT
@@ -78,27 +120,57 @@ export default function RootLayout() {
   const [authVersion, setAuthVersion] =
     useState(0);
 
+  const [nativeSplashHidden, setNativeSplashHidden] =
+    useState(false);
+
   const notificationRegistrationStarted =
     useRef(false);
 
   const initialNotificationHandled =
     useRef(false);
 
-  const authStatusRef = useRef<AuthStatus>('checking');
+  const nativeSplashHideStarted =
+    useRef(false);
 
-  const setSessionStatus = (status: AuthStatus) => {
-    authStatusRef.current = status;
-    setAuthStatus(status);
-  };
+  const setSessionStatus = useCallback(
+    (status: AuthStatus) => {
+      setAuthStatus(status);
+    },
+    []
+  );
 
-  const authenticated = authStatus === 'authenticated';
+  const authenticated =
+    authStatus === 'authenticated';
 
   const appReady =
     authStatus !== 'checking' &&
     !languageChecking;
 
   // ========================================
-  // LANGUAGE INITIALIZATION
+  // HIDE NATIVE SPLASH
+  // ========================================
+
+  const hideNativeSplash = useCallback(() => {
+    if (nativeSplashHideStarted.current) {
+      return;
+    }
+
+    nativeSplashHideStarted.current = true;
+
+    void SplashScreen.hideAsync()
+      .catch((error) => {
+        console.error(
+          'Native splash hide error:',
+          error
+        );
+      })
+      .finally(() => {
+        setNativeSplashHidden(true);
+      });
+  }, []);
+
+  // ========================================
+  // INITIALIZE LANGUAGE
   // ========================================
 
   useEffect(() => {
@@ -106,12 +178,15 @@ export default function RootLayout() {
 
     const initializeLanguage = async () => {
       try {
-        await loadSavedLanguage();
+        await withTimeout(
+          loadSavedLanguage(),
+          LANGUAGE_TIMEOUT_MS
+        );
 
         console.log('App language initialized.');
       } catch (error) {
-        console.error(
-          'Language initialization failed:',
+        console.warn(
+          'Language initialization unavailable:',
           error
         );
       } finally {
@@ -135,7 +210,9 @@ export default function RootLayout() {
   useEffect(() => {
     return subscribeAuth((isAuthenticated) => {
       setSessionStatus(
-        isAuthenticated ? 'authenticated' : 'guest'
+        isAuthenticated
+          ? 'authenticated'
+          : 'guest'
       );
 
       if (!isAuthenticated) {
@@ -145,68 +222,99 @@ export default function RootLayout() {
 
       setAuthVersion((version) => version + 1);
     });
-  }, []);
+  }, [setSessionStatus]);
 
   // ========================================
   // VALIDATE SAVED SESSION
   // ========================================
 
-  useEffect(() => {
-    let cancelled = false;
 
-    const validateSession = async () => {
-      try {
-        const token = await getToken();
+useEffect(() => {
+  let cancelled = false;
 
-        if (cancelled) return;
+  const validateSession = async () => {
+    try {
+      const token = await withTimeout(
+        getToken(),
+        SESSION_TIMEOUT_MS
+      );
 
-        if (!token) {
-          setSessionStatus('guest');
-          return;
-        }
+      if (cancelled) return;
 
-        const response = await apiRequest('/auth/me', {
+      // First-time users or users who logged out.
+      if (!token) {
+        setSessionStatus('guest');
+        return;
+      }
+
+      const response = await withTimeout(
+        apiRequest('/auth/me', {
           method: 'GET',
           token,
-        });
+          timeoutMs: SESSION_TIMEOUT_MS,
+        }),
+        SESSION_TIMEOUT_MS + 1000
+      );
 
-        if (cancelled) return;
+      if (cancelled) return;
 
-        if (response.success && response.data) {
-          setSessionStatus('authenticated');
-          return;
+      if (response.success && response.data) {
+        setSessionStatus('authenticated');
+        return;
+      }
+
+      // Unexpected response: keep the token.
+      setSessionStatus('guest');
+
+    } catch (error) {
+      if (cancelled) return;
+
+      console.warn(
+        'Session validation error:',
+        error
+      );
+
+      // Confirmed expired or unauthorized token.
+      if (
+        error instanceof ApiError &&
+        (error.status === 401 ||
+         error.status === 403)
+      ) {
+        try {
+          await withTimeout(
+            removeToken(),
+            SESSION_TIMEOUT_MS
+          );
+        } catch (storageError) {
+          console.warn(
+            'Unable to remove invalid token:',
+            storageError
+          );
         }
 
-        // An explicit unsuccessful authentication response
-        // means the saved session is not accepted.
-        await removeToken();
+        if (!cancelled) {
+          setSessionStatus('guest');
+        }
 
-        if (cancelled) return;
-
-        setSessionStatus('guest');
-      } catch (error) {
-        if (cancelled) return;
-
-        console.error(
-          'Session validation error:',
-          error
-        );
-
-        // Preserve the token on an uncertain network error.
-        // The app remains locked until validation succeeds.
-        setSessionStatus('checking');
+        return;
       }
-    };
 
-    void validateSession();
+      // Network failures and timeouts are uncertain.
+      // Preserve the saved token for the next launch.
+      setSessionStatus('guest');
+    }
+  };
 
-    return () => {
-      cancelled = true;
-    };
-  }, [authVersion]);
+  void validateSession();
+
+  return () => {
+    cancelled = true;
+  };
+}, [authVersion, setSessionStatus]);
+
 
   // ========================================
-  // INITIALIZE NOTIFICATION HANDLER
+  // INITIALIZE NOTIFICATIONS
   // ========================================
 
   useEffect(() => {
@@ -332,6 +440,14 @@ export default function RootLayout() {
   ]);
 
   // ========================================
+  // WELCOME SCREEN
+  // ========================================
+
+  const finishWelcome = useCallback(() => {
+    setWelcomeFinished(true);
+  }, []);
+
+  // ========================================
   // AUTHENTICATION NAVIGATION
   // ========================================
 
@@ -355,7 +471,6 @@ export default function RootLayout() {
       if (!isAuthScreen) {
         router.replace('/login');
       }
-
       return;
     }
 
@@ -371,22 +486,25 @@ export default function RootLayout() {
   ]);
 
   // ========================================
-  // LOADING SCREEN
-  // ========================================
-
-  if (!appReady) {
-    return <AnimatedSplashOverlay />;
-  }
-
-  // ========================================
   // APPLICATION
   // ========================================
 
-return (
-  <View style={styles.root}>
-  <StatusBar style="dark" />
+  return (
+    <View
+      style={styles.root}
+      onLayout={hideNativeSplash}
+    >
+     <StatusBar style="dark" />
 
-    <Stack
+{Platform.OS === 'android' && (
+  <AndroidStatusBar
+    barStyle="dark-content"
+    backgroundColor="#FFFDF8"
+    translucent={false}
+  />
+)}
+
+      <Stack
         screenOptions={{
           headerShown: false,
         }}
@@ -399,11 +517,7 @@ return (
 
         <Stack.Screen name="deity/[id]" />
 
-        <Stack.Screen name="pooja-details" />
-        <Stack.Screen name="pooja-date" />
-        <Stack.Screen name="pooja-devotee" />
-        <Stack.Screen name="pooja-payment" />
-        <Stack.Screen name="pooja-confirmation" />
+
 
         <Stack.Screen name="darshan" />
         <Stack.Screen name="darshan-videos" />
@@ -416,13 +530,13 @@ return (
 
         <Stack.Screen name="announcements" />
 
-        <Stack.Screen name="bookings" />
+
         <Stack.Screen name="donations" />
 
         <Stack.Screen name="about" />
         <Stack.Screen name="publications" />
         <Stack.Screen name="gallery" />
-        <Stack.Screen name="rooms" />
+
 
         <Stack.Screen name="profile" />
         <Stack.Screen name="account" />
@@ -434,21 +548,47 @@ return (
         <Stack.Screen name="language-settings" />
       </Stack>
 
-      {!welcomeFinished && (
-        <View style={styles.welcomeOverlay}>
-          <DynamicWelcomeScreen
-            onFinish={() => setWelcomeFinished(true)}
+      {!appReady || !nativeSplashHidden ? (
+        <View style={styles.loadingOverlay}>
+          <AnimatedIcon />
+          <ActivityIndicator
+            size="small"
+            color="#6B1720"
+            style={styles.loadingIndicator}
           />
         </View>
-      )}
+      ) : !welcomeFinished ? (
+        <View style={styles.welcomeOverlay}>
+          <DynamicWelcomeScreen
+            onFinish={finishWelcome}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
+
+// ========================================
+// STYLES
+// ========================================
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#FFFDF8',
+  },
+
+  loadingOverlay: {
+  ...StyleSheet.absoluteFill,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: '#FFFDF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingIndicator: {
+    marginTop: 30,
   },
 
   welcomeOverlay: {

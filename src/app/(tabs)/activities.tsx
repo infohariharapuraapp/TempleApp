@@ -153,7 +153,7 @@ const currentLanguage =
       meta: t('activities.spiritualJourney'),
     },
     {
-      icon: '✦',
+      icon: 'ॐ',
       title: t('activities.specialPrograms'),
       description: t(
         'activities.specialProgramsDescription'
@@ -328,9 +328,7 @@ const currentLanguage =
                   {t('activities.connectLearnServe')}
                 </Text>
               </View>
-              <Text style={styles.heroSparkle}>
-                ✦
-              </Text>
+
             </View>
           </LinearGradient>
         </FadeIn>
@@ -440,7 +438,7 @@ const currentLanguage =
                     ]}
                   >
                     <Text style={styles.featureIconText}>
-                      {section.icon || '✦'}
+                      {section.icon && !/[✦✧✨⭐🌟]/u.test(section.icon) ? section.icon : /service|seva/i.test(section.name) ? '🙏' : 'ॐ'}
                     </Text>
                   </View>
                   <View style={styles.featureContent}>
@@ -504,9 +502,7 @@ const currentLanguage =
         </Text>
       </View>
 
-      <Text style={styles.vaniMark}>
-        ✦
-      </Text>
+
     </View>
 
     {/* LOADING */}

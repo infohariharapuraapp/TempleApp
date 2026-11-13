@@ -1,4 +1,3 @@
-
 import i18n from 'i18next';
 import aboutTa from './about.ta.json';
 import aboutHi from './about.hi.json';

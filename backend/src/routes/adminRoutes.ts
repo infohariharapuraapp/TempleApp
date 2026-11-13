@@ -13,7 +13,7 @@ import {
   getUserById,
 
   updateUser,
-
+deleteEvent,
 
                 getAllEvents,
 createEvent,
@@ -47,6 +47,13 @@ router.put(
   authenticateToken,
   requireAdmin,
   updateEvent
+);
+
+router.delete(
+  '/events/:id',
+  authenticateToken,
+  requireAdmin,
+  deleteEvent
 );
 
 router.patch(

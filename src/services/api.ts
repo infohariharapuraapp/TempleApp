@@ -2,14 +2,24 @@
 import { getToken } from '@/services/authStorage';
 import i18n from '@/localization/i18n';
 
-// Production Render backend
+// ========================================
+// API CONFIGURATION
+// ========================================
+
 const API_BASE_URL =
   'https://hariharapura-temple-api.onrender.com/api';
+
+const DEFAULT_TIMEOUT_MS = 15000;
+
+// ========================================
+// TYPES
+// ========================================
 
 type ApiOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: any;
   token?: string;
+  timeoutMs?: number;
 };
 
 type SupportedLanguage =
@@ -26,6 +36,32 @@ const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   'hi',
   'ta',
 ];
+
+// ========================================
+// API ERROR
+// ========================================
+
+export class ApiError extends Error {
+  status?: number;
+
+  constructor(
+    message: string,
+    status?: number
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+
+    Object.setPrototypeOf(
+      this,
+      ApiError.prototype
+    );
+  }
+}
+
+// ========================================
+// LANGUAGE
+// ========================================
 
 function getSelectedLanguage(): SupportedLanguage {
   const currentLanguage =
@@ -53,8 +89,6 @@ function shouldAppendLanguage(
 
   const path = endpoint.split('?')[0];
 
-  // Don't translate authentication, admin,
-  // private user information or translation endpoints.
   const excludedPrefixes = [
     '/auth',
     '/admin',
@@ -78,20 +112,20 @@ function buildEndpoint(
     return endpoint;
   }
 
-  const language = getSelectedLanguage();
+  if (/[?&]lang=/i.test(endpoint)) {
+    return endpoint;
+  }
 
   const separator = endpoint.includes('?')
     ? '&'
     : '?';
 
-  // Respect any explicit language parameter
-  // already supplied by a screen.
-  if (/[?&]lang=/i.test(endpoint)) {
-    return endpoint;
-  }
-
-  return `${endpoint}${separator}lang=${language}`;
+  return `${endpoint}${separator}lang=${getSelectedLanguage()}`;
 }
+
+// ========================================
+// API REQUEST
+// ========================================
 
 export async function apiRequest<T = any>(
   endpoint: string,
@@ -101,18 +135,21 @@ export async function apiRequest<T = any>(
     method = 'GET',
     body,
     token,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options;
 
+  // Explicitly supplied token takes precedence.
   const authToken =
-    token || await getToken();
+    token !== undefined
+      ? token
+      : await getToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
   if (authToken) {
-    headers.Authorization =
-      `Bearer ${authToken}`;
+    headers.Authorization = `Bearer ${authToken}`;
   }
 
   const finalEndpoint = buildEndpoint(
@@ -120,36 +157,60 @@ export async function apiRequest<T = any>(
     method
   );
 
-  const response = await fetch(
-    `${API_BASE_URL}${finalEndpoint}`,
-    {
-      method,
-      headers,
-      body:
-        body !== undefined
-          ? JSON.stringify(body)
-          : undefined,
-    }
-  );
+  const controller = new AbortController();
 
-  let data: any;
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      'Invalid response from server'
+    const response = await fetch(
+      `${API_BASE_URL}${finalEndpoint}`,
+      {
+        method,
+        headers,
+        body:
+          body !== undefined
+            ? JSON.stringify(body)
+            : undefined,
+        signal: controller.signal,
+      }
     );
-  }
 
-  if (!response.ok) {
-    throw new Error(
-      data?.message ||
-      'Something went wrong'
-    );
-  }
+    let data: any;
 
-  return data as T;
+    try {
+      data = await response.json();
+    } catch {
+      throw new ApiError(
+        'Invalid response from server',
+        response.status
+      );
+    }
+
+    if (!response.ok) {
+      throw new ApiError(
+        data?.message ||
+          'Something went wrong',
+        response.status
+      );
+    }
+
+    return data as T;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === 'AbortError'
+    ) {
+      throw new ApiError(
+        'Request timed out. Please try again.'
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export { API_BASE_URL };

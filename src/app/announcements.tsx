@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { Image as ExpoImage } from 'expo-image';
 import {
   ActivityIndicator,
   Image,
@@ -14,6 +13,7 @@ import {
   RefreshControl,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiRequest } from '@/services/api';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ========================================
 // TYPES
@@ -325,7 +326,9 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFF7E8" />
+        <View style={styles.center}>
         <ActivityIndicator
           size="large"
           color={COLORS.maroon}
@@ -336,7 +339,8 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             defaultValue: 'Loading temple updates...',
           })}
         </Text>
-      </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -346,7 +350,8 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
 
   if (detailMode) {
     return (
-      <View style={styles.screen}>
+      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFF7E8" />
         <View style={styles.header}>
           <Pressable
             onPress={goBack}
@@ -533,7 +538,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             </AutoTranslatedText>
           </ScrollView>
         )}
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -542,7 +547,8 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
   // ========================================
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF7E8" />
       <View style={styles.header}>
         <Pressable
           onPress={goBack}
@@ -787,7 +793,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
           Divyakshetra Hariharapura
         </AutoTranslatedText>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -798,7 +804,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.cream,
+    backgroundColor: '#FFF7E8',
   },
 
   center: {
@@ -806,7 +812,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: COLORS.cream,
+    backgroundColor: '#FFF7E8',
   },
 
   statusText: {
@@ -818,7 +824,7 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: COLORS.maroon,
-    paddingTop: 52,
+    paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 18,
     flexDirection: 'row',

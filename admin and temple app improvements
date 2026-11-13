@@ -1,0 +1,13 @@
+src/app/(tabs)/activities.tsx:331: trailing whitespace.
+[32m+[m[41m              [m
+src/app/(tabs)/activities.tsx:505: trailing whitespace.
+[32m+[m[41m      [m
+src/app/(tabs)/activities.tsx:1296: new blank line at EOF.
+src/app/_layout.tsx:231: trailing whitespace.
+[32m+[m[41m [m
+src/app/_layout.tsx:520: trailing whitespace.
+[32m+[m[41m       [m
+src/app/_layout.tsx:533: trailing whitespace.
+[32m+[m[41m       [m
+src/app/_layout.tsx:539: trailing whitespace.
+[32m+[m[41m       [m

@@ -705,3 +705,86 @@ export const updateEventStatus = async (
     });
   }
 };
+
+/* =========================================================
+   DELETE EVENT
+========================================================= */
+
+export const deleteEvent = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid event ID',
+    });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Lock the event to prevent concurrent changes.
+    const existing = await client.query(
+      `SELECT id, title
+       FROM events
+       WHERE id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found',
+      });
+    }
+
+    // Cancel scheduled reminders before deletion.
+    // Keep historical notifications unchanged.
+    await client.query(
+      `UPDATE notifications
+       SET status = 'cancelled',
+           updated_at = CURRENT_TIMESTAMP
+       WHERE notification_type = 'event_reminder'
+         AND data->>'eventId' = $1
+         AND status = 'scheduled'`,
+      [String(id)]
+    );
+
+    // event_images records are deleted automatically
+    // through the ON DELETE CASCADE foreign key.
+    await client.query(
+      'DELETE FROM events WHERE id = $1',
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      message: 'Event deleted successfully',
+      data: {
+        id,
+        title: existing.rows[0].title,
+      },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    console.error('Delete event error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete event',
+    });
+  } finally {
+    client.release();
+  }
+};
