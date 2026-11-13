@@ -1,7 +1,7 @@
 
+import { API_BASE_URL } from '@/services/api';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { API_BASE_URL } from '@/services/api';
 
 type Language = 'en' | 'te' | 'kn' | 'hi' | 'ta';
 
@@ -124,7 +124,7 @@ async function processQueue() {
     if (
       batch.length >= MAX_BATCH_ITEMS ||
       totalCharacters + length >
-        MAX_BATCH_CHARACTERS
+      MAX_BATCH_CHARACTERS
     ) {
       continue;
     }
@@ -166,6 +166,7 @@ async function processQueue() {
     const result = await response.json();
 
     const translations = result?.data?.translations;
+
 
     if (
       !result?.success ||
@@ -275,7 +276,7 @@ export function useAutoTranslate(text: string): string {
 
   // Avoid displaying a previous language's
   // translation during the first render after switching.
-return language === 'en'
-  ? text
-  : translationCache.get(key) ?? text;
+  return language === 'en'
+    ? text
+    : translationCache.get(key) ?? text;
 }

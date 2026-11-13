@@ -452,7 +452,10 @@ export default function HomeScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+   <SafeAreaView
+  style={styles.container}
+  edges={['top', 'left', 'right']}
+>
       <Animated.View
         pointerEvents="none"
         style={[
@@ -530,15 +533,15 @@ export default function HomeScreen() {
           {/* Hero */}
           <Animated.View
             style={[
-              styles.banner,
-              {
-                width: width - 40,
-                transform: [
-                  { translateY: heroTranslateY },
-                  { scale: heroScale },
-                ],
-              },
-            ]}
+  styles.banner,
+  {
+    width: '100%',
+    transform: [
+      { translateY: heroTranslateY },
+      { scale: heroScale },
+    ],
+  },
+]}
           >
             <Image
               source={{

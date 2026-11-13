@@ -113,7 +113,10 @@ export default function DeitiesScreen() {
   // SCREEN
   // ========================================
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+  style={styles.container}
+  edges={['top', 'left', 'right']}
+>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

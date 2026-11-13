@@ -384,7 +384,7 @@ export default function RootLayout() {
 
 return (
   <View style={styles.root}>
-  <StatusBar style="light" />
+  <StatusBar style="dark" />
 
     <Stack
         screenOptions={{
