@@ -296,3 +296,50 @@ export const deactivateActivity = async (
     });
   }
 };
+
+
+export const deleteActivity = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const activityId = Number(req.params.id);
+
+    if (
+      !Number.isSafeInteger(activityId) ||
+      activityId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid activity ID',
+      });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM activities
+       WHERE id = $1
+       RETURNING id, title`,
+      [activityId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Activity not found',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Activity permanently deleted',
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error('Error deleting activity:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete activity',
+    });
+  }
+};

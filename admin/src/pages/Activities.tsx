@@ -1,6 +1,17 @@
-import { FormEvent, useEffect, useState } from 'react';
+
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { apiRequest } from '../lib/api';
+
+// ========================================
+// TYPES
+// ========================================
 
 type Activity = {
   id: number;
@@ -65,26 +76,76 @@ const emptySectionForm: ActivitySectionForm = {
   is_active: true,
 };
 
+const deleteButtonStyle = {
+  backgroundColor: '#dc2626',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: 6,
+  padding: '9px 14px',
+  cursor: 'pointer',
+};
+
+// ========================================
+// ACTIVITIES ADMIN PAGE
+// ========================================
+
 export default function Activities() {
   const [items, setItems] = useState<Activity[]>([]);
-  const [form, setForm] = useState<ActivityForm>(emptyForm);
+  const [form, setForm] = useState<ActivityForm>({
+    ...emptyForm,
+  });
 
   const [editing, setEditing] = useState<number | null>(null);
 
-  const [imageMode, setImageMode] = useState<'url' | 'upload'>('url');
+  const [imageMode, setImageMode] =
+    useState<'url' | 'upload'>('url');
+
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  const previewRef = useRef<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Activity sections
-  const [sections, setSections] = useState<ActivitySection[]>([]);
+  const [deletingActivityId, setDeletingActivityId] =
+    useState<number | null>(null);
+
+  // ========================================
+  // ACTIVITY SECTION STATES
+  // ========================================
+
+  const [sections, setSections] =
+    useState<ActivitySection[]>([]);
+
   const [sectionForm, setSectionForm] =
-    useState<ActivitySectionForm>(emptySectionForm);
+    useState<ActivitySectionForm>({
+      ...emptySectionForm,
+    });
+
   const [editingSection, setEditingSection] =
     useState<number | null>(null);
-  const [sectionLoading, setSectionLoading] = useState(false);
+
+  const [sectionLoading, setSectionLoading] =
+    useState(false);
+
   const [sectionError, setSectionError] = useState('');
+  const [sectionSuccess, setSectionSuccess] = useState('');
+
+  const [deletingSectionId, setDeletingSectionId] =
+    useState<number | null>(null);
+
+  const isProcessing =
+    loading ||
+    sectionLoading ||
+    uploading ||
+    deletingActivityId !== null ||
+    deletingSectionId !== null;
+
+  // ========================================
+  // LOAD ACTIVITIES
+  // ========================================
 
   async function loadActivities() {
     try {
@@ -107,6 +168,10 @@ export default function Activities() {
       setLoading(false);
     }
   }
+
+  // ========================================
+  // LOAD ACTIVITY SECTIONS
+  // ========================================
 
   async function loadSections() {
     try {
@@ -131,21 +196,44 @@ export default function Activities() {
   }
 
   useEffect(() => {
-    loadActivities();
-    loadSections();
+    void loadActivities();
+    void loadSections();
+
+    return () => {
+      if (previewRef.current) {
+        URL.revokeObjectURL(previewRef.current);
+      }
+    };
   }, []);
+
+  // ========================================
+  // ACTIVITY FORM HELPERS
+  // ========================================
 
   function updateField(
     field: keyof ActivityForm,
     value: string | number | boolean
   ) {
-    setForm((current) => ({
+    setForm(current => ({
       ...current,
       [field]: value,
     }));
   }
 
+  function clearPreview() {
+    if (previewRef.current) {
+      URL.revokeObjectURL(previewRef.current);
+      previewRef.current = null;
+    }
+
+    setPreviewUrl('');
+  }
+
   function startEdit(activity: Activity) {
+    if (isProcessing) return;
+
+    clearPreview();
+
     setEditing(activity.id);
 
     setForm({
@@ -162,6 +250,8 @@ export default function Activities() {
     });
 
     setImageMode('url');
+    setError('');
+    setSuccess('');
 
     window.scrollTo({
       top: 0,
@@ -170,14 +260,22 @@ export default function Activities() {
   }
 
   function cancelEdit() {
+    clearPreview();
+
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setImageMode('url');
     setError('');
   }
 
+  // ========================================
+  // CREATE / UPDATE ACTIVITY
+  // ========================================
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    if (isProcessing) return;
 
     if (!form.title.trim()) {
       setError('Activity title is required.');
@@ -192,21 +290,37 @@ export default function Activities() {
     try {
       setLoading(true);
       setError('');
+      setSuccess('');
+
+      const payload = {
+        ...form,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        location: form.location.trim(),
+        image_url: form.image_url.trim(),
+      };
 
       if (editing !== null) {
         await apiRequest(`/admin/activities/${editing}`, {
           method: 'PUT',
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       } else {
         await apiRequest('/admin/activities', {
           method: 'POST',
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       }
 
-      await loadActivities();
+      const message =
+        editing !== null
+          ? 'Activity updated successfully.'
+          : 'Activity created successfully.';
+
       cancelEdit();
+      await loadActivities();
+
+      setSuccess(message);
     } catch (err) {
       setError(
         err instanceof Error
@@ -218,17 +332,25 @@ export default function Activities() {
     }
   }
 
-  async function toggleActivity(activity: Activity) {
-    try {
-      setError('');
-      setLoading(true);
+  // ========================================
+  // ACTIVATE / DEACTIVATE ACTIVITY
+  // ========================================
 
-      if (!activity.section_id) {
-        setError(
-          'This activity does not have a section. Please edit it and select a section.'
-        );
-        return;
-      }
+  async function toggleActivity(activity: Activity) {
+    if (isProcessing) return;
+
+    if (!activity.section_id) {
+      setError(
+        'This activity does not have a section. ' +
+        'Please edit it and select a section.'
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
 
       await apiRequest(`/admin/activities/${activity.id}`, {
         method: 'PUT',
@@ -247,6 +369,12 @@ export default function Activities() {
       });
 
       await loadActivities();
+
+      setSuccess(
+        `Activity ${
+          activity.is_active ? 'deactivated' : 'activated'
+        } successfully.`
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -258,17 +386,72 @@ export default function Activities() {
     }
   }
 
+  // ========================================
+  // PERMANENTLY DELETE ACTIVITY
+  // ========================================
+
+  async function deleteActivity(activity: Activity) {
+    if (isProcessing) return;
+
+    const confirmed = window.confirm(
+      `Permanently delete "${activity.title}"?\n\n` +
+      'This activity will be removed from the database.\n' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    setDeletingActivityId(activity.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      await apiRequest(
+        `/admin/activities/${activity.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      setItems(previous =>
+        previous.filter(item => item.id !== activity.id)
+      );
+
+      if (editing === activity.id) {
+        cancelEdit();
+      }
+
+      setSuccess(
+        `"${activity.title}" deleted successfully.`
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete activity'
+      );
+    } finally {
+      setDeletingActivityId(null);
+    }
+  }
+
+  // ========================================
+  // ACTIVITY SECTION FORM HELPERS
+  // ========================================
+
   function updateSectionField(
     field: keyof ActivitySectionForm,
     value: string | number | boolean
   ) {
-    setSectionForm((current) => ({
+    setSectionForm(current => ({
       ...current,
       [field]: value,
     }));
   }
 
   function startEditSection(section: ActivitySection) {
+    if (isProcessing) return;
+
     setEditingSection(section.id);
 
     setSectionForm({
@@ -279,16 +462,25 @@ export default function Activities() {
       display_order: section.display_order ?? 0,
       is_active: section.is_active,
     });
+
+    setSectionError('');
+    setSectionSuccess('');
   }
 
   function cancelSectionEdit() {
     setEditingSection(null);
-    setSectionForm(emptySectionForm);
+    setSectionForm({ ...emptySectionForm });
     setSectionError('');
   }
 
+  // ========================================
+  // CREATE / UPDATE ACTIVITY SECTION
+  // ========================================
+
   async function handleSectionSubmit(event: FormEvent) {
     event.preventDefault();
+
+    if (isProcessing) return;
 
     if (!sectionForm.name.trim()) {
       setSectionError('Section name is required.');
@@ -298,24 +490,43 @@ export default function Activities() {
     try {
       setSectionLoading(true);
       setSectionError('');
+      setSectionSuccess('');
+
+      const payload = {
+        ...sectionForm,
+        name: sectionForm.name.trim(),
+        description: sectionForm.description.trim(),
+        icon: sectionForm.icon.trim(),
+        image_url: sectionForm.image_url.trim(),
+      };
 
       if (editingSection !== null) {
         await apiRequest(
           `/activity-sections/admin/${editingSection}`,
           {
             method: 'PUT',
-            body: JSON.stringify(sectionForm),
+            body: JSON.stringify(payload),
           }
         );
       } else {
-        await apiRequest('/activity-sections/admin', {
-          method: 'POST',
-          body: JSON.stringify(sectionForm),
-        });
+        await apiRequest(
+          '/activity-sections/admin',
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
       }
 
-      await loadSections();
+      const message =
+        editingSection !== null
+          ? 'Activity section updated successfully.'
+          : 'Activity section created successfully.';
+
       cancelSectionEdit();
+      await loadSections();
+
+      setSectionSuccess(message);
     } catch (err) {
       setSectionError(
         err instanceof Error
@@ -327,10 +538,17 @@ export default function Activities() {
     }
   }
 
+  // ========================================
+  // ACTIVATE / DEACTIVATE SECTION
+  // ========================================
+
   async function toggleSection(section: ActivitySection) {
+    if (isProcessing) return;
+
     try {
       setSectionLoading(true);
       setSectionError('');
+      setSectionSuccess('');
 
       await apiRequest(
         `/activity-sections/admin/${section.id}`,
@@ -348,6 +566,12 @@ export default function Activities() {
       );
 
       await loadSections();
+
+      setSectionSuccess(
+        `Section ${
+          section.is_active ? 'deactivated' : 'activated'
+        } successfully.`
+      );
     } catch (err) {
       setSectionError(
         err instanceof Error
@@ -359,33 +583,99 @@ export default function Activities() {
     }
   }
 
-  async function handleImageUpload(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = event.target.files?.[0];
+  // ========================================
+  // PERMANENTLY DELETE ACTIVITY SECTION
+  // ========================================
 
-    if (!file) {
+  async function deleteActivitySection(
+    section: ActivitySection
+  ) {
+    if (isProcessing) return;
+
+    const activitiesInSection = items.filter(
+      activity =>
+        Number(activity.section_id) === section.id
+    );
+
+    if (activitiesInSection.length > 0) {
+      setSectionError(
+        `Cannot delete "${section.name}". ` +
+        `It contains ${activitiesInSection.length} ` +
+        'activities. Move or delete those activities first.'
+      );
       return;
     }
 
+    const confirmed = window.confirm(
+      `Permanently delete section "${section.name}"?\n\n` +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    setDeletingSectionId(section.id);
+    setSectionError('');
+    setSectionSuccess('');
+
     try {
-      setUploading(true);
-      setError('');
+      await apiRequest(
+        `/activity-sections/admin/${section.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
 
-      /*
-       * IMPORTANT:
-       * This is only a temporary browser preview.
-       *
-       * The actual upload to the backend/storage will be
-       * connected after the admin activity API is working.
-       */
+      setSections(previous =>
+        previous.filter(item => item.id !== section.id)
+      );
 
-      const previewUrl = URL.createObjectURL(file);
+      if (editingSection === section.id) {
+        cancelSectionEdit();
+      }
 
-      setForm((current) => ({
-        ...current,
-        image_url: previewUrl,
-      }));
+      setSectionSuccess(
+        `"${section.name}" deleted successfully.`
+      );
+    } catch (err) {
+      setSectionError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete activity section'
+      );
+    } finally {
+      setDeletingSectionId(null);
+    }
+  }
+
+  // ========================================
+  // IMAGE SELECTION / PREVIEW
+  // ========================================
+
+  function handleImageUpload(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    clearPreview();
+    setUploading(true);
+    setError('');
+
+    try {
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please select an image file.');
+      }
+
+      const url = URL.createObjectURL(file);
+
+      previewRef.current = url;
+      setPreviewUrl(url);
+
+      // Preview only.
+      // No upload endpoint was present in the
+      // original Activities.tsx.
+      // Do not save blob URLs to PostgreSQL.
     } catch (err) {
       setError(
         err instanceof Error
@@ -397,41 +687,57 @@ export default function Activities() {
     }
   }
 
+  // ========================================
+  // UI
+  // ========================================
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Activities</h1>
           <p>
-            Manage activity sections and activities shown in
-            the devotee app
+            Manage activity sections and activities
+            shown in the devotee app.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="error-message">
+        <div className="error-message" role="alert">
           {error}
         </div>
       )}
 
-      {/* ============================= */}
-      {/* ACTIVITY SECTIONS */}
-      {/* ============================= */}
+      {success && (
+        <div className="card" role="status">
+          {success}
+        </div>
+      )}
+
+      {/* =====================================
+          ACTIVITY SECTIONS
+      ===================================== */}
 
       <div className="card">
         <div className="section-header">
           <div>
             <h2>Activity Sections</h2>
             <p>
-              Create and manage categories for activities
+              Create and manage categories for activities.
             </p>
           </div>
         </div>
 
         {sectionError && (
-          <div className="error-message">
+          <div className="error-message" role="alert">
             {sectionError}
+          </div>
+        )}
+
+        {sectionSuccess && (
+          <div className="card" role="status">
+            {sectionSuccess}
           </div>
         )}
 
@@ -439,11 +745,10 @@ export default function Activities() {
           <div className="form-grid">
             <div className="form-field">
               <label>Section Name *</label>
-
               <input
                 type="text"
                 value={sectionForm.name}
-                onChange={(event) =>
+                onChange={event =>
                   updateSectionField(
                     'name',
                     event.target.value
@@ -456,11 +761,10 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Icon</label>
-
               <input
                 type="text"
                 value={sectionForm.icon}
-                onChange={(event) =>
+                onChange={event =>
                   updateSectionField(
                     'icon',
                     event.target.value
@@ -472,12 +776,11 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Display Order</label>
-
               <input
                 type="number"
                 min="0"
                 value={sectionForm.display_order}
-                onChange={(event) =>
+                onChange={event =>
                   updateSectionField(
                     'display_order',
                     Number(event.target.value)
@@ -488,37 +791,30 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Status</label>
-
               <select
                 value={
                   sectionForm.is_active
                     ? 'active'
                     : 'inactive'
                 }
-                onChange={(event) =>
+                onChange={event =>
                   updateSectionField(
                     'is_active',
                     event.target.value === 'active'
                   )
                 }
               >
-                <option value="active">
-                  Active
-                </option>
-
-                <option value="inactive">
-                  Inactive
-                </option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </select>
             </div>
           </div>
 
           <div className="form-field">
             <label>Short Description</label>
-
             <textarea
               value={sectionForm.description}
-              onChange={(event) =>
+              onChange={event =>
                 updateSectionField(
                   'description',
                   event.target.value
@@ -531,11 +827,10 @@ export default function Activities() {
 
           <div className="form-field">
             <label>Section Image URL</label>
-
             <input
               type="text"
               value={sectionForm.image_url}
-              onChange={(event) =>
+              onChange={event =>
                 updateSectionField(
                   'image_url',
                   event.target.value
@@ -549,19 +844,20 @@ export default function Activities() {
             <button
               type="submit"
               className="primary-button"
-              disabled={sectionLoading}
+              disabled={isProcessing}
             >
               {sectionLoading
                 ? 'Saving...'
                 : editingSection !== null
-                ? 'Update Section'
-                : 'Add Section'}
+                  ? 'Update Section'
+                  : 'Add Section'}
             </button>
 
             {editingSection !== null && (
               <button
                 type="button"
                 className="secondary-button"
+                disabled={isProcessing}
                 onClick={cancelSectionEdit}
               >
                 Cancel
@@ -570,7 +866,9 @@ export default function Activities() {
           </div>
         </form>
 
-        <div style={{ marginTop: '24px' }}>
+        {/* EXISTING SECTIONS */}
+
+        <div style={{ marginTop: 24 }}>
           <h3>Existing Sections</h3>
 
           {sectionLoading && sections.length === 0 ? (
@@ -579,7 +877,7 @@ export default function Activities() {
             <p>No activity sections found.</p>
           ) : (
             <div className="items-list">
-              {sections.map((section) => (
+              {sections.map(section => (
                 <div
                   className="item-row"
                   key={section.id}
@@ -589,6 +887,7 @@ export default function Activities() {
                       <img
                         src={section.image_url}
                         alt={section.name}
+                        loading="lazy"
                       />
                     ) : (
                       <div className="no-image">
@@ -606,9 +905,7 @@ export default function Activities() {
                     </h3>
 
                     {section.description && (
-                      <p>
-                        {section.description}
-                      </p>
+                      <p>{section.description}</p>
                     )}
 
                     <span>
@@ -624,9 +921,17 @@ export default function Activities() {
                     </span>
                   </div>
 
-                  <div className="item-actions">
+                  <div
+                    className="item-actions"
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                    }}
+                  >
                     <button
                       type="button"
+                      disabled={isProcessing}
                       onClick={() =>
                         startEditSection(section)
                       }
@@ -636,13 +941,28 @@ export default function Activities() {
 
                     <button
                       type="button"
+                      disabled={isProcessing}
                       onClick={() =>
-                        toggleSection(section)
+                        void toggleSection(section)
                       }
                     >
                       {section.is_active
                         ? 'Deactivate'
                         : 'Activate'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="danger"
+                      style={deleteButtonStyle}
+                      disabled={isProcessing}
+                      onClick={() =>
+                        void deleteActivitySection(section)
+                      }
+                    >
+                      {deletingSectionId === section.id
+                        ? 'Deleting...'
+                        : 'Delete'}
                     </button>
                   </div>
                 </div>
@@ -652,9 +972,9 @@ export default function Activities() {
         </div>
       </div>
 
-      {/* ============================= */}
-      {/* ACTIVITY FORM */}
-      {/* ============================= */}
+      {/* =====================================
+          ACTIVITY FORM
+      ===================================== */}
 
       <div className="card">
         <h2>
@@ -667,11 +987,10 @@ export default function Activities() {
           <div className="form-grid">
             <div className="form-field">
               <label>Title *</label>
-
               <input
                 type="text"
                 value={form.title}
-                onChange={(event) =>
+                onChange={event =>
                   updateField(
                     'title',
                     event.target.value
@@ -684,10 +1003,9 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Activity Section *</label>
-
               <select
                 value={form.section_id}
-                onChange={(event) =>
+                onChange={event =>
                   updateField(
                     'section_id',
                     event.target.value
@@ -702,8 +1020,12 @@ export default function Activities() {
                 </option>
 
                 {sections
-                  .filter((section) => section.is_active)
-                  .map((section) => (
+                  .filter(
+                    section =>
+                      section.is_active ||
+                      section.id === form.section_id
+                  )
+                  .map(section => (
                     <option
                       key={section.id}
                       value={section.id}
@@ -719,12 +1041,11 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Display Order</label>
-
               <input
                 type="number"
                 min="0"
                 value={form.display_order}
-                onChange={(event) =>
+                onChange={event =>
                   updateField(
                     'display_order',
                     Number(event.target.value)
@@ -735,11 +1056,10 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Activity Date</label>
-
               <input
                 type="date"
                 value={form.activity_date}
-                onChange={(event) =>
+                onChange={event =>
                   updateField(
                     'activity_date',
                     event.target.value
@@ -750,11 +1070,10 @@ export default function Activities() {
 
             <div className="form-field">
               <label>Location</label>
-
               <input
                 type="text"
                 value={form.location}
-                onChange={(event) =>
+                onChange={event =>
                   updateField(
                     'location',
                     event.target.value
@@ -767,10 +1086,9 @@ export default function Activities() {
 
           <div className="form-field">
             <label>Description</label>
-
             <textarea
               value={form.description}
-              onChange={(event) =>
+              onChange={event =>
                 updateField(
                   'description',
                   event.target.value
@@ -780,6 +1098,8 @@ export default function Activities() {
               rows={5}
             />
           </div>
+
+          {/* IMAGE INPUT */}
 
           <div className="form-field">
             <label>Activity Image</label>
@@ -818,31 +1138,39 @@ export default function Activities() {
               <input
                 type="text"
                 value={form.image_url}
-                onChange={(event) =>
+                onChange={event => {
+                  clearPreview();
                   updateField(
                     'image_url',
                     event.target.value
-                  )
-                }
+                  );
+                }}
                 placeholder="https://example.com/activity-image.jpg"
               />
             )}
 
             {imageMode === 'upload' && (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={uploading}
-              />
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                />
+
+                <small>
+                  Image selection provides a preview only.
+                  Use a hosted image URL to save the image.
+                </small>
+              </>
             )}
 
-            {form.image_url && (
+            {(previewUrl || form.image_url) && (
               <div className="image-preview">
                 <img
-                  src={form.image_url}
+                  src={previewUrl || form.image_url}
                   alt="Activity preview"
-                  onError={(event) => {
+                  onError={event => {
                     event.currentTarget.style.display =
                       'none';
                   }}
@@ -853,27 +1181,21 @@ export default function Activities() {
 
           <div className="form-field">
             <label>Status</label>
-
             <select
               value={
                 form.is_active
                   ? 'active'
                   : 'inactive'
               }
-              onChange={(event) =>
+              onChange={event =>
                 updateField(
                   'is_active',
                   event.target.value === 'active'
                 )
               }
             >
-              <option value="active">
-                Active
-              </option>
-
-              <option value="inactive">
-                Inactive
-              </option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
 
@@ -881,19 +1203,20 @@ export default function Activities() {
             <button
               type="submit"
               className="primary-button"
-              disabled={loading || uploading}
+              disabled={isProcessing}
             >
               {loading
                 ? 'Saving...'
                 : editing !== null
-                ? 'Update Activity'
-                : 'Add Activity'}
+                  ? 'Update Activity'
+                  : 'Add Activity'}
             </button>
 
             {editing !== null && (
               <button
                 type="button"
                 className="secondary-button"
+                disabled={isProcessing}
                 onClick={cancelEdit}
               >
                 Cancel
@@ -903,18 +1226,15 @@ export default function Activities() {
         </form>
       </div>
 
-      {/* ============================= */}
-      {/* ACTIVITIES LIST */}
-      {/* ============================= */}
+      {/* =====================================
+          ACTIVITIES LIST
+      ===================================== */}
 
       <div className="card">
         <div className="section-header">
           <div>
             <h2>Activities</h2>
-
-            <p>
-              Activities managed by the admin
-            </p>
+            <p>Activities managed by the admin.</p>
           </div>
         </div>
 
@@ -924,7 +1244,7 @@ export default function Activities() {
           <p>No activities found.</p>
         ) : (
           <div className="items-list">
-            {items.map((activity) => (
+            {items.map(activity => (
               <div
                 className="item-row"
                 key={activity.id}
@@ -934,6 +1254,7 @@ export default function Activities() {
                     <img
                       src={activity.image_url}
                       alt={activity.title}
+                      loading="lazy"
                     />
                   ) : (
                     <div className="no-image">
@@ -953,9 +1274,7 @@ export default function Activities() {
                   )}
 
                   {activity.description && (
-                    <p>
-                      {activity.description}
-                    </p>
+                    <p>{activity.description}</p>
                   )}
 
                   {activity.activity_date && (
@@ -988,9 +1307,17 @@ export default function Activities() {
                   </span>
                 </div>
 
-                <div className="item-actions">
+                <div
+                  className="item-actions"
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
                   <button
                     type="button"
+                    disabled={isProcessing}
                     onClick={() =>
                       startEdit(activity)
                     }
@@ -1000,13 +1327,28 @@ export default function Activities() {
 
                   <button
                     type="button"
+                    disabled={isProcessing}
                     onClick={() =>
-                      toggleActivity(activity)
+                      void toggleActivity(activity)
                     }
                   >
                     {activity.is_active
                       ? 'Deactivate'
                       : 'Activate'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="danger"
+                    style={deleteButtonStyle}
+                    disabled={isProcessing}
+                    onClick={() =>
+                      void deleteActivity(activity)
+                    }
+                  >
+                    {deletingActivityId === activity.id
+                      ? 'Deleting...'
+                      : 'Delete'}
                   </button>
                 </div>
               </div>

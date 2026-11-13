@@ -364,3 +364,113 @@ export const deactivateActivitySection = async (
     });
   }
 };
+
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN - Permanently Delete Activity Section
+|--------------------------------------------------------------------------
+|
+| Safety:
+| - Only valid section IDs are accepted.
+| - Sections containing activities cannot be deleted.
+| - Existing activities are never automatically deleted.
+| - Foreign key violations are handled safely.
+|
+*/
+
+export const deleteActivitySection = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const sectionId = Number(req.params.id);
+
+    if (
+      !Number.isSafeInteger(sectionId) ||
+      sectionId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid activity section ID',
+      });
+    }
+
+    // Delete only when no activities reference this section.
+    // The NOT EXISTS check is enforced in the database query.
+    const result = await pool.query(
+      `
+      DELETE FROM activity_sections AS s
+      WHERE s.id = $1
+        AND NOT EXISTS (
+          SELECT 1
+          FROM activities AS a
+          WHERE a.section_id = s.id
+        )
+      RETURNING s.id, s.name
+      `,
+      [sectionId]
+    );
+
+    if (result.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Activity section permanently deleted',
+        data: result.rows[0],
+      });
+    }
+
+    // Determine whether the section exists or contains activities.
+    const sectionResult = await pool.query(
+      `
+      SELECT
+        s.id,
+        (
+          SELECT COUNT(*)::int
+          FROM activities AS a
+          WHERE a.section_id = s.id
+        ) AS activity_count
+      FROM activity_sections AS s
+      WHERE s.id = $1
+      `,
+      [sectionId]
+    );
+
+    if (sectionResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Activity section not found',
+      });
+    }
+
+    return res.status(409).json({
+      success: false,
+      message:
+        'Cannot delete this section because it contains ' +
+        `${sectionResult.rows[0].activity_count} activities. ` +
+        'Move or delete those activities first.',
+    });
+  } catch (error: unknown) {
+    console.error('Error deleting activity section:', error);
+
+    // PostgreSQL foreign key constraint violation
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === '23503'
+    ) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'This section is referenced by existing records ' +
+          'and cannot be deleted.',
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete activity section',
+    });
+  }
+};

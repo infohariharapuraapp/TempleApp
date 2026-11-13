@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 
 import {
@@ -6,7 +7,7 @@ import {
   getAdminActivitySections,
   createActivitySection,
   updateActivitySection,
-  deactivateActivitySection,
+  deleteActivitySection,
 } from '../controllers/activitySectionController';
 
 import { authenticateToken } from '../middleware/authMiddleware';
@@ -20,6 +21,7 @@ const router = Router();
 |--------------------------------------------------------------------------
 */
 
+// Get all activity sections (active and inactive)
 router.get(
   '/admin/all',
   authenticateToken,
@@ -27,6 +29,7 @@ router.get(
   getAdminActivitySections
 );
 
+// Create new activity section
 router.post(
   '/admin',
   authenticateToken,
@@ -34,6 +37,7 @@ router.post(
   createActivitySection
 );
 
+// Update activity section / Activate / Deactivate
 router.put(
   '/admin/:id',
   authenticateToken,
@@ -41,11 +45,12 @@ router.put(
   updateActivitySection
 );
 
+// Permanently delete an empty activity section
 router.delete(
   '/admin/:id',
   authenticateToken,
   requireAdmin,
-  deactivateActivitySection
+  deleteActivitySection
 );
 
 /*
@@ -54,8 +59,10 @@ router.delete(
 |--------------------------------------------------------------------------
 */
 
+// Get active activity sections
 router.get('/', getActivitySections);
 
+// Get one active activity section
 router.get('/:id', getActivitySectionById);
 
 export default router;
