@@ -85,8 +85,9 @@ async function localizeDharmaFields(
 
     for (const field of fields) {
       const isQuestionContent =
-        field === 'title' ||
-        field === 'description' && 'category_id' in row;
+  field === 'title' ||
+  (field === 'description' && 'category_id' in row) ||
+  field === 'answer';
 
       if (
         isQuestionContent &&
@@ -490,17 +491,40 @@ timeoutMs
         [questionId]
       );
 
-     return res.json({
+     // ========================================
+// TRANSLATE QUESTION AND APPROVED ANSWERS
+// ========================================
+
+const selectedLanguage =
+  getDharmaLanguage(req.query.lang);
+
+const [
+  localizedQuestions,
+  localizedAnswers,
+] = await Promise.all([
+  localizeDharmaFields(
+    questionResult.rows,
+    ['title', 'description', 'category_name'],
+    selectedLanguage
+  ),
+
+  localizeDharmaFields(
+    answersResult.rows,
+    ['answer'],
+    selectedLanguage
+  ),
+]);
+
+return res.json({
   success: true,
-  question: (
-    await localizeDharmaFields(
-      questionResult.rows,
-      ['title', 'description', 'category_name'],
-      getDharmaLanguage(req.query.lang)
-    )
-  )[0],
-  answers: answersResult.rows,
-  communityAnswerSlotsUsed: countResult.rows[0].total,
+
+  question: localizedQuestions[0],
+
+  answers: localizedAnswers,
+
+  communityAnswerSlotsUsed:
+    countResult.rows[0].total,
+
   maxCommunityAnswers: 10,
 });
     } catch (error) {
