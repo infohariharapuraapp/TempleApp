@@ -1,6 +1,15 @@
 
 import { Request, Response } from 'express';
 import { pool } from '../db';
+import {
+  SUPPORTED_LANGUAGES,
+  TranslationLanguage,
+  translateTextOrOriginal,
+} from '../services/translationService';
+
+import {
+  withTranslationDeadline,
+} from '../services/translationDeadline';
 
 type QuoteInput = {
   title?: unknown;
@@ -119,10 +128,38 @@ function validateBody(
           : undefined,
   };
 }
+function normalizeQuoteLanguage(
+  value: unknown
+): TranslationLanguage | null {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase();
 
+  const aliases: Record<string, string> = {
+    english: 'en',
+    telugu: 'te',
+    kannada: 'kn',
+    hindi: 'hi',
+    tamil: 'ta',
+    'తెలుగు': 'te',
+    'ಕನ್ನಡ': 'kn',
+    'हिन्दी': 'hi',
+    'हिंदी': 'hi',
+    'தமிழ்': 'ta',
+  };
+
+  const code = aliases[raw] || raw.split('-')[0];
+
+  return SUPPORTED_LANGUAGES.includes(
+    code as TranslationLanguage
+  )
+    ? (code as TranslationLanguage)
+    : null;
+}
 // PUBLIC: Published quotes only, latest first
+// PUBLIC: Published quotes with dynamic translation
 export async function getQuotes(
-  _req: Request,
+  req: Request,
   res: Response
 ) {
   try {
@@ -140,9 +177,82 @@ export async function getQuotes(
       ORDER BY published_at DESC NULLS LAST, id DESC
     `);
 
+    const targetLanguage =
+      normalizeQuoteLanguage(req.query.lang) || 'en';
+
+    const rows = result.rows.map(row => ({ ...row }));
+
+    let cursor = 0;
+    const deadline = Date.now() + 3500;
+    let finished = false;
+
+    async function worker() {
+      while (
+        cursor < rows.length &&
+        Date.now() < deadline &&
+        !finished
+      ) {
+        const index = cursor++;
+        const row = rows[index];
+
+        const sourceLanguage =
+          normalizeQuoteLanguage(row.language);
+
+        if (
+          !sourceLanguage ||
+          sourceLanguage === targetLanguage
+        ) {
+          continue;
+        }
+
+        const fields = [
+          'quote_text',
+          'title',
+        ] as const;
+
+        for (const field of fields) {
+          if (finished || Date.now() >= deadline) {
+            break;
+          }
+
+          const original = row[field];
+
+          if (
+            typeof original !== 'string' ||
+            !original.trim()
+          ) {
+            continue;
+          }
+
+          const translated =
+            await translateTextOrOriginal(
+              original,
+              targetLanguage,
+              sourceLanguage
+            );
+
+          if (!finished) {
+            row[field] = translated;
+          }
+        }
+      }
+    }
+
+    await withTranslationDeadline(
+      Promise.all(
+        Array.from(
+          { length: Math.min(3, rows.length) },
+          () => worker()
+        )
+      ).then(() => undefined),
+      undefined
+    );
+
+    finished = true;
+
     return res.json({
       success: true,
-      data: result.rows,
+      data: rows.map(row => ({ ...row })),
     });
   } catch (error) {
     console.error('Get quotes error:', error);

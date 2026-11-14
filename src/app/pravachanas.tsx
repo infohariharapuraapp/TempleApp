@@ -2,7 +2,7 @@ import i18n from '@/localization/i18n';
 import { useTranslation } from 'react-i18next';
 
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
@@ -362,10 +362,13 @@ function getSpiritualLocale(): string {
 }
 export default function PravachanasScreen() {
   const { i18n: selectedI18n } = useTranslation();
-  const language =
-    selectedI18n.resolvedLanguage ||
-    selectedI18n.language ||
-    'en';
+  const language = (
+  selectedI18n.resolvedLanguage ||
+  selectedI18n.language ||
+  'en'
+).split('-')[0].toLowerCase();
+
+const requestIdRef = useRef(0);
 
   const [tab, setTab] = useState<Tab>('All');
   const [videos, setVideos] = useState<Pravachana[]>([]);
@@ -374,98 +377,127 @@ export default function PravachanasScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+const loadData = useCallback(async (refresh = false) => {
+  const requestId = ++requestIdRef.current;
 
-  const loadData = useCallback(async (refresh = false) => {
-    try {
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+  try {
+    setLoading(!refresh);
+    setRefreshing(refresh);
+    setError('');
 
-      setError('');
+    const lang = encodeURIComponent(language);
 
-      const results = await Promise.allSettled([
-        apiRequest<ApiResponse<Pravachana>>('/pravachanas'),
-        apiRequest<ApiResponse<GuruVani>>('/guru-vani'),
-        apiRequest<ApiResponse<Quote>>('/quotes'),
-      ]);
+    const results = await Promise.allSettled([
+      apiRequest<ApiResponse<Pravachana>>(
+        `/pravachanas?lang=${lang}`
+      ),
+      apiRequest<ApiResponse<GuruVani>>(
+        `/guru-vani?lang=${lang}`
+      ),
+      apiRequest<ApiResponse<Quote>>(
+        `/quotes?lang=${lang}`
+      ),
+    ]);
 
-      let successful = 0;
+    if (requestId !== requestIdRef.current) {
+      return;
+    }
 
-      if (
-        results[0].status === 'fulfilled' &&
-        results[0].value.success &&
-        Array.isArray(results[0].value.data)
-      ) {
-        setVideos(
-          [...results[0].value.data].sort(
-            (a, b) =>
-              timestamp(b.published_at) -
-                timestamp(a.published_at) ||
-              b.id - a.id
-          )
-        );
-        successful++;
-      } else {
-        setVideos([]);
-      }
+    let successful = 0;
 
-      if (
-        results[1].status === 'fulfilled' &&
-        results[1].value.success &&
-        Array.isArray(results[1].value.data)
-      ) {
-        setGuruVani(
-          [...results[1].value.data].sort(
-            (a, b) =>
-              timestamp(b.published_at) -
-                timestamp(a.published_at) ||
-              b.id - a.id
-          )
-        );
-        successful++;
-      } else {
-        setGuruVani([]);
-      }
+    if (
+      results[0].status === 'fulfilled' &&
+      results[0].value.success &&
+      Array.isArray(results[0].value.data)
+    ) {
+      setVideos(
+        [...results[0].value.data].sort(
+          (a, b) =>
+            timestamp(b.published_at) -
+              timestamp(a.published_at) ||
+            b.id - a.id
+        )
+      );
 
-      if (
-        results[2].status === 'fulfilled' &&
-        results[2].value.success &&
-        Array.isArray(results[2].value.data)
-      ) {
-        setQuotes(
-          [...results[2].value.data].sort(
-            (a, b) =>
-              timestamp(b.published_at) -
-                timestamp(a.published_at) ||
-              b.id - a.id
-          )
-        );
-        successful++;
-      } else {
-        setQuotes([]);
-      }
+      successful++;
+    } else {
+      setVideos([]);
+    }
 
-      if (successful === 0) {
-        setError('Unable to load content. Please try again.');
-      } else if (successful < 3) {
-        setError('Some content could not be loaded.');
-      }
-    } catch (err) {
-      console.error('Pravachana & Quotes error:', err);
-      setError('Unable to load content. Please try again.');
-    } finally {
+    if (
+      results[1].status === 'fulfilled' &&
+      results[1].value.success &&
+      Array.isArray(results[1].value.data)
+    ) {
+      setGuruVani(
+        [...results[1].value.data].sort(
+          (a, b) =>
+            timestamp(b.published_at) -
+              timestamp(a.published_at) ||
+            b.id - a.id
+        )
+      );
+
+      successful++;
+    } else {
+      setGuruVani([]);
+    }
+
+    if (
+      results[2].status === 'fulfilled' &&
+      results[2].value.success &&
+      Array.isArray(results[2].value.data)
+    ) {
+      setQuotes(
+        [...results[2].value.data].sort(
+          (a, b) =>
+            timestamp(b.published_at) -
+              timestamp(a.published_at) ||
+            b.id - a.id
+        )
+      );
+
+      successful++;
+    } else {
+      setQuotes([]);
+    }
+
+    if (successful === 0) {
+      setError(
+        'Unable to load content. Please try again.'
+      );
+    } else if (successful < 3) {
+      setError(
+        'Some content could not be loaded.'
+      );
+    }
+  } catch (err) {
+    if (requestId !== requestIdRef.current) {
+      return;
+    }
+
+    console.error('Pravachana & Quotes error:', err);
+
+    setError(
+      'Unable to load content. Please try again.'
+    );
+  } finally {
+    if (requestId === requestIdRef.current) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [language]);
+  }
+}, [language]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadData();
-    }, [loadData])
-  );
+useFocusEffect(
+  useCallback(() => {
+    void loadData();
+
+    return () => {
+      requestIdRef.current++;
+    };
+  }, [loadData])
+);
 
   const feed: FeedItem[] = [
     ...videos.map(

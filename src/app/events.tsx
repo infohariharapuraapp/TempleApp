@@ -83,7 +83,7 @@ function translatedCategoryName(
     return translated.trim();
   }
 
-  return category.name_en?.trim() || category.name;
+  return category.name?.trim() || category.name_en?.trim() || "";
 }
 
 function getCoverImage(event: TempleEvent): string | null {

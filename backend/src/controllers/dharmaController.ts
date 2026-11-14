@@ -23,56 +23,168 @@ function getDharmaLanguage(
     ? language
     : 'en';
 }
+
+function detectDharmaSourceLanguage(
+  text: string
+): TranslationLanguage | null {
+  const scripts: {
+    language: TranslationLanguage;
+    pattern: RegExp;
+  }[] = [
+    { language: 'te', pattern: /[\u0C00-\u0C7F]/g },
+    { language: 'kn', pattern: /[\u0C80-\u0CFF]/g },
+    { language: 'ta', pattern: /[\u0B80-\u0BFF]/g },
+    { language: 'hi', pattern: /[\u0900-\u097F]/g },
+    { language: 'en', pattern: /[a-zA-Z]/g },
+  ];
+
+  const scores = scripts.map(item => ({
+    language: item.language,
+    count: (text.match(item.pattern) || []).length,
+  })).sort((a, b) => b.count - a.count);
+
+  if (
+    !scores[0].count ||
+    scores[0].count === scores[1].count
+  ) {
+    return null;
+  }
+
+  return scores[0].language;
+}
+
+
 async function localizeDharmaFields(
   rows: any[],
   fields: string[],
   language: TranslationLanguage
 ): Promise<any[]> {
-  if (language === 'en' || !rows.length) {
+  if (!rows.length) {
     return rows;
   }
+
+  const allowQuestionTranslation =
+    process.env.ENABLE_DHARMA_QUESTION_TRANSLATION === 'true';
+
   const output = rows.map(row => ({ ...row }));
-  const texts = new Set<string>();
-  for (const row of rows) {
+
+  const tasks = new Map<
+    string,
+    {
+      text: string;
+      source: TranslationLanguage;
+      targets: {
+        rowIndex: number;
+        field: string;
+      }[];
+    }
+  >();
+
+  for (let index = 0; index < output.length; index++) {
+    const row = output[index];
+
     for (const field of fields) {
-      const value = row[field];
+      const isQuestionContent =
+        field === 'title' ||
+        field === 'description' && 'category_id' in row;
+
       if (
-        typeof value === 'string' &&
-        value.trim() &&
-        value.length <= 5000
+        isQuestionContent &&
+        !allowQuestionTranslation
       ) {
-        texts.add(value);
+        continue;
       }
+
+      const text = row[field];
+
+      if (
+        typeof text !== 'string' ||
+        !text.trim() ||
+        text.length > 5000
+      ) {
+        continue;
+      }
+
+      // Basic protection against contact information.
+      if (
+        isQuestionContent &&
+        (
+          /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(text) ||
+          /(?:\d[\s()+-]*){10,}/.test(text)
+        )
+      ) {
+        continue;
+      }
+
+      const source = isQuestionContent
+        ? detectDharmaSourceLanguage(text)
+        : 'en';
+
+      if (!source || source === language) {
+        continue;
+      }
+
+      const key = `${source}:${text}`;
+
+      if (!tasks.has(key)) {
+        tasks.set(key, {
+          text,
+          source,
+          targets: [],
+        });
+      }
+
+      tasks.get(key)!.targets.push({
+        rowIndex: index,
+        field,
+      });
     }
   }
-  const uniqueTexts = [...texts];
-  const translations = new Map<string, string>();
+
+  const pending = [...tasks.values()];
+
   const deadline =
     Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+
   let cursor = 0;
   let stopped = false;
+
   async function worker() {
     while (
       !stopped &&
-      cursor < uniqueTexts.length &&
+      cursor < pending.length &&
       Date.now() < deadline
     ) {
-      const original = uniqueTexts[cursor++];
-      const translated = await translateTextOrOriginal(
-        original,
-        language,
-        'en'
-      );
-      if (!stopped && Date.now() < deadline) {
-        translations.set(original, translated);
+      const task = pending[cursor++];
+
+      const translated =
+        await translateTextOrOriginal(
+          task.text,
+          language,
+          task.source
+        );
+
+      if (
+        stopped ||
+        Date.now() >= deadline
+      ) {
+        continue;
+      }
+
+      for (const target of task.targets) {
+        output[target.rowIndex][target.field] =
+          translated;
       }
     }
   }
+
   try {
     await withTranslationDeadline(
       Promise.all(
         Array.from(
-          { length: Math.min(3, uniqueTexts.length) },
+          {
+            length: Math.min(3, pending.length),
+          },
           worker
         )
       ).then(() => undefined),
@@ -81,14 +193,7 @@ async function localizeDharmaFields(
   } finally {
     stopped = true;
   }
-  for (const row of output) {
-    for (const field of fields) {
-      if (typeof row[field] === 'string') {
-        row[field] =
-          translations.get(row[field]) ?? row[field];
-      }
-    }
-  }
+
   return output;
 }
   import { AuthRequest } from '../middleware/authMiddleware';
@@ -256,16 +361,16 @@ async function localizeDharmaFields(
       );
 
       return res.json({
-        success: true,
-        questions: await localizeDharmaFields(
-          result.rows,
-          ['category_name'],
-          getDharmaLanguage(req.query.lang)
-        ),
-        page,
-        limit,
-        hasMore: result.rows.length === limit,
-      });
+  success: true,
+  questions: await localizeDharmaFields(
+    result.rows,
+    ['title', 'description', 'category_name'],
+    getDharmaLanguage(req.query.lang)
+  ),
+  page,
+  limit,
+  hasMore: result.rows.length === limit,
+});
     } catch (error) {
       console.error('Get Dharma questions error:', error);
 
@@ -381,19 +486,19 @@ async function localizeDharmaFields(
         [questionId]
       );
 
-      return res.json({
-        success: true,
-        question: (
-          await localizeDharmaFields(
-            questionResult.rows,
-            ['category_name'],
-            getDharmaLanguage(req.query.lang)
-          )
-        )[0],
-        answers: answersResult.rows,
-        communityAnswerSlotsUsed: countResult.rows[0].total,
-        maxCommunityAnswers: 10,
-      });
+     return res.json({
+  success: true,
+  question: (
+    await localizeDharmaFields(
+      questionResult.rows,
+      ['title', 'description', 'category_name'],
+      getDharmaLanguage(req.query.lang)
+    )
+  )[0],
+  answers: answersResult.rows,
+  communityAnswerSlotsUsed: countResult.rows[0].total,
+  maxCommunityAnswers: 10,
+});
     } catch (error) {
       console.error('Get Dharma question error:', error);
 

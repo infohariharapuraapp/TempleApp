@@ -1,5 +1,8 @@
 import { Request, RequestHandler, Response } from 'express';
-import { withTranslationDeadline } from '../services/translationDeadline';
+import {
+  withTranslationDeadline,
+  PUBLIC_TRANSLATION_TIMEOUT_MS,
+} from '../services/translationDeadline';
 // TRANSLATION_DEADLINE_V1
 import {
   SUPPORTED_LANGUAGES,
@@ -13,9 +16,9 @@ const TRANSLATABLE_ROUTES: Record<string, readonly string[]> = {
   '/api/deities': ['name', 'description', 'significance', 'devotional'],
   '/api/activities': ['name', 'title', 'description', 'location'],
   '/api/activity-sections': ['name', 'title', 'description'],
-  '/api/events': ['title', 'description', 'location'],
+  '/api/events': ['title', 'description', 'location', 'category_name'],
   '/api/event-categories': ['name', 'description'],
-  '/api/gallery': ['title', 'description', 'caption'],
+  '/api/gallery': ['name', 'title', 'description', 'caption', 'category'],
   '/api/guru-parampara': ['name', 'title', 'translation'],
   '/api/guru-vani': ['title', 'meaning', 'guru_name'],
   '/api/mahaswamiji-programmes': ['title', 'description', 'venue', 'location'],
@@ -23,7 +26,7 @@ const TRANSLATABLE_ROUTES: Record<string, readonly string[]> = {
   '/api/poojas': ['name', 'title', 'description', 'significance'],
   '/api/pravachanas': ['title', 'description', 'speaker_name'],
   '/api/publications': ['name', 'title', 'description', 'author', 'category_name'],
-  '/api/quotes': ['title', 'meaning', 'description'],
+  
   '/api/buildings': ['name', 'title', 'description'],
   '/api/welcome-screen': ['title', 'description'],
   '/api/welcome-slokams': ['title', 'description'],
@@ -120,30 +123,110 @@ function collectTasks(
 
   return { clone: visit(root, 0), tasks };
 }
+async function translateResponse(
+  body: unknown,
+  language: TranslationLanguage,
+  fields: Set<string>
+) {
+  const { clone, tasks } = collectTasks(
+    body,
+    fields,
+    MAX_FIELDS
+  );
 
-async function translateResponse(body: unknown, language: TranslationLanguage, fields: Set<string>) {
-  const { clone, tasks } = collectTasks(body, fields, MAX_FIELDS);
-  // Deduplicate identical strings within the same response.
-  const uniqueTexts = [...new Set(tasks.map(task => task.text))];
+  if (!tasks.length) {
+    return clone;
+  }
+
+  // Prioritize visible names, titles and categories.
+  const priorityFields = new Set([
+    'name',
+    'title',
+    'category',
+    'category_name',
+    'temple_name',
+    'guru_name',
+    'speaker_name',
+    'author',
+  ]);
+
+  const orderedTasks = [...tasks].sort(
+    (a, b) =>
+      Number(priorityFields.has(b.key)) -
+      Number(priorityFields.has(a.key))
+  );
+
+  const uniqueTexts = [
+    ...new Set(
+      orderedTasks.map(task => task.text)
+    ),
+  ];
+
   const translated = new Map<string, string>();
+
+  const deadline =
+    Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+
   let cursor = 0;
-  const deadline = Date.now() + 3500;
+  let stopped = false;
 
   async function worker() {
-    while (cursor < uniqueTexts.length && Date.now() < deadline) {
-      const index = cursor++;
-      const original = uniqueTexts[index];
+    while (
+      !stopped &&
+      cursor < uniqueTexts.length &&
+      Date.now() < deadline
+    ) {
+      const original = uniqueTexts[cursor++];
+
       try {
-        translated.set(original, await translateTextOrOriginal(original, language, 'en'));
+        const result =
+          await translateTextOrOriginal(
+            original,
+            language,
+            'en'
+          );
+
+        if (
+          !stopped &&
+          Date.now() < deadline
+        ) {
+          translated.set(original, result);
+        }
       } catch (error) {
-        console.warn('Public content translation failed:', error);
-        translated.set(original, original);
+        console.warn(
+          'Public content translation failed:',
+          error
+        );
       }
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, uniqueTexts.length) }, worker));
-  for (const task of tasks) task.parent[task.key] = translated.get(task.text) ?? task.text;
+  try {
+    await withTranslationDeadline(
+      Promise.all(
+        Array.from(
+          {
+            length: Math.min(
+              CONCURRENCY,
+              uniqueTexts.length
+            ),
+          },
+          worker
+        )
+      ).then(() => undefined),
+      undefined
+    );
+  } finally {
+    stopped = true;
+  }
+
+  // Preserve completed translations.
+  // Only unfinished fields retain their original text.
+  for (const task of tasks) {
+    task.parent[task.key] =
+      translated.get(task.text) ?? task.text;
+  }
+
   return clone;
 }
 
@@ -174,10 +257,11 @@ export const publicTranslationMiddleware: RequestHandler = (req, res, next) => {
     sent = true;
     void (async () => {
       try {
-        const translated = await withTranslationDeadline(
-          translateResponse(body, language, fields),
-          body
-        );
+       const translated = await translateResponse(
+  body,
+  language,
+  fields
+);
         if (!res.headersSent && !res.writableEnded) originalJson(translated);
       } catch (error) {
         console.error('Public translation middleware error:', error);
