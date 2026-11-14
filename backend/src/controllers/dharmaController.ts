@@ -143,8 +143,11 @@ async function localizeDharmaFields(
 
   const pending = [...tasks.values()];
 
-  const deadline =
-    Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+  const timeoutMs = allowQuestionTranslation
+  ? 10000
+  : PUBLIC_TRANSLATION_TIMEOUT_MS;
+
+const deadline = Date.now() + timeoutMs;
 
   let cursor = 0;
   let stopped = false;
@@ -187,9 +190,10 @@ async function localizeDharmaFields(
           },
           worker
         )
-      ).then(() => undefined),
-      undefined
-    );
+    ).then(() => undefined),
+undefined,
+timeoutMs
+);
   } finally {
     stopped = true;
   }

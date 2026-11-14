@@ -126,7 +126,8 @@ function collectTasks(
 async function translateResponse(
   body: unknown,
   language: TranslationLanguage,
-  fields: Set<string>
+  fields: Set<string>,
+  timeoutMs: number = PUBLIC_TRANSLATION_TIMEOUT_MS
 ) {
   const { clone, tasks } = collectTasks(
     body,
@@ -139,22 +140,29 @@ async function translateResponse(
   }
 
   // Prioritize visible names, titles and categories.
-  const priorityFields = new Set([
-    'name',
-    'title',
-    'category',
-    'category_name',
-    'temple_name',
-    'guru_name',
-    'speaker_name',
-    'author',
-  ]);
+// Prioritize main headings before nested content.
+const fieldPriority: Record<string, number> = {
+  name: 100,
+  temple_name: 100,
+  category_name: 95,
+  category: 90,
+  guru_name: 85,
+  title: 80,
+  speaker_name: 75,
+  author: 70,
+  location: 60,
+  venue: 60,
+  caption: 40,
+  description: 30,
+  significance: 20,
+  meaning: 20,
+};
 
-  const orderedTasks = [...tasks].sort(
-    (a, b) =>
-      Number(priorityFields.has(b.key)) -
-      Number(priorityFields.has(a.key))
-  );
+const orderedTasks = [...tasks].sort(
+  (a, b) =>
+    (fieldPriority[b.key] ?? 0) -
+    (fieldPriority[a.key] ?? 0)
+);
 
   const uniqueTexts = [
     ...new Set(
@@ -163,9 +171,7 @@ async function translateResponse(
   ];
 
   const translated = new Map<string, string>();
-
-  const deadline =
-    Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+const deadline = Date.now() + timeoutMs;
 
   let cursor = 0;
   let stopped = false;
@@ -214,8 +220,9 @@ async function translateResponse(
           worker
         )
       ).then(() => undefined),
-      undefined
-    );
+undefined,
+timeoutMs
+);
   } finally {
     stopped = true;
   }
@@ -257,10 +264,16 @@ export const publicTranslationMiddleware: RequestHandler = (req, res, next) => {
     sent = true;
     void (async () => {
       try {
-       const translated = await translateResponse(
+     const timeoutMs =
+  path === '/api/gallery/albums'
+    ? 10000
+    : PUBLIC_TRANSLATION_TIMEOUT_MS;
+
+const translated = await translateResponse(
   body,
   language,
-  fields
+  fields,
+  timeoutMs
 );
         if (!res.headersSent && !res.writableEnded) originalJson(translated);
       } catch (error) {

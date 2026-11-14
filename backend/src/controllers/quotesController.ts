@@ -156,8 +156,37 @@ function normalizeQuoteLanguage(
     ? (code as TranslationLanguage)
     : null;
 }
+function detectQuoteLanguage(
+  text: string,
+  fallback: TranslationLanguage | null
+): TranslationLanguage | null {
+  const scores: Record<TranslationLanguage, number> = {
+    en: (text.match(/[a-zA-Z]/g) || []).length,
+    te: (text.match(/[\u0C00-\u0C7F]/g) || []).length,
+    kn: (text.match(/[\u0C80-\u0CFF]/g) || []).length,
+    hi: (text.match(/[\u0900-\u097F]/g) || []).length,
+    ta: (text.match(/[\u0B80-\u0BFF]/g) || []).length,
+  };
+
+  const ranked = (
+    Object.entries(scores) as [
+      TranslationLanguage,
+      number
+    ][]
+  ).sort((a, b) => b[1] - a[1]);
+
+  if (
+    ranked[0][1] === 0 ||
+    ranked[0][1] === ranked[1][1]
+  ) {
+    return fallback;
+  }
+
+  return ranked[0][0];
+}
 // PUBLIC: Published quotes only, latest first
 // PUBLIC: Published quotes with dynamic translation
+// PUBLIC: Published quotes with automatic translation
 export async function getQuotes(
   req: Request,
   res: Response
@@ -182,9 +211,12 @@ export async function getQuotes(
 
     const rows = result.rows.map(row => ({ ...row }));
 
+    const TIMEOUT_MS = 10000;
+
     let cursor = 0;
-    const deadline = Date.now() + 3500;
     let finished = false;
+
+    const deadline = Date.now() + TIMEOUT_MS;
 
     async function worker() {
       while (
@@ -195,15 +227,8 @@ export async function getQuotes(
         const index = cursor++;
         const row = rows[index];
 
-        const sourceLanguage =
+        const storedLanguage =
           normalizeQuoteLanguage(row.language);
-
-        if (
-          !sourceLanguage ||
-          sourceLanguage === targetLanguage
-        ) {
-          continue;
-        }
 
         const fields = [
           'quote_text',
@@ -211,7 +236,10 @@ export async function getQuotes(
         ] as const;
 
         for (const field of fields) {
-          if (finished || Date.now() >= deadline) {
+          if (
+            finished ||
+            Date.now() >= deadline
+          ) {
             break;
           }
 
@@ -224,6 +252,19 @@ export async function getQuotes(
             continue;
           }
 
+          const sourceLanguage =
+            detectQuoteLanguage(
+              original,
+              storedLanguage
+            );
+
+          if (
+            !sourceLanguage ||
+            sourceLanguage === targetLanguage
+          ) {
+            continue;
+          }
+
           const translated =
             await translateTextOrOriginal(
               original,
@@ -231,7 +272,10 @@ export async function getQuotes(
               sourceLanguage
             );
 
-          if (!finished) {
+          if (
+            !finished &&
+            Date.now() < deadline
+          ) {
             row[field] = translated;
           }
         }
@@ -241,11 +285,17 @@ export async function getQuotes(
     await withTranslationDeadline(
       Promise.all(
         Array.from(
-          { length: Math.min(3, rows.length) },
+          {
+            length: Math.min(
+              3,
+              rows.length
+            ),
+          },
           () => worker()
         )
       ).then(() => undefined),
-      undefined
+      undefined,
+      TIMEOUT_MS
     );
 
     finished = true;
@@ -254,8 +304,12 @@ export async function getQuotes(
       success: true,
       data: rows.map(row => ({ ...row })),
     });
+
   } catch (error) {
-    console.error('Get quotes error:', error);
+    console.error(
+      'Get quotes error:',
+      error
+    );
 
     return res.status(500).json({
       success: false,
