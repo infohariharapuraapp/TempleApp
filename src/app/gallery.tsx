@@ -109,7 +109,12 @@ const getImageUrl = (
 /* ===================================================== */
 
 export default function GalleryScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0].toLowerCase();
   /*
    * ===================================================
    * GALLERY DATA
@@ -220,7 +225,7 @@ export default function GalleryScreen() {
           await apiRequest<{
             success: boolean;
             data: GalleryAlbum[];
-          }>('/gallery/albums');
+          }>(`/gallery/albums?lang=${encodeURIComponent(currentLanguage)}`);
 
         if (response.success) {
           /*
@@ -308,7 +313,7 @@ export default function GalleryScreen() {
       } finally {
         setLoading(false);
       }
-    }, [t]);
+    }, [t, currentLanguage]);
 
   /*
    * Initial load.

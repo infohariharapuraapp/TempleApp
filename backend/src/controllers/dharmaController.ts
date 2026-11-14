@@ -1,6 +1,96 @@
 
   import { Request, Response } from 'express';
   import { pool } from '../db';
+import {
+  TranslationLanguage,
+  SUPPORTED_LANGUAGES,
+  translateTextOrOriginal,
+} from '../services/translationService';
+import {
+  withTranslationDeadline,
+  PUBLIC_TRANSLATION_TIMEOUT_MS,
+} from '../services/translationDeadline';
+// DHARMA_DYNAMIC_LANGUAGE_V1
+function getDharmaLanguage(
+  value: unknown
+): TranslationLanguage {
+  if (typeof value !== 'string') return 'en';
+  const language = value
+    .trim()
+    .toLowerCase()
+    .split('-')[0] as TranslationLanguage;
+  return SUPPORTED_LANGUAGES.includes(language)
+    ? language
+    : 'en';
+}
+async function localizeDharmaFields(
+  rows: any[],
+  fields: string[],
+  language: TranslationLanguage
+): Promise<any[]> {
+  if (language === 'en' || !rows.length) {
+    return rows;
+  }
+  const output = rows.map(row => ({ ...row }));
+  const texts = new Set<string>();
+  for (const row of rows) {
+    for (const field of fields) {
+      const value = row[field];
+      if (
+        typeof value === 'string' &&
+        value.trim() &&
+        value.length <= 5000
+      ) {
+        texts.add(value);
+      }
+    }
+  }
+  const uniqueTexts = [...texts];
+  const translations = new Map<string, string>();
+  const deadline =
+    Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+  let cursor = 0;
+  let stopped = false;
+  async function worker() {
+    while (
+      !stopped &&
+      cursor < uniqueTexts.length &&
+      Date.now() < deadline
+    ) {
+      const original = uniqueTexts[cursor++];
+      const translated = await translateTextOrOriginal(
+        original,
+        language,
+        'en'
+      );
+      if (!stopped && Date.now() < deadline) {
+        translations.set(original, translated);
+      }
+    }
+  }
+  try {
+    await withTranslationDeadline(
+      Promise.all(
+        Array.from(
+          { length: Math.min(3, uniqueTexts.length) },
+          worker
+        )
+      ).then(() => undefined),
+      undefined
+    );
+  } finally {
+    stopped = true;
+  }
+  for (const row of output) {
+    for (const field of fields) {
+      if (typeof row[field] === 'string') {
+        row[field] =
+          translations.get(row[field]) ?? row[field];
+      }
+    }
+  }
+  return output;
+}
   import { AuthRequest } from '../middleware/authMiddleware';
 
   // ========================================
@@ -8,7 +98,7 @@
   // ========================================
 
   export const getDharmaCategories = async (
-    _req: Request,
+    req: Request,
     res: Response
   ) => {
     try {
@@ -21,7 +111,11 @@
 
       return res.json({
         success: true,
-        categories: result.rows,
+        categories: await localizeDharmaFields(
+          result.rows,
+          ['name', 'description'],
+          getDharmaLanguage(req.query.lang)
+        ),
       });
     } catch (error) {
       console.error('Get Dharma categories error:', error);
@@ -163,7 +257,11 @@
 
       return res.json({
         success: true,
-        questions: result.rows,
+        questions: await localizeDharmaFields(
+          result.rows,
+          ['category_name'],
+          getDharmaLanguage(req.query.lang)
+        ),
         page,
         limit,
         hasMore: result.rows.length === limit,
@@ -285,7 +383,13 @@
 
       return res.json({
         success: true,
-        question: questionResult.rows[0],
+        question: (
+          await localizeDharmaFields(
+            questionResult.rows,
+            ['category_name'],
+            getDharmaLanguage(req.query.lang)
+          )
+        )[0],
         answers: answersResult.rows,
         communityAnswerSlotsUsed: countResult.rows[0].total,
         maxCommunityAnswers: 10,

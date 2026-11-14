@@ -1,7 +1,8 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -50,6 +51,26 @@ type ApiResponse<T> = {
 // ========================================
 
 export default function PublicationsScreen() {
+  // PUBLICATIONS_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language =
+    (i18n.resolvedLanguage ||
+      i18n.language ||
+      'en').split('-')[0];
+  const requestIdRef = useRef(0);
+  const localizeError = (value: string) => {
+    const key = value.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const translationKey = 'publicationsLocal.' + key;
+    return i18n.exists(translationKey)
+      ? String(t(translationKey))
+      : String(t(
+          'publicationsLocal.something_went_wrong_please_try_again'
+        ));
+  };
+
   const [categories, setCategories] = useState<
     PublicationCategory[]
   >([]);
@@ -65,6 +86,7 @@ export default function PublicationsScreen() {
   const loadCategories = useCallback(async (
     showLoading = true
   ) => {
+    const currentRequest = ++requestIdRef.current;
     try {
       if (showLoading) {
         setLoading(true);
@@ -74,9 +96,12 @@ export default function PublicationsScreen() {
 
       const response = await apiRequest<
         ApiResponse<PublicationCategory[]>
-      >('/publications/categories');
+      >(`/publications/categories?lang=${encodeURIComponent(language)}`);
 
-      if (!response.success) {
+      if (currentRequest !== requestIdRef.current) {
+          return;
+        }
+        if (!response.success) {
         throw new Error(
           response.message ||
           'Failed to load publication categories'
@@ -85,6 +110,10 @@ export default function PublicationsScreen() {
 
       setCategories(response.data || []);
     } catch (err) {
+        if (currentRequest !== requestIdRef.current) {
+          return;
+        }
+
       console.error(
         'Publication categories error:',
         err
@@ -96,17 +125,19 @@ export default function PublicationsScreen() {
           : 'Unable to load publications'
       );
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (currentRequest === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
     }
-  }, []);
+  }, [language]);
 
   // Refresh when screen becomes active
   useFocusEffect(
     useCallback(() => {
       void loadCategories();
 
-      return () => {};
+      return () => { requestIdRef.current++; };
     }, [loadCategories])
   );
 
@@ -187,18 +218,11 @@ export default function PublicationsScreen() {
           />
         }
       >
-        <AutoTranslatedText style={styles.smallTitle}>
-          TEMPLE RESOURCES
-        </AutoTranslatedText>
+        <Text style={styles.smallTitle}>{t('publicationsLocal.temple_resources')}</Text>
 
-        <AutoTranslatedText style={styles.title}>
-          Publications 📚
-        </AutoTranslatedText>
+        <Text style={styles.title}>{t('publicationsLocal.publications_heading')}</Text>
 
-        <AutoTranslatedText style={styles.subtitle}>
-          Explore books, magazines, news and
-          devotional reading material.
-        </AutoTranslatedText>
+        <Text style={styles.subtitle}>{t('publicationsLocal.explore_books_magazines_news_and_devotional_reading_material')}</Text>
 
         <View style={styles.banner}>
           <Text style={styles.bannerIcon}>
@@ -206,20 +230,13 @@ export default function PublicationsScreen() {
           </Text>
 
           <View style={styles.bannerContent}>
-            <AutoTranslatedText style={styles.bannerTitle}>
-              Spiritual Knowledge
-            </AutoTranslatedText>
+            <Text style={styles.bannerTitle}>{t('publicationsLocal.spiritual_knowledge')}</Text>
 
-            <AutoTranslatedText style={styles.bannerText}>
-              Discover publications and devotional
-              resources from the temple.
-            </AutoTranslatedText>
+            <Text style={styles.bannerText}>{t('publicationsLocal.discover_publications_and_devotional_resources_from_the_temple')}</Text>
           </View>
         </View>
 
-        <AutoTranslatedText style={styles.sectionTitle}>
-          Explore Publications
-        </AutoTranslatedText>
+        <Text style={styles.sectionTitle}>{t('publicationsLocal.explore_publications')}</Text>
 
         {loading && (
           <View style={styles.centerBox}>
@@ -228,25 +245,21 @@ export default function PublicationsScreen() {
               color="#B66A2C"
             />
 
-            <AutoTranslatedText style={styles.message}>
-              Loading publications...
-            </AutoTranslatedText>
+            <Text style={styles.message}>{t('publicationsLocal.loading_publications')}</Text>
           </View>
         )}
 
         {!loading && error !== '' && (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>
-              {error}
+              {localizeError(error)}
             </Text>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={() => void loadCategories()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{t('publicationsLocal.try_again')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -259,15 +272,9 @@ export default function PublicationsScreen() {
                 📚
               </Text>
 
-              <AutoTranslatedText style={styles.emptyTitle}>
-                No Publications Available
-              </AutoTranslatedText>
+              <Text style={styles.emptyTitle}>{t('publicationsLocal.no_publications_available')}</Text>
 
-              <AutoTranslatedText style={styles.message}>
-                Publication categories will
-                appear here once added by
-                the temple administration.
-              </AutoTranslatedText>
+              <Text style={styles.message}>{t('publicationsLocal.publication_categories_will_appear_here_once_added_by_the_temple_administration')}</Text>
             </View>
           )}
 
@@ -303,9 +310,7 @@ export default function PublicationsScreen() {
                     </Text>
                   )}
 
-                  <AutoTranslatedText style={styles.viewText}>
-                    Explore ›
-                  </AutoTranslatedText>
+                  <Text style={styles.viewText}>{t('publicationsLocal.explore')}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -318,15 +323,9 @@ export default function PublicationsScreen() {
           </Text>
 
           <View style={styles.infoContent}>
-            <AutoTranslatedText style={styles.infoTitle}>
-              Devotional Reading
-            </AutoTranslatedText>
+            <Text style={styles.infoTitle}>{t('publicationsLocal.devotional_reading')}</Text>
 
-            <AutoTranslatedText style={styles.infoText}>
-              Explore spiritual books, magazines,
-              articles and downloadable publications
-              shared by the temple.
-            </AutoTranslatedText>
+            <Text style={styles.infoText}>{t('publicationsLocal.explore_spiritual_books_magazines_articles_and_downloadable_publications_shared_by_the_temple')}</Text>
           </View>
         </View>
 
@@ -336,9 +335,7 @@ export default function PublicationsScreen() {
             router.replace('/(tabs)')
           }
         >
-          <AutoTranslatedText style={styles.homeButtonText}>
-            Back to Home
-          </AutoTranslatedText>
+          <Text style={styles.homeButtonText}>{t('publicationsLocal.back_to_home')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

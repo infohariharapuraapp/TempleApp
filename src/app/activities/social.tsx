@@ -1,5 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
 import React from 'react';
+
 import {
   Image,
   ScrollView,
@@ -8,120 +8,133 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function CategoryScreen() {
+
+  const { t } = useTranslation();
+
+  const prefix = 'activityCategories.social';
+
+  const socialActivities = [
+    {
+      number: '01',
+
+      title: t(`${prefix}.shivaTitle`),
+
+      image:
+        'https://www.divyakshetrahariharapura.com/web/assets/img/event/social-activities/1.jpg',
+
+      paragraphs: [
+        t(`${prefix}.shivaParagraph1`),
+        t(`${prefix}.shivaParagraph2`),
+        t(`${prefix}.shivaParagraph3`),
+        t(`${prefix}.shivaParagraph4`),
+      ],
+    },
+
+    {
+      number: '02',
+
+      title: t(`${prefix}.gayatriTitle`),
+
+      image:
+        'https://www.divyakshetrahariharapura.com/web/assets/img/event/social-activities/2.jpg',
+
+      paragraphs: [
+        t(`${prefix}.gayatriDescription`),
+      ],
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
+
+        {/* BACK BUTTON */}
+
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
+
+          <Text style={styles.backText}>
+            ‹ {t('activitySection.back')}
+          </Text>
+
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.eyebrow}>TEMPLE ACTIVITIES</AutoTranslatedText>
+        {/* HEADER */}
 
-        <AutoTranslatedText style={styles.title}>Social Activities</AutoTranslatedText>
+        <Text style={styles.eyebrow}>
+          {t('activitySection.templeActivities')}
+        </Text>
 
-        <AutoTranslatedText style={styles.subtitle}>
-          Initiatives that promote Sanatana Dharma, spiritual learning and
-          community participation.
-        </AutoTranslatedText>
+        <Text style={styles.title}>
+          {t(`${prefix}.title`)}
+        </Text>
 
-        {/* 01 - Shiva Deeksha */}
-        <View style={styles.itemCard}>
-          <Text style={styles.number}>01</Text>
+        <Text style={styles.subtitle}>
+          {t(`${prefix}.subtitle`)}
+        </Text>
 
-          <AutoTranslatedText style={styles.itemTitle}>
-            SHIVA DEEKSHA PROGRAMME
-          </AutoTranslatedText>
+        {/* SOCIAL ACTIVITY CARDS */}
 
-          <Image
-            source={{
-              uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/social-activities/1.jpg',
-            }}
-            style={styles.itemImage}
-            resizeMode="contain"
-          />
+        {socialActivities.map((activity) => (
 
-          <Text style={styles.itemText}>
-            The Glories of Guru Upadesha are boundless. Initiation from a
-            Sadguru is a very rare treasure and indeed the greatest boon of
-            life. Guru Upadesha becomes the best Saadhana to achieve Chittha
-            Shudhhi (internal purity). It breaks the cage of worldliness and
-            leads to the Supreme Atma Gnyaana.
-          </Text>
+          <View
+            key={activity.number}
+            style={styles.itemCard}
+          >
 
-          <Text style={styles.itemText}>
-            The Shiva Deeksha program is a unique initiative that reveals
-            MahaSwamiji’s compassion and care to enlighten individuals and
-            nurture his/her sense of belonging to Sanatana Dharma. In the
-            ShivaDeeksha Programme, MahaSwamiji blesses people with the sacred
-            ‘Shiva Panchakshari Mantra’ initiation - as per Sastras,
-            irrespective of caste, creed, age or sex. This Mantra Deeksha stays
-            lifelong and grants spiritual & materialistic welfare.
-          </Text>
+            <Text style={styles.number}>
+              {activity.number}
+            </Text>
 
-          <Text style={styles.itemText}>
-            The Shiva Deeksha programme does not end at a mere one day
-            celebration. Sreemath Hariharapura ensures an all time bond with
-            the devotees who take part in this programme. Every year, for the
-            Shivarathri Pooja, Mruthika Lingas are sent to the all the
-            locations where the Shiva Deeksha programme had been conducted.
-            Devotees at the locality perform Pooja to this Shiva Linga with
-            their own hands on the auspicious Shivarathri night.
-          </Text>
+            <Text style={styles.itemTitle}>
+              {activity.title}
+            </Text>
 
-          <Text style={styles.itemText}>
-            The Shiva Deeksha Program brings together people from innumerable
-            walks of life in understanding and practicing Sanatana Dharma.
-            This also plants the sense of equanimity and unity in people.
-            Presently, the Shiva Deeksha programme has been conducted at about
-            1000 centres across the four Indian states of Karnataka, Andhra,
-            Tamil Nadu and Maharashtra, and around 10,00,000 people have
-            benefitted due to this.
-          </Text>
-        </View>
+            <Image
+              source={{ uri: activity.image }}
+              style={styles.itemImage}
+              resizeMode="contain"
+            />
 
-        {/* 02 - Vishwa Gayatri */}
-        <View style={styles.itemCard}>
-          <Text style={styles.number}>02</Text>
+            {activity.paragraphs.map((paragraph, index) => (
 
-          <AutoTranslatedText style={styles.itemTitle}>
-            VISHWA GAYATRI UPASAK PARISHAT
-          </AutoTranslatedText>
+              <Text
+                key={index}
+                style={styles.itemText}
+              >
+                {paragraph}
+              </Text>
 
-          <Image
-            source={{
-              uri: 'https://www.divyakshetrahariharapura.com/web/assets/img/event/social-activities/2.jpg',
-            }}
-            style={styles.itemImage}
-            resizeMode="contain"
-          />
+            ))}
 
-          <Text style={styles.itemText}>
-            Gayatri Upasana is a very ancient worship that is said to bestow
-            prosperity, courage and harmony. It is also believed that this
-            Upasana improves the memory power, grasping capacity, brilliance
-            and intellect of an individual. The Vishwa Gayatri Upaasak Parishat
-            is a scheme in which women are taught to perform the Gayathri
-            Upasana, by worshipping Vedamatha Gayathri Devi based on Sastras,
-            with Gayathri Sahasranama. Presently around 1,00,000 women in and
-            around South India have learnt this Upaasana.
-          </Text>
-        </View>
+          </View>
+
+        ))}
+
       </ScrollView>
+
     </SafeAreaView>
   );
 }
 
+// ========================================
+// EXISTING DESIGN
+// ========================================
+
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
@@ -202,4 +215,5 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 10,
   },
+
 });

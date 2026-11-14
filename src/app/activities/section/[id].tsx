@@ -87,8 +87,9 @@ export default function ActivitySectionScreen() {
   const [loading, setLoading] =
     useState(true);
 
-  const language = i18n.resolvedLanguage ||
-    i18n.language;
+  const language = (
+    i18n.resolvedLanguage || i18n.language || 'en'
+  ).split('-')[0].toLowerCase();
 
   const dateLocale =
     DATE_LOCALES[language] || 'en-IN';
@@ -98,10 +99,14 @@ export default function ActivitySectionScreen() {
   // ========================================
 
   useEffect(() => {
-    loadActivities();
-  }, [id]);
+    let active = true;
+    loadActivities(() => active);
+    return () => {
+      active = false;
+    };
+  }, [id, language]);
 
-  const loadActivities = async () => {
+  const loadActivities = async (isActive: () => boolean) => {
 
     try {
 
@@ -116,13 +121,11 @@ export default function ActivitySectionScreen() {
           activities: Activity[];
         };
       }>(
-        `/activities/section/${encodeURIComponent(id)}`
+        `/activities/section/${encodeURIComponent(id)}?lang=${encodeURIComponent(language)}`
       );
 
-      if (
-        response.success &&
-        response.data
-      ) {
+      if (!isActive()) return;
+      if (response.success && response.data) {
 
         setSection(response.data.section);
 
@@ -142,8 +145,7 @@ export default function ActivitySectionScreen() {
       );
 
     } finally {
-
-      setLoading(false);
+      if (isActive()) setLoading(false);
 
     }
 

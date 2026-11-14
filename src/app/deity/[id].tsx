@@ -47,7 +47,10 @@ type DeityResponse = {
 export default function DeityDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage || i18n.language || 'en'
+  ).split('-')[0].toLowerCase();
 
   const [deity, setDeity] = useState<Deity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +78,7 @@ export default function DeityDetailsScreen() {
         setDeity(null);
 
         const result = await apiRequest<DeityResponse>(
-          `/deities/${id}`
+          `/deities/${encodeURIComponent(id)}?lang=${encodeURIComponent(language)}`
         );
 
         if (!active) return;
@@ -103,7 +106,7 @@ export default function DeityDetailsScreen() {
     return () => {
       active = false;
     };
-  }, [id, t]);
+  }, [id, language, t]);
 
   // ========================================
   // LOADING SCREEN

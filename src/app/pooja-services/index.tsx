@@ -1,9 +1,10 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+
 
 import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -72,7 +73,13 @@ const COLORS = {
 // ========================================
 
 export default function PoojaServicesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0].toLowerCase();
+  const requestIdRef = useRef(0);
     const { width } = useWindowDimensions();
 
 
@@ -90,10 +97,13 @@ export default function PoojaServicesScreen() {
 
   const loadSections = useCallback(
     async (isRefresh = false) => {
+      const requestId = ++requestIdRef.current;
       if (isRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
+        setRefreshing(false);
+        setSections([]);
       }
 
       setError('');
@@ -101,8 +111,9 @@ export default function PoojaServicesScreen() {
       try {
         const response = await apiRequest<
           ApiResponse<PoojaSection[]>
-        >('/poojas/sections');
+        >('/poojas/sections?lang=' + encodeURIComponent(currentLanguage));
 
+        if (requestId !== requestIdRef.current) return;
         if (!response.success) {
           throw new Error(
             response.message ||
@@ -116,22 +127,26 @@ export default function PoojaServicesScreen() {
     : []
 );
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t('poojaServices.loadError')
-        );
+        if (requestId !== requestIdRef.current) return;
+        console.error(err);
+        setError(t('poojaServices.loadError'));
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [t]
+    [t, currentLanguage]
   );
+  
 
   useFocusEffect(
     useCallback(() => {
       void loadSections();
+      return () => {
+        requestIdRef.current += 1;
+      };
     }, [loadSections])
   );
 
@@ -176,9 +191,7 @@ export default function PoojaServicesScreen() {
           {t('poojaServices.templeRituals')}
         </Text>
 
-        <AutoTranslatedText style={styles.title}>
-          Pooja Services
-        </AutoTranslatedText>
+        <Text style={styles.title}>{t('poojaServices.title')}</Text>
 
         <Text style={styles.subtitle}>
           {t('poojaServices.subtitle')}

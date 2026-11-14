@@ -1,6 +1,18 @@
 
 import { apiRequest } from '@/services/api';
 import { getToken } from '@/services/authStorage';
+import i18n from '@/localization/i18n';
+// DHARMA_LANGUAGE_V1
+function getDharmaLanguage(): string {
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).toLowerCase().split('-')[0];
+  return ['en', 'te', 'kn', 'hi', 'ta'].includes(language)
+    ? language
+    : 'en';
+}
 
 // ========================================
 // TYPES
@@ -61,7 +73,7 @@ export type DharmaQuestionDetailsResponse = {
 // ========================================
 
 export async function fetchDharmaCategories() {
-  return apiRequest('/dharma/categories') as Promise<{
+  return apiRequest('/dharma/categories?lang=' + encodeURIComponent(getDharmaLanguage())) as Promise<{
     success: boolean;
     categories: DharmaCategory[];
   }>;
@@ -73,7 +85,9 @@ export async function fetchDharmaQuestions(options?: {
   filter?: 'latest' | 'answered' | 'unanswered';
   page?: number;
 }) {
-  const params: string[] = [];
+  const params: string[] = [
+    'lang=' + encodeURIComponent(getDharmaLanguage())
+  ];
 
   if (options?.categoryId) {
     params.push(
@@ -113,7 +127,7 @@ export async function fetchDharmaQuestionById(
   const token = await getToken();
 
   return apiRequest(
-    `/dharma/questions/${questionId}`,
+    `/dharma/questions/${questionId}?lang=${encodeURIComponent(getDharmaLanguage())}`,
     token
       ? { token }
       : {}

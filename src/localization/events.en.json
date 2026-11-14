@@ -20,6 +20,8 @@
     "eventUnavailable": "This event is no longer available.",
     "detailsLoading": "Loading event details...",
     "detailsDate": "Event Date",
-    "detailsDescriptionFallback": "More details will be available soon."
+    "detailsDescriptionFallback": "More details will be available soon.",
+    "startsAt": "Starts at {{time}}",
+    "endsAt": "Ends at {{time}}"
   }
 }

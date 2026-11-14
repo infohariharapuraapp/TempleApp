@@ -1,4 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+import dharmaI18n from '@/localization/i18n';
 
 import React, {
   useEffect,
@@ -34,6 +35,20 @@ import {
 // COLORS
 // ========================================
 
+
+function localizeDharmaError(value: string): string {
+  const key = value.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const translationKey = 'dharmaLocal.' + key;
+  return dharmaI18n.exists(translationKey)
+    ? String(dharmaI18n.t(translationKey))
+    : String(dharmaI18n.t(
+        'dharmaLocal.something_went_wrong_please_try_again'
+      ));
+}
+
 const COLORS = {
   background: '#FFFDF8',
   maroon: '#6B1720',
@@ -62,6 +77,14 @@ function getErrorMessage(error: unknown): string {
 // ========================================
 
 export default function AskQuestionScreen() {
+  // DHARMA_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+
   const [categories, setCategories] =
     useState<DharmaCategory[]>([]);
 
@@ -174,11 +197,10 @@ export default function AskQuestionScreen() {
     };
 
     loadCategories();
-
     return () => {
       active = false;
     };
-  }, []);
+  }, [language]);
 
   // ========================================
   // SUBMIT QUESTION
@@ -195,33 +217,25 @@ export default function AskQuestionScreen() {
     const details = description.trim();
 
     if (categoryId === null) {
-      Alert.alert(
-        'Select Category',
-        'Please select a question category.'
+      Alert.alert(t('dharmaLocal.select_category'), t('dharmaLocal.please_select_a_question_category')
       );
       return;
     }
 
     if (question.length < 10) {
-      Alert.alert(
-        'Invalid Question',
-        'Please enter a question with at least 10 characters.'
+      Alert.alert(t('dharmaLocal.invalid_question'), t('dharmaLocal.please_enter_a_question_with_at_least_10_characters')
       );
       return;
     }
 
     if (question.length > 200) {
-      Alert.alert(
-        'Question Too Long',
-        'The question must not exceed 200 characters.'
+      Alert.alert(t('dharmaLocal.question_too_long'), t('dharmaLocal.the_question_must_not_exceed_200_characters')
       );
       return;
     }
 
     if (details.length > 2000) {
-      Alert.alert(
-        'Description Too Long',
-        'The description must not exceed 2000 characters.'
+      Alert.alert(t('dharmaLocal.description_too_long'), t('dharmaLocal.the_description_must_not_exceed_2000_characters')
       );
       return;
     }
@@ -245,12 +259,10 @@ export default function AskQuestionScreen() {
         );
       }
 
-      Alert.alert(
-        'Question Submitted',
-        'Your question has been submitted successfully and is awaiting temple admin approval. It will become visible to devotees after approval.',
+      Alert.alert(t('dharmaLocal.question_submitted'), t('dharmaLocal.your_question_has_been_submitted_successfully_and_is_awaiting_temple_admin_approval_it_will_become_visible_to_devotees_after_approval'),
         [
           {
-            text: 'OK',
+            text: t('dharmaLocal.ok'),
             onPress: () => router.back(),
           },
         ]
@@ -261,9 +273,8 @@ export default function AskQuestionScreen() {
         error
       );
 
-      Alert.alert(
-        'Submission Failed',
-        getErrorMessage(error)
+      Alert.alert(t('dharmaLocal.submission_failed'),
+        localizeDharmaError(getErrorMessage(error))
       );
     } finally {
       submittingRef.current = false;
@@ -286,7 +297,7 @@ export default function AskQuestionScreen() {
             router.back();
           }}
           style={styles.backButton}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('dharmaLocal.go_back')}
           disabled={submitting}
         >
           <Ionicons
@@ -296,9 +307,7 @@ export default function AskQuestionScreen() {
           />
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.headerTitle}>
-          Ask a Question
-        </AutoTranslatedText>
+        <Text style={styles.headerTitle}>{t('dharmaLocal.ask_a_question')}</Text>
 
         <View style={{ width: 40 }} />
       </View>
@@ -332,22 +341,14 @@ export default function AskQuestionScreen() {
               ॐ
             </Text>
 
-            <AutoTranslatedText style={styles.introTitle}>
-              Dharma Sandeham
-            </AutoTranslatedText>
+            <Text style={styles.introTitle}>{t('dharmaLocal.dharma_sandeham')}</Text>
 
-            <AutoTranslatedText style={styles.introDescription}>
-              Have a question about temple traditions,
-              pooja rituals, or spiritual practices?
-              Ask fellow devotees and share knowledge.
-            </AutoTranslatedText>
+            <Text style={styles.introDescription}>{t('dharmaLocal.have_a_question_about_temple_traditions_pooja_rituals_or_spiritual_practices_ask_fellow_devotees_and_share_knowledge')}</Text>
           </View>
 
           {/* CATEGORY SELECTION */}
 
-          <AutoTranslatedText style={styles.label}>
-            Select Category *
-          </AutoTranslatedText>
+          <Text style={styles.label}>{t('dharmaLocal.select_category')}</Text>
 
           {loadingCategories ? (
             <View style={styles.categoryLoading}>
@@ -355,9 +356,7 @@ export default function AskQuestionScreen() {
                 color={COLORS.maroon}
               />
 
-              <AutoTranslatedText style={styles.loadingText}>
-                Loading categories...
-              </AutoTranslatedText>
+              <Text style={styles.loadingText}>{t('dharmaLocal.loading_categories')}</Text>
             </View>
           ) : categoryError ? (
             <View style={styles.categoryMessage}>
@@ -368,14 +367,12 @@ export default function AskQuestionScreen() {
               />
 
               <Text style={styles.categoryMessageText}>
-                {categoryError}
+                {categoryError ? localizeDharmaError(categoryError) : ""}
               </Text>
             </View>
           ) : categories.length === 0 ? (
             <View style={styles.categoryMessage}>
-              <AutoTranslatedText style={styles.categoryMessageText}>
-                No question categories are currently available.
-              </AutoTranslatedText>
+              <Text style={styles.categoryMessageText}>{t('dharmaLocal.no_question_categories_are_currently_available')}</Text>
             </View>
           ) : (
             <View style={styles.categories}>
@@ -412,13 +409,11 @@ export default function AskQuestionScreen() {
 
           {/* QUESTION TITLE */}
 
-          <AutoTranslatedText style={styles.label}>
-            Your Question *
-          </AutoTranslatedText>
+          <Text style={styles.label}>{t('dharmaLocal.your_question')}</Text>
 
           <TextInput
             style={styles.questionInput}
-            placeholder="Example: How many pradakshinas should we perform?"
+            placeholder={t('dharmaLocal.example_how_many_pradakshinas_should_we_perform')}
             placeholderTextColor={COLORS.muted}
             value={title}
             onChangeText={setTitle}
@@ -438,14 +433,12 @@ export default function AskQuestionScreen() {
 
           {/* QUESTION DESCRIPTION */}
 
-          <AutoTranslatedText style={styles.label}>
-            Additional Details (Optional)
-          </AutoTranslatedText>
+          <Text style={styles.label}>{t('dharmaLocal.additional_details_optional')}</Text>
 
           <TextInput
             ref={descriptionRef}
             style={styles.descriptionInput}
-            placeholder="Explain your doubt in more detail..."
+            placeholder={t('dharmaLocal.explain_your_doubt_in_more_detail')}
             placeholderTextColor={COLORS.muted}
             value={description}
             onChangeText={setDescription}
@@ -475,9 +468,7 @@ export default function AskQuestionScreen() {
                 color={COLORS.maroon}
               />
 
-              <AutoTranslatedText style={styles.keyboardDoneText}>
-                Done Typing
-              </AutoTranslatedText>
+              <Text style={styles.keyboardDoneText}>{t('dharmaLocal.done_typing')}</Text>
             </TouchableOpacity>
           )}
 
@@ -490,12 +481,7 @@ export default function AskQuestionScreen() {
               color={COLORS.maroon}
             />
 
-            <Text style={styles.infoText}>
-              Each question can receive answers from up to
-              10 different devotees. Questions and answers
-              are reviewed by temple administrators before
-              becoming publicly visible.
-            </Text>
+            <Text style={styles.infoText}>{t('dharmaLocal.each_question_can_receive_answers_from_up_to_10_different_devotees_questions_and_answers_are_reviewed_by_temple_administrators_before_becoming_publicly_visible')}</Text>
           </View>
 
           {/* SUBMIT BUTTON */}
@@ -523,9 +509,7 @@ export default function AskQuestionScreen() {
                   color={COLORS.white}
                 />
 
-                <AutoTranslatedText style={styles.submitText}>
-                  Submitting...
-                </AutoTranslatedText>
+                <Text style={styles.submitText}>{t('dharmaLocal.submitting')}</Text>
               </>
             ) : (
               <>
@@ -535,16 +519,12 @@ export default function AskQuestionScreen() {
                   color={COLORS.white}
                 />
 
-                <AutoTranslatedText style={styles.submitText}>
-                  Submit Question
-                </AutoTranslatedText>
+                <Text style={styles.submitText}>{t('dharmaLocal.submit_question')}</Text>
               </>
             )}
           </TouchableOpacity>
 
-          <AutoTranslatedText style={styles.footerNote}>
-            Please ask respectful, temple-related questions.
-          </AutoTranslatedText>
+          <Text style={styles.footerNote}>{t('dharmaLocal.please_ask_respectful_temple_related_questions')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

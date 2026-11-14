@@ -1,4 +1,6 @@
 import * as Device from 'expo-device';
+import i18n from '@/localization/i18n';
+// PUSH_LANGUAGE_V1
 import Constants from 'expo-constants';
 
 import {
@@ -222,6 +224,11 @@ async function performPushRegistration():
           expoPushToken,
           platform: Platform.OS,
           deviceName: Device.deviceName ?? null,
+          preferredLanguage: (
+            i18n.resolvedLanguage ||
+            i18n.language ||
+            'en'
+          ).toLowerCase().split('-')[0],
         }),
       }
     );
@@ -445,5 +452,21 @@ export async function initializeNotificationListener() {
     );
 
     return () => {};
+  }
+}
+export async function syncPushNotificationLanguage(): Promise<void> {
+  if (IS_EXPO_GO || !Device.isDevice) return;
+  try {
+    const token = await getToken();
+    if (!token) return;
+    const Notifications = await import('expo-notifications');
+    const permissions = await Notifications.getPermissionsAsync();
+    if (permissions.status !== 'granted') return;
+    if (registrationPromise) {
+      await registrationPromise;
+    }
+    await registerForPushNotificationsAsync();
+  } catch (error) {
+    console.warn('Push language synchronization failed:', error);
   }
 }

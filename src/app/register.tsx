@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, { useRef, useState } from 'react';
 import {
@@ -20,6 +20,121 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiRequest } from '@/services/api';
 
 export default function RegisterScreen() {
+  // AUTH_LANGUAGE_V1
+  const { t } = useTranslation();
+  // Only known, static authentication messages
+  // are translated. No external translation requests.
+  const localizeAuthError = (
+    message: unknown,
+    fallback: string
+  ): string => {
+    if (typeof message !== 'string') {
+      return fallback;
+    }
+    const knownMessages: Record<string, string> = {
+      "HARIHARIPURA TEMPLE": "authLocal.hariharipura_temple",
+      "TEMPLE": "authLocal.temple",
+      "Welcome Back": "authLocal.welcome_back",
+      "Login to access temple services, bookings and activities.": "authLocal.login_to_access_temple_services_bookings_and_activities",
+      "Mobile Number or Email": "authLocal.mobile_number_or_email",
+      "Enter mobile number or email": "authLocal.enter_mobile_number_or_email",
+      "Password": "authLocal.password",
+      "Enter your password": "authLocal.enter_your_password",
+      "Show": "authLocal.show",
+      "Hide": "authLocal.hide",
+      "Show password": "authLocal.show_password",
+      "Hide password": "authLocal.hide_password",
+      "Forgot Password?": "authLocal.forgot_password_link",
+      "Login": "authLocal.login",
+      "New devotee?": "authLocal.new_devotee",
+      "Create Account": "authLocal.create_account",
+      "Login Required": "authLocal.login_required",
+      "Please enter your mobile number or email and password.": "authLocal.please_enter_your_mobile_number_or_email_and_password",
+      "Login Failed": "authLocal.login_failed",
+      "Invalid login credentials.": "authLocal.invalid_login_credentials",
+      "Unable to connect to the server.": "authLocal.unable_to_connect_to_the_server",
+      "Join our devotee community and stay connected with temple services and activities.": "authLocal.join_our_devotee_community_and_stay_connected_with_temple_services_and_activities",
+      "Full Name": "authLocal.full_name",
+      "Enter your full name": "authLocal.enter_your_full_name",
+      "Mobile Number": "authLocal.mobile_number",
+      "10-digit mobile number": "authLocal.10_digit_mobile_number",
+      "Email Address": "authLocal.email_address",
+      "Enter your email address": "authLocal.enter_your_email_address",
+      "Minimum 8 characters": "authLocal.minimum_8_characters",
+      "Use at least 8 characters.": "authLocal.use_at_least_8_characters",
+      "Confirm Password": "authLocal.confirm_password",
+      "Re-enter your password": "authLocal.re_enter_your_password",
+      "Hide confirmation password": "authLocal.hide_confirmation_password",
+      "Show confirmation password": "authLocal.show_confirmation_password",
+      "Fields marked * are required. Your email address is used for password recovery.": "authLocal.fields_marked_are_required_your_email_address_is_used_for_password_recovery",
+      "Already have an account?": "authLocal.already_have_an_account",
+      "🙏 Stay connected with Hariharipura Temple": "authLocal.stay_connected_with_hariharipura_temple",
+      "Invalid Name": "authLocal.invalid_name",
+      "Enter your full name (2–100 characters).": "authLocal.enter_your_full_name_2_100_characters",
+      "Invalid Mobile Number": "authLocal.invalid_mobile_number",
+      "Enter a valid 10-digit Indian mobile number.": "authLocal.enter_a_valid_10_digit_indian_mobile_number",
+      "Email Required": "authLocal.email_required",
+      "Please enter your email address. It is required for password recovery.": "authLocal.please_enter_your_email_address_it_is_required_for_password_recovery",
+      "Invalid Email": "authLocal.invalid_email",
+      "Please enter a valid email address.": "authLocal.please_enter_a_valid_email_address",
+      "Invalid Password": "authLocal.invalid_password",
+      "Password must be at least 8 characters and no more than 72 UTF-8 bytes.": "authLocal.password_must_be_at_least_8_characters_and_no_more_than_72_utf_8_bytes",
+      "Password Mismatch": "authLocal.password_mismatch",
+      "Password and confirm password do not match.": "authLocal.password_and_confirm_password_do_not_match",
+      "Registration Successful": "authLocal.registration_successful",
+      "Your devotee account has been created. Please login to continue.": "authLocal.your_devotee_account_has_been_created_please_login_to_continue",
+      "Registration Failed": "authLocal.registration_failed",
+      "Unable to create your account.": "authLocal.unable_to_create_your_account",
+      "Forgot Password": "authLocal.forgot_password_title",
+      "Enter your registered email address or mobile number. We will send a verification code to your registered email.": "authLocal.enter_your_registered_email_address_or_mobile_number_we_will_send_a_verification_code_to_your_registered_email",
+      "OTP will be delivered only to your registered email.": "authLocal.otp_will_be_delivered_only_to_your_registered_email",
+      "Send OTP": "authLocal.send_otp",
+      "Check Your Email": "authLocal.check_your_email",
+      "Enter the 6-digit verification code sent to the registered email address associated with your account.": "authLocal.enter_the_6_digit_verification_code_sent_to_the_registered_email_address_associated_with_your_account",
+      "Verification Code": "authLocal.verification_code",
+      "OTP expires after 5 minutes.": "authLocal.otp_expires_after_5_minutes",
+      "Verify OTP": "authLocal.verify_otp",
+      "Change Email / Mobile Number": "authLocal.change_email_mobile_number",
+      "Resend OTP": "authLocal.resend_otp",
+      "Create New Password": "authLocal.create_new_password",
+      "Your OTP has been verified. Create a new password to secure your account.": "authLocal.your_otp_has_been_verified_create_a_new_password_to_secure_your_account",
+      "New Password": "authLocal.new_password",
+      "Re-enter your new password": "authLocal.re_enter_your_new_password",
+      "Re-enter the same password to confirm.": "authLocal.re_enter_the_same_password_to_confirm",
+      "Reset Password": "authLocal.reset_password",
+      "Back to Login": "authLocal.back_to_login",
+      "Required": "authLocal.required",
+      "Enter your registered email or mobile number.": "authLocal.enter_your_registered_email_or_mobile_number",
+      "Invalid Details": "authLocal.invalid_details",
+      "Enter a valid email address or 10-digit mobile number.": "authLocal.enter_a_valid_email_address_or_10_digit_mobile_number",
+      "If your account has a registered email address, a 6-digit password reset OTP will be sent there.": "authLocal.if_your_account_has_a_registered_email_address_a_6_digit_password_reset_otp_will_be_sent_there",
+      "Unable to Send OTP": "authLocal.unable_to_send_otp",
+      "Please try again.": "authLocal.please_try_again",
+      "Invalid OTP": "authLocal.invalid_otp",
+      "Enter the complete 6-digit OTP.": "authLocal.enter_the_complete_6_digit_otp",
+      "Verification Failed": "authLocal.verification_failed",
+      "Invalid or expired OTP. Please request a new OTP.": "authLocal.invalid_or_expired_otp_please_request_a_new_otp",
+      "Unable to verify OTP.": "authLocal.unable_to_verify_otp",
+      "Use at least 8 characters and no more than 72 UTF-8 bytes.": "authLocal.use_at_least_8_characters_and_no_more_than_72_utf_8_bytes",
+      "Both passwords must match.": "authLocal.both_passwords_must_match",
+      "Session Expired": "authLocal.session_expired",
+      "Please verify a new OTP.": "authLocal.please_verify_a_new_otp",
+      "Password Reset Successful": "authLocal.password_reset_successful",
+      "Your password has been changed. Login with your new password.": "authLocal.your_password_has_been_changed_login_with_your_new_password",
+      "Go to Login": "authLocal.go_to_login",
+      "Reset Failed": "authLocal.reset_failed",
+      "Unable to reset password.": "authLocal.unable_to_reset_password",
+      "Something went wrong. Please try again.": "authLocal.something_went_wrong_please_try_again"
+    };
+    const key = Object.prototype.hasOwnProperty.call(
+      knownMessages,
+      message.trim()
+    )
+      ? knownMessages[message.trim()]
+      : null;
+    return key ? String(t(key)) : fallback;
+  };
+
   const { width } = useWindowDimensions();
   const small = width < 360;
 
@@ -63,33 +178,29 @@ export default function RegisterScreen() {
     const emailAddress = email.trim().toLowerCase();
 
     if (name.length < 2 || name.length > 100) {
-      Alert.alert(
-        'Invalid Name',
-        'Enter your full name (2–100 characters).'
+      Alert.alert(t('authLocal.invalid_name'),
+        t('authLocal.enter_your_full_name_2_100_characters')
       );
       return;
     }
 
     if (!/^[6-9]\d{9}$/.test(mobile)) {
-      Alert.alert(
-        'Invalid Mobile Number',
-        'Enter a valid 10-digit Indian mobile number.'
+      Alert.alert(t('authLocal.invalid_mobile_number'),
+        t('authLocal.enter_a_valid_10_digit_indian_mobile_number')
       );
       return;
     }
 
     if (!emailAddress) {
-      Alert.alert(
-        'Email Required',
-        'Please enter your email address. It is required for password recovery.'
+      Alert.alert(t('authLocal.email_required'),
+        t('authLocal.please_enter_your_email_address_it_is_required_for_password_recovery')
       );
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) {
-      Alert.alert(
-        'Invalid Email',
-        'Please enter a valid email address.'
+      Alert.alert(t('authLocal.invalid_email'),
+        t('authLocal.please_enter_a_valid_email_address')
       );
       return;
     }
@@ -98,17 +209,15 @@ export default function RegisterScreen() {
       password.length < 8 ||
       new TextEncoder().encode(password).length > 72
     ) {
-      Alert.alert(
-        'Invalid Password',
-        'Password must be at least 8 characters and no more than 72 UTF-8 bytes.'
+      Alert.alert(t('authLocal.invalid_password'),
+        t('authLocal.password_must_be_at_least_8_characters_and_no_more_than_72_utf_8_bytes')
       );
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(
-        'Password Mismatch',
-        'Password and confirm password do not match.'
+      Alert.alert(t('authLocal.password_mismatch'),
+        t('authLocal.password_and_confirm_password_do_not_match')
       );
       return;
     }
@@ -129,25 +238,22 @@ export default function RegisterScreen() {
       });
 
       if (response.success) {
-        Alert.alert(
-          'Registration Successful',
-          'Your devotee account has been created. Please login to continue.',
+        Alert.alert(t('authLocal.registration_successful'),
+          t('authLocal.your_devotee_account_has_been_created_please_login_to_continue'),
           [{
-            text: 'Login',
+            text: t('authLocal.login'),
             onPress: () => router.replace('/login'),
           }]
         );
         return;
       }
 
-      Alert.alert(
-        'Registration Failed',
-        response.message || 'Unable to create your account.'
+      Alert.alert(t('authLocal.registration_failed'),
+        localizeAuthError(response.message, t('authLocal.unable_to_create_your_account'))
       );
     } catch (error: any) {
-      Alert.alert(
-        'Registration Failed',
-        error?.message || 'Unable to connect to the server.'
+      Alert.alert(t('authLocal.registration_failed'),
+        localizeAuthError(error?.message, t('authLocal.unable_to_connect_to_the_server'))
       );
     } finally {
       setLoading(false);
@@ -191,31 +297,24 @@ export default function RegisterScreen() {
                 <Text style={styles.templeEmoji}>🙏</Text>
               </View>
 
-              <AutoTranslatedText style={styles.label}>
-                HARIHARIPURA TEMPLE
-              </AutoTranslatedText>
+              <Text style={styles.label}>{t('authLocal.hariharipura_temple')}</Text>
 
-              <AutoTranslatedText style={[
+              <Text style={[
                 styles.title,
                 small && { fontSize: 25 },
-              ]}>
-                Create Account
-              </AutoTranslatedText>
+              ]}>{t('authLocal.create_account')}</Text>
 
-              <AutoTranslatedText style={styles.subtitle}>
-                Join our devotee community and stay
-                connected with temple services and activities.
-              </AutoTranslatedText>
+              <Text style={styles.subtitle}>{t('authLocal.join_our_devotee_community_and_stay_connected_with_temple_services_and_activities')}</Text>
             </View>
 
             <Text style={styles.inputLabel}>
-              Full Name <Text style={styles.required}>*</Text>
+              {t('authLocal.full_name')}{' '}<Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={styles.input}
               value={fullName}
               onChangeText={setFullName}
-              placeholder="Enter your full name"
+              placeholder={t('authLocal.enter_your_full_name')}
               placeholderTextColor="#9B9188"
               autoCapitalize="words"
               autoCorrect={false}
@@ -226,14 +325,14 @@ export default function RegisterScreen() {
             />
 
             <Text style={styles.inputLabel}>
-              Mobile Number <Text style={styles.required}>*</Text>
+              {t('authLocal.mobile_number')}{' '}<Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               ref={phoneRef}
               style={styles.input}
               value={phone}
               onChangeText={setPhone}
-              placeholder="10-digit mobile number"
+              placeholder={t('authLocal.10_digit_mobile_number')}
               placeholderTextColor="#9B9188"
               keyboardType="phone-pad"
               maxLength={10}
@@ -242,14 +341,14 @@ export default function RegisterScreen() {
             />
 
             <Text style={styles.inputLabel}>
-              Email Address <Text style={styles.required}>*</Text>
+              {t('authLocal.email_address')}{' '}<Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               ref={emailRef}
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="Enter your email address"
+              placeholder={t('authLocal.enter_your_email_address')}
               placeholderTextColor="#9B9188"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -261,7 +360,7 @@ export default function RegisterScreen() {
             />
 
             <Text style={styles.inputLabel}>
-              Password <Text style={styles.required}>*</Text>
+              {t('authLocal.password')}{' '}<Text style={styles.required}>*</Text>
             </Text>
             <View style={styles.passwordContainer}>
               <TextInput
@@ -269,7 +368,7 @@ export default function RegisterScreen() {
                 style={styles.passwordInput}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Minimum 8 characters"
+                placeholder={t('authLocal.minimum_8_characters')}
                 placeholderTextColor="#9B9188"
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -285,22 +384,19 @@ export default function RegisterScreen() {
                 disabled={loading}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  showPassword ? 'Hide password' : 'Show password'
+                  showPassword ? t('authLocal.hide_password') : t('authLocal.show_password')
                 }
               >
                 <Text style={styles.showText}>
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? t('authLocal.hide') : t('authLocal.show')}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <AutoTranslatedText style={styles.passwordHint}>
-              Use at least 8 characters.
-            </AutoTranslatedText>
+            <Text style={styles.passwordHint}>{t('authLocal.use_at_least_8_characters')}</Text>
 
             <Text style={styles.inputLabel}>
-              Confirm Password{' '}
-              <Text style={styles.required}>*</Text>
+              {t('authLocal.confirm_password')}{' '}<Text style={styles.required}>*</Text>
             </Text>
             <View style={styles.passwordContainer}>
               <TextInput
@@ -308,7 +404,7 @@ export default function RegisterScreen() {
                 style={styles.passwordInput}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                placeholder="Re-enter your password"
+                placeholder={t('authLocal.re_enter_your_password')}
                 placeholderTextColor="#9B9188"
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
@@ -327,21 +423,18 @@ export default function RegisterScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={
                   showConfirmPassword
-                    ? 'Hide confirmation password'
-                    : 'Show confirmation password'
+                    ? t('authLocal.hide_confirmation_password')
+                    : t('authLocal.show_confirmation_password')
                 }
               >
                 <Text style={styles.showText}>
-                  {showConfirmPassword ? 'Hide' : 'Show'}
+                  {showConfirmPassword ? t('authLocal.hide') : t('authLocal.show')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.infoBox}>
-              <AutoTranslatedText style={styles.infoText}>
-                Fields marked * are required. Your email
-                address is used for password recovery.
-              </AutoTranslatedText>
+              <Text style={styles.infoText}>{t('authLocal.fields_marked_are_required_your_email_address_is_used_for_password_recovery')}</Text>
             </View>
 
             <TouchableOpacity
@@ -357,28 +450,22 @@ export default function RegisterScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <AutoTranslatedText style={styles.registerButtonText}>
-                  Create Account
-                </AutoTranslatedText>
+                <Text style={styles.registerButtonText}>{t('authLocal.create_account')}</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.loginRow}>
-              <AutoTranslatedText style={styles.loginText}>
-                Already have an account?
-              </AutoTranslatedText>
+              <Text style={styles.loginText}>{t('authLocal.already_have_an_account')}</Text>
               <TouchableOpacity
                 onPress={() => router.replace('/login')}
                 disabled={loading}
               >
-                <AutoTranslatedText style={styles.loginLink}> Login</AutoTranslatedText>
+                <Text style={styles.loginLink}>{' ' + t('authLocal.login')}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.footer}>
-              <AutoTranslatedText style={styles.footerText}>
-                🙏 Stay connected with Hariharipura Temple
-              </AutoTranslatedText>
+              <Text style={styles.footerText}>{t('authLocal.stay_connected_with_hariharipura_temple')}</Text>
             </View>
           </View>
         </ScrollView>

@@ -1,4 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+import dharmaI18n from '@/localization/i18n';
 
 import React, { useState } from 'react';
 
@@ -19,6 +20,20 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   reportDharmaContent,
 } from '@/services/dharmaApi';
+
+
+function localizeDharmaError(value: string): string {
+  const key = value.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const translationKey = 'dharmaLocal.' + key;
+  return dharmaI18n.exists(translationKey)
+    ? String(dharmaI18n.t(translationKey))
+    : String(dharmaI18n.t(
+        'dharmaLocal.something_went_wrong_please_try_again'
+      ));
+}
 
 const COLORS = {
   background: '#FFFDF8',
@@ -54,6 +69,9 @@ export default function ReportDialog({
   target,
   onClose,
 }: ReportDialogProps) {
+  // DHARMA_LANGUAGE_V1
+  const { t } = useTranslation();
+
   const [selectedReason, setSelectedReason] =
     useState<string | null>(null);
 
@@ -70,9 +88,7 @@ export default function ReportDialog({
     if (!target || submitting) return;
 
     if (!selectedReason) {
-      Alert.alert(
-        'Select Reason',
-        'Please select a reason for reporting.'
+      Alert.alert(t('dharmaLocal.select_reason'), t('dharmaLocal.please_select_a_reason_for_reporting')
       );
       return;
     }
@@ -107,16 +123,13 @@ export default function ReportDialog({
       setSelectedReason(null);
       onClose();
 
-      Alert.alert(
-        'Report Submitted',
-        'Your report has been submitted to the temple administration for review.'
+      Alert.alert(t('dharmaLocal.report_submitted'), t('dharmaLocal.your_report_has_been_submitted_to_the_temple_administration_for_review')
       );
     } catch (error) {
-      Alert.alert(
-        'Report Failed',
+      Alert.alert(t('dharmaLocal.report_failed'),
         error instanceof Error
-          ? error.message
-          : 'Unable to submit your report. Please try again.'
+        ? localizeDharmaError(error.message)
+        : t('dharmaLocal.unable_to_submit_your_report_please_try_again')
       );
     } finally {
       setSubmitting(false);
@@ -148,14 +161,12 @@ export default function ReportDialog({
 
             <View style={styles.headerText}>
               <Text style={styles.title}>
-                Report {target?.type === 'question'
-                  ? 'Question'
-                  : 'Answer'}
+                {target?.type === 'question'
+        ? t('dharmaLocal.report_question')
+        : t('dharmaLocal.report_answer')}
               </Text>
 
-              <AutoTranslatedText style={styles.subtitle}>
-                Help keep Dharma Sandeham respectful.
-              </AutoTranslatedText>
+              <Text style={styles.subtitle}>{t('dharmaLocal.help_keep_dharma_sandeham_respectful')}</Text>
             </View>
 
             <TouchableOpacity
@@ -170,9 +181,7 @@ export default function ReportDialog({
             </TouchableOpacity>
           </View>
 
-          <AutoTranslatedText style={styles.sectionLabel}>
-            WHY ARE YOU REPORTING THIS?
-          </AutoTranslatedText>
+          <Text style={styles.sectionLabel}>{t('dharmaLocal.why_are_you_reporting_this')}</Text>
 
           <ScrollView
             style={styles.reasonsScroll}
@@ -209,8 +218,9 @@ export default function ReportDialog({
                   />
 
                   <Text style={styles.reasonText}>
-                    {reason}
-                  </Text>
+                    {t('dharmaLocal.' + reason.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, ''))}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -223,10 +233,7 @@ export default function ReportDialog({
               color={COLORS.maroon}
             />
 
-            <AutoTranslatedText style={styles.infoText}>
-              Reports are reviewed by temple admins.
-              Reporting does not automatically remove content.
-            </AutoTranslatedText>
+            <Text style={styles.infoText}>{t('dharmaLocal.reports_are_reviewed_by_temple_admins_reporting_does_not_automatically_remove_content')}</Text>
           </View>
 
           <TouchableOpacity
@@ -252,8 +259,8 @@ export default function ReportDialog({
 
             <Text style={styles.submitText}>
               {submitting
-                ? 'Submitting Report...'
-                : 'Submit Report'}
+                ? t('dharmaLocal.submitting_report')
+                : t('dharmaLocal.submit_report')}
             </Text>
           </TouchableOpacity>
 
@@ -262,9 +269,7 @@ export default function ReportDialog({
             onPress={handleClose}
             disabled={submitting}
           >
-            <AutoTranslatedText style={styles.cancelText}>
-              Cancel
-            </AutoTranslatedText>
+            <Text style={styles.cancelText}>{t('dharmaLocal.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </View>

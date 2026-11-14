@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+﻿import { useTranslation } from 'react-i18next';
 import React, {
   useCallback,
   useRef,
@@ -35,6 +35,7 @@ const ROOM_BOOKING_URL =
 // ========================================
 
 export default function RoomBookingScreen() {
+  const { t } = useTranslation();
   const webViewRef = useRef<WebView>(null);
   const loadStartedAt = useRef<number>(0);
 
@@ -109,16 +110,14 @@ export default function RoomBookingScreen() {
           onPress={handleBack}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('bookingScreens.back')}
         >
           <Text style={styles.backText}>
-            ‹
+            â€¹
           </Text>
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.title}>
-          Room Booking
-        </AutoTranslatedText>
+        <Text style={styles.title}>{t('bookingScreens.roomTitle')}</Text>
 
         <View style={styles.headerSpacer} />
       </View>
@@ -218,9 +217,7 @@ export default function RoomBookingScreen() {
         color="#8B0000"
       />
 
-      <AutoTranslatedText style={styles.loaderText}>
-        Loading Room Booking...
-      </AutoTranslatedText>
+      <Text style={styles.loaderText}>{t('bookingScreens.roomLoading')}</Text>
     </View>
   )}
 
@@ -229,26 +226,19 @@ export default function RoomBookingScreen() {
   {hasError && (
     <View style={styles.errorContainer}>
       <Text style={styles.errorIcon}>
-        ⚠️
+        âš ï¸
       </Text>
 
-      <AutoTranslatedText style={styles.errorTitle}>
-        Unable to Load Booking
-      </AutoTranslatedText>
+      <Text style={styles.errorTitle}>{t('bookingScreens.roomError')}</Text>
 
-      <AutoTranslatedText style={styles.errorText}>
-        Please check your internet
-        connection and try again.
-      </AutoTranslatedText>
+      <Text style={styles.errorText}>{t('bookingScreens.connectionError')}</Text>
 
       <TouchableOpacity
         style={styles.retryButton}
         onPress={handleRetry}
         activeOpacity={0.8}
       >
-        <AutoTranslatedText style={styles.retryText}>
-          Try Again
-        </AutoTranslatedText>
+        <Text style={styles.retryText}>{t('bookingScreens.retry')}</Text>
       </TouchableOpacity>
     </View>
   )}
@@ -367,3 +357,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

@@ -1,4 +1,7 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+
+import translationI18n from '@/localization/i18n';
+
+
 
 import React, {
   useCallback,
@@ -89,7 +92,7 @@ function formatDate(value?: string | null) {
     return '';
   }
 
-  return date.toLocaleDateString('en-IN', {
+  return date.toLocaleDateString(getUpdatesLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -121,8 +124,48 @@ function announcementDate(item: Announcement) {
 // MAIN SCREEN
 // ========================================
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  return translationI18n.t(
+    'templeUpdates.' + key,
+    { defaultValue: text }
+  );
+}
+function getUpdatesLocale(): string {
+  const language = (
+    translationI18n.resolvedLanguage ||
+    translationI18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
+function translatedCount(
+  key: string,
+  count: number
+): string {
+  return translationI18n.t(
+    'templeUpdates.' + key +
+    (count === 1 ? '_one' : '_other'),
+    { count }
+  );
+}
+
+
+
+
 export default function AnnouncementsScreen() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
 
 const supportedLanguages = ['en', 'te', 'kn', 'hi', 'ta'];
 
@@ -335,9 +378,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
         />
 
         <Text style={styles.statusText}>
-          {t('announcements.loading', {
-            defaultValue: 'Loading temple updates...',
-          })}
+          {tr('Loading temple updates...')}
         </Text>
         </View>
       </SafeAreaView>
@@ -357,7 +398,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             onPress={goBack}
             style={styles.backButton}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={tr("Go back")}
           >
             <Ionicons
               name="arrow-back"
@@ -367,13 +408,9 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
           </Pressable>
 
           <View style={styles.headerText}>
-            <AutoTranslatedText style={styles.headerEyebrow}>
-              DIVYAKSHETRA HARIHARAPURA
-            </AutoTranslatedText>
+            <Text style={styles.headerEyebrow}>{tr("DIVYAKSHETRA HARIHARAPURA")}</Text>
 
-            <AutoTranslatedText style={styles.headerTitle}>
-              Update Details
-            </AutoTranslatedText>
+            <Text style={styles.headerTitle}>{tr("Update Details")}</Text>
           </View>
         </View>
 
@@ -386,20 +423,15 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             />
 
             <Text style={styles.statusText}>
-              {error ||
-                t('announcements.notFound', {
-                  defaultValue:
-                    'Announcement not found.',
-                })}
+              {(error && tr(error)) ||
+                tr('Announcement not found.')}
             </Text>
 
             <Pressable
               style={styles.retryButton}
               onPress={() => void loadData()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{tr("Try Again")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -421,7 +453,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
               <View style={styles.badgeRow}>
                 <View style={styles.categoryBadge}>
                   <Text style={styles.categoryBadgeText}>
-                    {announcement.category || 'General'}
+                    {tr(announcement.category || 'General')}
                   </Text>
                 </View>
 
@@ -433,9 +465,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                       color="#8A5A11"
                     />
 
-                    <AutoTranslatedText style={styles.pinnedText}>
-                      Important
-                    </AutoTranslatedText>
+                    <Text style={styles.pinnedText}>{tr("Important")}</Text>
                   </View>
                 )}
               </View>
@@ -478,9 +508,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
 
               <View style={styles.goldDivider} />
 
-              <AutoTranslatedText style={styles.sectionHeading}>
-                Announcement Details
-              </AutoTranslatedText>
+              <Text style={styles.sectionHeading}>{tr("Announcement Details")}</Text>
 
               <Text style={styles.detailMessage}>
                 {announcement.message}
@@ -503,9 +531,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                     color={COLORS.white}
                   />
 
-                  <AutoTranslatedText style={styles.pdfButtonText}>
-                    View PDF Attachment
-                  </AutoTranslatedText>
+                  <Text style={styles.pdfButtonText}>{tr("View PDF Attachment")}</Text>
 
                   <Ionicons
                     name="open-outline"
@@ -527,15 +553,11 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                   color={COLORS.maroon}
                 />
 
-                <AutoTranslatedText style={styles.shareButtonText}>
-                  Share Update
-                </AutoTranslatedText>
+                <Text style={styles.shareButtonText}>{tr("Share Update")}</Text>
               </Pressable>
             </View>
 
-            <AutoTranslatedText style={styles.footerText}>
-              Divyakshetra Hariharapura
-            </AutoTranslatedText>
+            <Text style={styles.footerText}>{tr("Divyakshetra Hariharapura")}</Text>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -554,7 +576,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
           onPress={goBack}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={tr("Go back")}
         >
           <Ionicons
             name="arrow-back"
@@ -564,13 +586,9 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
         </Pressable>
 
         <View style={styles.headerText}>
-          <AutoTranslatedText style={styles.headerEyebrow}>
-            DIVYAKSHETRA HARIHARAPURA
-          </AutoTranslatedText>
+          <Text style={styles.headerEyebrow}>{tr("DIVYAKSHETRA HARIHARAPURA")}</Text>
 
-          <AutoTranslatedText style={styles.headerTitle}>
-            Divyakshetra Updates
-          </AutoTranslatedText>
+          <Text style={styles.headerTitle}>{tr("Divyakshetra Updates")}</Text>
         </View>
       </View>
 
@@ -597,15 +615,9 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             />
           </View>
 
-          <AutoTranslatedText style={styles.introTitle}>
-            Temple News & Announcements
-          </AutoTranslatedText>
+          <Text style={styles.introTitle}>{tr("Temple News & Announcements")}</Text>
 
-          <AutoTranslatedText style={styles.introDescription}>
-            Stay connected with festivals, poojas,
-            sevas, special programmes and important
-            updates from Divyakshetra Hariharapura.
-          </AutoTranslatedText>
+          <Text style={styles.introDescription}>{tr("Stay connected with festivals, poojas, sevas, special programmes and important updates from Divyakshetra Hariharapura.")}</Text>
         </View>
 
         {/* CATEGORY FILTERS */}
@@ -621,7 +633,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
 
             return (
               <Pressable
-                key={item}
+                key={tr(item)}
                 onPress={() => setCategory(item)}
                 style={[
                   styles.categoryChip,
@@ -636,7 +648,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                       styles.categoryChipTextSelected,
                   ]}
                 >
-                  {item}
+                  {tr(item)}
                 </Text>
               </Pressable>
             );
@@ -646,12 +658,12 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
         <View style={styles.listHeadingRow}>
           <Text style={styles.listHeading}>
             {category === 'All'
-              ? 'Latest Updates'
-              : category}
+              ? tr('Latest Updates')
+              : tr(category)}
           </Text>
 
           <Text style={styles.resultCount}>
-            {filteredItems.length} updates
+            {translatedCount('updates_count', filteredItems.length)}
           </Text>
         </View>
 
@@ -664,16 +676,14 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
             />
 
             <Text style={styles.emptyText}>
-              {error}
+              {tr(error)}
             </Text>
 
             <Pressable
               style={styles.retryButton}
               onPress={() => void loadData()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{tr("Try Again")}</Text>
             </Pressable>
           </View>
         ) : filteredItems.length === 0 ? (
@@ -684,14 +694,9 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
               color={COLORS.gold}
             />
 
-            <AutoTranslatedText style={styles.emptyTitle}>
-              No Updates Available
-            </AutoTranslatedText>
+            <Text style={styles.emptyTitle}>{tr("No Updates Available")}</Text>
 
-            <AutoTranslatedText style={styles.emptyText}>
-              New temple announcements will appear
-              here when published.
-            </AutoTranslatedText>
+            <Text style={styles.emptyText}>{tr("New temple announcements will appear here when published.")}</Text>
           </View>
         ) : (
           filteredItems.map(item => (
@@ -716,9 +721,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                     color={COLORS.goldSoft}
                   />
 
-                  <AutoTranslatedText style={styles.placeholderText}>
-                    DIVYAKSHETRA
-                  </AutoTranslatedText>
+                  <Text style={styles.placeholderText}>{tr("DIVYAKSHETRA")}</Text>
                 </View>
               )}
 
@@ -726,7 +729,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                 <View style={styles.badgeRow}>
                   <View style={styles.categoryBadge}>
                     <Text style={styles.categoryBadgeText}>
-                      {item.category || 'General'}
+                      {tr(item.category || 'General')}
                     </Text>
                   </View>
 
@@ -738,9 +741,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                         color="#8A5A11"
                       />
 
-                      <AutoTranslatedText style={styles.pinnedText}>
-                        Pinned
-                      </AutoTranslatedText>
+                      <Text style={styles.pinnedText}>{tr("Pinned")}</Text>
                     </View>
                   )}
                 </View>
@@ -773,9 +774,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
                   </View>
 
                   <View style={styles.readMore}>
-                    <AutoTranslatedText style={styles.readMoreText}>
-                      Read More
-                    </AutoTranslatedText>
+                    <Text style={styles.readMoreText}>{tr("Read More")}</Text>
 
                     <Ionicons
                       name="arrow-forward"
@@ -789,9 +788,7 @@ const selectedLanguage = supportedLanguages.includes(languageCode)
           ))
         )}
 
-        <AutoTranslatedText style={styles.footerText}>
-          Divyakshetra Hariharapura
-        </AutoTranslatedText>
+        <Text style={styles.footerText}>{tr("Divyakshetra Hariharapura")}</Text>
       </ScrollView>
     </SafeAreaView>
   );

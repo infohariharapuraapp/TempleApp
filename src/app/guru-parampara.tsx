@@ -1,6 +1,6 @@
 
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -73,7 +73,13 @@ function resolveGuruImage(
 // ========================================
 
 export default function GuruParamparaScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0].toLowerCase();
+  const requestIdRef = useRef(0);
   const [gurus, setGurus] = useState<Guru[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,14 +89,18 @@ export default function GuruParamparaScreen() {
   // ========================================
 
   const loadGurus = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       setError('');
-
+      setGurus([]);
       const response = await apiRequest<GuruResponse>(
-        '/guru-parampara'
+        '/guru-parampara?lang=' +
+        encodeURIComponent(currentLanguage)
       );
-
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       if (
         response.success &&
         Array.isArray(response.data)
@@ -102,7 +112,6 @@ export default function GuruParamparaScreen() {
               a.display_order - b.display_order ||
               a.id - b.id
           );
-
         setGurus(activeGurus);
       } else {
         setGurus([]);
@@ -111,24 +120,30 @@ export default function GuruParamparaScreen() {
         );
       }
     } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       console.error(
         'Guru Parampara loading error:',
         err
       );
-
-      setError(t('guruParamparaScreen.connectionError'));
+      setError(
+        t('guruParamparaScreen.connectionError')
+      );
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [t]);
-
-  // Refresh whenever this page becomes active
+  }, [t, currentLanguage]);
   useFocusEffect(
     useCallback(() => {
       void loadGurus();
+      return () => {
+        requestIdRef.current += 1;
+      };
     }, [loadGurus])
   );
-
   // ========================================
   // SCREEN UI
   // ========================================

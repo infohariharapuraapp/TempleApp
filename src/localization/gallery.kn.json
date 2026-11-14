@@ -19,6 +19,9 @@
     "sharing": "ಹಂಚಲಾಗುತ್ತಿದೆ...",
     "download": "ಡೌನ್‌ಲೋಡ್",
     "saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
-    "shareImage": "ದೇವಾಲಯದ ಚಿತ್ರವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ"
+    "shareImage": "ದೇವಾಲಯದ ಚಿತ್ರವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ",
+    "photoCount_one": "{{count}} ಫೋಟೋ",
+    "photoCount_other": "{{count}} ಫೋಟೋಗಳು",
+    "photoCount_plural": "{{count}} ಫೋಟೋಗಳು"
   }
 }

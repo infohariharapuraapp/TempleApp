@@ -20,6 +20,8 @@
     "eventUnavailable": "இந்த நிகழ்வு தற்போது கிடைக்கவில்லை.",
     "detailsLoading": "நிகழ்வு விவரங்கள் ஏற்றப்படுகின்றன...",
     "detailsDate": "நிகழ்வு தேதி",
-    "detailsDescriptionFallback": "மேலும் விவரங்கள் விரைவில் கிடைக்கும்."
+    "detailsDescriptionFallback": "மேலும் விவரங்கள் விரைவில் கிடைக்கும்.",
+    "startsAt": "{{time}} மணிக்கு தொடக்கம்",
+    "endsAt": "{{time}} மணிக்கு நிறைவு"
   }
 }

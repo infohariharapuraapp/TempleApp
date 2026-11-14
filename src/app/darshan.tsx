@@ -1,6 +1,7 @@
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -201,7 +202,14 @@ function DarshanVideoCard({
 // ========================================
 
 export default function TodayDarshanScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // DARSHAN_LANGUAGE_V2
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const requestId = useRef(0);
 
   const [videos, setVideos] =
     useState<TodayDarshan[]>([]);
@@ -221,6 +229,7 @@ export default function TodayDarshanScreen() {
 
   const loadDarshan = useCallback(
     async (isRefresh = false) => {
+      const currentRequest = ++requestId.current;
       try {
         if (isRefresh) {
           setRefreshing(true);
@@ -232,9 +241,10 @@ export default function TodayDarshanScreen() {
 
         const response =
           await apiRequest<ApiResponse>(
-            '/darshan/today'
+            `/darshan/today?lang=${encodeURIComponent(language)}`
           );
 
+        if (currentRequest !== requestId.current) return;
         if (!response.success) {
           throw new Error(
             t('darshan.videoLoadError')
@@ -247,6 +257,7 @@ export default function TodayDarshanScreen() {
             : []
         );
       } catch (err) {
+        if (currentRequest !== requestId.current) return;
         console.error(
           'Failed to load Darshan:',
           err
@@ -256,11 +267,13 @@ export default function TodayDarshanScreen() {
           t('darshan.videoLoadError')
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (currentRequest === requestId.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [t]
+    [t, language]
   );
 
   // ========================================
@@ -269,7 +282,10 @@ export default function TodayDarshanScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadDarshan();
+      void loadDarshan();
+      return () => {
+        requestId.current++;
+      };
     }, [loadDarshan])
   );
 

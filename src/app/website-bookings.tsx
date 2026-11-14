@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+﻿import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
@@ -30,6 +30,7 @@ const PROFILE_URL =
 const LOADING_TIMEOUT = 15000;
 
 export default function WebsiteBookingsScreen() {
+  const { t } = useTranslation();
   const webViewRef = useRef<WebView>(null);
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -100,10 +101,10 @@ export default function WebsiteBookingsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack}>
-          <Text style={styles.backText}>‹</Text>
+          <Text style={styles.backText}>â€¹</Text>
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.title}>My Bookings</AutoTranslatedText>
+        <Text style={styles.title}>{t('bookingScreens.bookingsTitle')}</Text>
 
         <View style={{ width: 30 }} />
       </View>
@@ -149,25 +150,19 @@ export default function WebsiteBookingsScreen() {
               size="large"
               color="#8B0000"
             />
-            <AutoTranslatedText style={styles.message}>
-              Loading your bookings...
-            </AutoTranslatedText>
+            <Text style={styles.message}>{t('bookingScreens.bookingsLoading')}</Text>
           </View>
         )}
 
         {hasError && (
           <View style={styles.loading}>
-            <AutoTranslatedText style={styles.message}>
-              Unable to load your bookings.
-            </AutoTranslatedText>
+            <Text style={styles.message}>{t('bookingScreens.bookingsError')}</Text>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={handleRetry}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{t('bookingScreens.retry')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -230,3 +225,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

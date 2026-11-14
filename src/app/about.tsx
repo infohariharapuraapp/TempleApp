@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -301,17 +301,17 @@ export default function AboutScreen() {
           />
 
           <GuruItem
-            name="Sri Swayamprakasha Krishna Yogeendra Saraswathi MahaSwamiji"
+            name={t('aboutDetails.guru1Name')}
             image="https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g1.jpg"
           />
 
           <GuruItem
-            name="Sri Swayamprakasha Abhinava Ramananda Saraswathi MahaSwamiji"
+            name={t('aboutDetails.guru2Name')}
             image="https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g2.jpg"
           />
 
           <GuruItem
-            name="Sri Swayamprakasha Ramananda Saraswathi MahaSwamiji – III"
+            name={t('aboutDetails.guru3Name')}
             image="https://www.divyakshetrahariharapura.com/web/assets/img/guru-parampara/g3.jpg"
           />
 
@@ -337,10 +337,9 @@ export default function AboutScreen() {
             style={styles.swamijiImage}
           />
 
-          <AutoTranslatedText style={styles.subTitle}>
-            Parama Poojya Sri Sri Swayamprakasha
-            Sachidananda Saraswati Mahaswamiji
-          </AutoTranslatedText>
+          <Text style={styles.subTitle}>
+            {t('aboutDetails.text039')}
+          </Text>
 
           <Text style={styles.bodyText}>
             {t('aboutDetails.text040')}
@@ -536,9 +535,9 @@ export default function AboutScreen() {
             {t('aboutDetails.text062')}
           </Text>
 
-          <AutoTranslatedText style={styles.bottomPrayer}>
-            🙏 Om Tat Sat 🙏
-          </AutoTranslatedText>
+          <Text style={styles.bottomPrayer}>
+            {t('aboutDetails.text063')}
+          </Text>
 
         </View>
 

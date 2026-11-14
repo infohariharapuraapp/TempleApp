@@ -21,6 +21,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ========================================
 
 import en from './en.json';
+import policyEn from './policies.en.json';
+import policyTe from './policies.te.json';
+import policyTa from './policies.ta.json';
+import policyHi from './policies.hi.json';
+import policyKn from './policies.kn.json';
 import te from './te.json';
 import kn from './kn.json';
 import hi from './hi.json';
@@ -172,7 +177,8 @@ const resources = {
       galleryEn,
       sreemathEn,
       guruParamparaEn,
-      aboutEn
+      aboutEn,
+      policyEn
     ),
   },
 
@@ -188,7 +194,8 @@ const resources = {
       galleryTe,
       sreemathTe,
       guruParamparaTe,
-      aboutTe
+      aboutTe,
+      policyTe
     ),
   },
 
@@ -204,7 +211,8 @@ const resources = {
       galleryKn,
       sreemathKn,
       guruParamparaKn,
-      aboutKn
+      aboutKn,
+      policyKn
     ),
   },
 
@@ -220,7 +228,8 @@ const resources = {
       galleryHi,
       sreemathHi,
       guruParamparaHi,
-      aboutHi
+      aboutHi,
+      policyHi
     ),
   },
 
@@ -236,7 +245,8 @@ const resources = {
       galleryTa,
       sreemathTa,
       guruParamparaTa,
-      aboutTa
+      aboutTa,
+      policyTa
     ),
   },
 };

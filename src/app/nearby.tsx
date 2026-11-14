@@ -1,5 +1,6 @@
 
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import nearbyI18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
 import { apiRequest } from '@/services/api';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState,  useEffect, } from 'react';
@@ -19,6 +20,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+
+ // NEARBY_LOCALIZATION_V1
+function trNearby(value: string): string {
+  const key = value.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return nearbyI18n.t(
+    'nearbyPlaces.' + key,
+    { defaultValue: value }
+  );
+}
 const C = {
   background: '#FFFDF8',
   white: '#FFFFFF',
@@ -68,11 +80,13 @@ type ApiResponse<T> = {
 
 type ScreenMode = 'categories' | 'places' | 'details';
 
-function getMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : 'Something went wrong. Please try again.';
-}
+function getMessage(
+    error: unknown,
+    fallback: string = 'Something went wrong. Please try again.'
+  ) {
+    console.error('Nearby request error:', error);
+    return fallback;
+  }
 
 function validImageUrl(value: string | null | undefined) {
   if (!value) return false;
@@ -103,14 +117,20 @@ function validMapsUrl(value: string) {
 
 async function openDirections(url: string | null) {
   if (!url || !validMapsUrl(url)) {
-    Alert.alert('Directions', 'A valid Google Maps link is unavailable.');
+    Alert.alert(
+      trNearby("Directions"),
+      trNearby("A valid Google Maps link is unavailable.")
+    );
     return;
   }
 
   try {
     await Linking.openURL(url);
   } catch {
-    Alert.alert('Directions', 'Unable to open Google Maps.');
+    Alert.alert(
+      trNearby("Directions"),
+      trNearby("Unable to open Google Maps.")
+    );
   }
 }
 
@@ -124,17 +144,19 @@ async function callPlace(phone: string | null) {
   try {
     await Linking.openURL(`tel:${cleaned}`);
   } catch {
-    Alert.alert('Phone', 'Unable to open the phone dialer.');
+    Alert.alert(
+      trNearby("Phone"),
+      trNearby("Unable to open the phone dialer.")
+    );
   }
 }
 
 function SectionLoading({ message }: { message: string }) {
+  useTranslation();
   return (
     <View style={styles.center}>
       <ActivityIndicator color={C.maroon} size="large" />
-      <AutoTranslatedText style={styles.helper}>
-        {message}
-      </AutoTranslatedText>
+      <Text style={styles.helper}>{message}</Text>
     </View>
   );
 }
@@ -150,20 +172,15 @@ function EmptyState({
   message: string;
   onRetry?: () => void;
 }) {
+  useTranslation();
   return (
     <View style={styles.center}>
       <Text style={styles.emptyEmoji}>{emoji}</Text>
-      <AutoTranslatedText style={styles.emptyTitle}>
-        {title}
-      </AutoTranslatedText>
-      <AutoTranslatedText style={styles.helper}>
-        {message}
-      </AutoTranslatedText>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.helper}>{message}</Text>
       {onRetry && (
         <TouchableOpacity style={styles.retry} onPress={onRetry}>
-          <AutoTranslatedText style={styles.retryText}>
-            Try Again
-          </AutoTranslatedText>
+          <Text style={styles.retryText}>{trNearby("Try Again")}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -171,6 +188,13 @@ function EmptyState({
 }
 
 export default function NearbyScreen() {
+  // NEARBY_DYNAMIC_LANGUAGE_V2
+  const { i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
   const [mode, setMode] = useState<ScreenMode>('categories');
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -193,27 +217,41 @@ export default function NearbyScreen() {
 
   const galleryRef = useRef<ScrollView>(null);
   const requestId = useRef(0);
+  const categoryRequestId = useRef(0);
   const galleryRequestId = useRef(0);
 
   const loadCategories = useCallback(async () => {
+    const currentRequest = ++categoryRequestId.current;
     try {
       setError('');
 
       const response = await apiRequest<ApiResponse<Category[]>>(
-        '/nearby/categories'
+        `/nearby/categories?lang=${encodeURIComponent(language)}`
       );
 
       if (!response.success) {
         throw new Error(response.message || 'Unable to load categories');
       }
 
-      setCategories(response.data || []);
+      if (currentRequest !== categoryRequestId.current) return;
+      const updatedCategories = response.data || [];
+      setCategories(updatedCategories);
+      setCategory(previous =>
+        previous
+          ? updatedCategories.find(
+              item => item.id === previous.id
+            ) || previous
+          : null
+      );
     } catch (err) {
-      setError(getMessage(err));
+      if (currentRequest !== categoryRequestId.current) return;
+      setError(getMessage(err, 'Unable to load categories'));
     } finally {
-      setLoading(false);
+      if (currentRequest === categoryRequestId.current) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [language]);
 
   const loadPlaces = useCallback(async (categoryId: number) => {
     const currentRequest = ++requestId.current;
@@ -223,7 +261,7 @@ export default function NearbyScreen() {
 
     try {
       const response = await apiRequest<ApiResponse<Place[]>>(
-        `/nearby/places?category_id=${categoryId}`
+        `/nearby/places?category_id=${categoryId}&lang=${encodeURIComponent(language)}`
       );
 
       if (currentRequest !== requestId.current) return;
@@ -232,18 +270,25 @@ export default function NearbyScreen() {
         throw new Error(response.message || 'Unable to load places');
       }
 
-      setPlaces(response.data || []);
+      const updatedPlaces = response.data || [];
+      setPlaces(updatedPlaces);
+      setPlace(previous =>
+        previous
+          ? updatedPlaces.find(
+              item => item.id === previous.id
+            ) || previous
+          : null
+      );
     } catch (err) {
       if (currentRequest !== requestId.current) return;
       setPlaces([]);
-      setPlacesError(getMessage(err));
+      setPlacesError(getMessage(err, 'Unable to load places'));
     } finally {
       if (currentRequest === requestId.current) {
         setPlacesLoading(false);
       }
     }
-  }, []);
-
+  }, [language]);
   const loadGallery = useCallback(async (selectedPlace: Place) => {
     const currentRequest = ++galleryRequestId.current;
 
@@ -282,7 +327,7 @@ export default function NearbyScreen() {
     } catch (err) {
       if (currentRequest !== galleryRequestId.current) return;
 
-      setGalleryError(getMessage(err));
+      setGalleryError(getMessage(err, 'Unable to load photos'));
 
       setGallery(
         validImageUrl(selectedPlace.image_url)
@@ -296,16 +341,39 @@ export default function NearbyScreen() {
     }
   }, []);
 
+  const selectionRef = useRef({
+    mode,
+    category,
+    place
+  });
+  selectionRef.current = {
+    mode,
+    category,
+    place
+  };
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       void loadCategories();
-
+      const selected = selectionRef.current;
+      if (
+        selected.mode !== 'categories' &&
+        selected.category
+      ) {
+        void loadPlaces(selected.category.id);
+      }
+      if (
+        selected.mode === 'details' &&
+        selected.place
+      ) {
+        void loadGallery(selected.place);
+      }
       return () => {
+        categoryRequestId.current++;
         requestId.current++;
         galleryRequestId.current++;
       };
-    }, [loadCategories])
+    }, [loadCategories, loadPlaces, loadGallery])
   );
 
   const selectCategory = (item: Category) => {
@@ -397,18 +465,14 @@ export default function NearbyScreen() {
         <TouchableOpacity
           onPress={goBack}
           style={styles.backButton}
-          accessibilityLabel="Go back"
+          accessibilityLabel={trNearby("Go back")}
         >
           <Text style={styles.backArrow}>‹</Text>
         </TouchableOpacity>
 
         <View style={styles.topTitleWrap}>
-          <AutoTranslatedText style={styles.topEyebrow}>
-            DIVYAKSHETRA HARIHARAPURA
-          </AutoTranslatedText>
-          <AutoTranslatedText style={styles.topTitle}>
-            Nearby Places
-          </AutoTranslatedText>
+          <Text style={styles.topEyebrow}>{trNearby("DIVYAKSHETRA HARIHARAPURA")}</Text>
+          <Text style={styles.topTitle}>{trNearby("Nearby Places")}</Text>
         </View>
 
         <View style={styles.topRight}>
@@ -434,30 +498,19 @@ export default function NearbyScreen() {
             <View style={styles.hero}>
               <Text style={styles.heroEmoji}>🛕</Text>
 
-              <AutoTranslatedText style={styles.heroLabel}>
-                YOUR TEMPLE TRAVEL COMPANION
-              </AutoTranslatedText>
+              <Text style={styles.heroLabel}>{trNearby("YOUR TEMPLE TRAVEL COMPANION")}</Text>
 
-              <AutoTranslatedText style={styles.heroTitle}>
-                Explore Around Hariharapura
-              </AutoTranslatedText>
+              <Text style={styles.heroTitle}>{trNearby("Explore Around Hariharapura")}</Text>
 
-              <AutoTranslatedText style={styles.heroDescription}>
-                Discover beautiful destinations and useful services
-                near the temple.
-              </AutoTranslatedText>
+              <Text style={styles.heroDescription}>{trNearby("Discover beautiful destinations and useful services near the temple.")}</Text>
 
               <View style={styles.heroDecoration} />
             </View>
 
             <View style={styles.sectionHeading}>
               <View>
-                <AutoTranslatedText style={styles.sectionEyebrow}>
-                  DISCOVER
-                </AutoTranslatedText>
-                <AutoTranslatedText style={styles.sectionTitle}>
-                  Explore Categories
-                </AutoTranslatedText>
+                <Text style={styles.sectionEyebrow}>{trNearby("DISCOVER")}</Text>
+                <Text style={styles.sectionTitle}>{trNearby("Explore Categories")}</Text>
               </View>
               <Text style={styles.countBadge}>
                 {categories.length}
@@ -465,12 +518,12 @@ export default function NearbyScreen() {
             </View>
 
             {loading ? (
-              <SectionLoading message="Loading nearby categories..." />
+              <SectionLoading message={trNearby("Loading nearby categories...")} />
             ) : error ? (
               <EmptyState
                 emoji="⚠️"
-                title="Unable to Load"
-                message={error}
+                title={trNearby("Unable to Load")}
+                message={trNearby(error)}
                 onRetry={() => {
                   setLoading(true);
                   void loadCategories();
@@ -479,8 +532,8 @@ export default function NearbyScreen() {
             ) : categories.length === 0 ? (
               <EmptyState
                 emoji="🗺️"
-                title="No Categories Available"
-                message="Nearby places will appear here when added by the temple."
+                title={trNearby("No Categories Available")}
+                message={trNearby("Nearby places will appear here when added by the temple.")}
               />
             ) : (
               <View style={styles.categoryGrid}>
@@ -505,13 +558,11 @@ export default function NearbyScreen() {
                       style={styles.categoryDescription}
                       numberOfLines={3}
                     >
-                      {item.description || 'Explore nearby places'}
+                      {item.description || trNearby('Explore nearby places')}
                     </Text>
 
                     <View style={styles.categoryFooter}>
-                      <AutoTranslatedText style={styles.exploreText}>
-                        Explore
-                      </AutoTranslatedText>
+                      <Text style={styles.exploreText}>{trNearby("Explore")}</Text>
                       <Text style={styles.smallArrow}>→</Text>
                     </View>
                   </TouchableOpacity>
@@ -541,12 +592,8 @@ export default function NearbyScreen() {
 
             <View style={styles.sectionHeading}>
               <View>
-                <AutoTranslatedText style={styles.sectionEyebrow}>
-                  EXPLORE DESTINATIONS
-                </AutoTranslatedText>
-                <AutoTranslatedText style={styles.sectionTitle}>
-                  Places to Discover
-                </AutoTranslatedText>
+                <Text style={styles.sectionEyebrow}>{trNearby("EXPLORE DESTINATIONS")}</Text>
+                <Text style={styles.sectionTitle}>{trNearby("Places to Discover")}</Text>
               </View>
 
               {!placesLoading && (
@@ -555,19 +602,19 @@ export default function NearbyScreen() {
             </View>
 
             {placesLoading ? (
-              <SectionLoading message="Loading places..." />
+              <SectionLoading message={trNearby("Loading places...")} />
             ) : placesError ? (
               <EmptyState
                 emoji="⚠️"
-                title="Unable to Load Places"
-                message={placesError}
+                title={trNearby("Unable to Load Places")}
+                message={trNearby(placesError)}
                 onRetry={() => void loadPlaces(category.id)}
               />
             ) : places.length === 0 ? (
               <EmptyState
                 emoji="🏞️"
-                title="No Places Available"
-                message="Places in this category will be added soon."
+                title={trNearby("No Places Available")}
+                message={trNearby("Places in this category will be added soon.")}
               />
             ) : (
               places.map(item => (
@@ -591,9 +638,7 @@ export default function NearbyScreen() {
                     )}
 
                     <View style={styles.imageBadge}>
-                      <AutoTranslatedText style={styles.imageBadgeText}>
-                        EXPLORE
-                      </AutoTranslatedText>
+                      <Text style={styles.imageBadgeText}>{trNearby("EXPLORE")}</Text>
                     </View>
                   </View>
 
@@ -621,9 +666,7 @@ export default function NearbyScreen() {
                     )}
 
                     <View style={styles.placeFooter}>
-                      <AutoTranslatedText style={styles.detailsLink}>
-                        View Details
-                      </AutoTranslatedText>
+                      <Text style={styles.detailsLink}>{trNearby("View Details")}</Text>
                       <Text style={styles.detailsArrow}>→</Text>
                     </View>
                   </View>
@@ -674,9 +717,7 @@ export default function NearbyScreen() {
               ) : (
                 <View style={styles.detailPlaceholder}>
                   <Text style={{ fontSize: 65 }}>🏞️</Text>
-                  <AutoTranslatedText style={styles.helper}>
-                    Photos coming soon
-                  </AutoTranslatedText>
+                  <Text style={styles.helper}>{trNearby("Photos coming soon")}</Text>
                 </View>
               )}
             </View>
@@ -705,9 +746,7 @@ export default function NearbyScreen() {
             {galleryLoading && (
               <View style={styles.galleryLoading}>
                 <ActivityIndicator color={C.maroon} size="small" />
-                <AutoTranslatedText style={styles.helper}>
-                  Loading photos...
-                </AutoTranslatedText>
+                <Text style={styles.helper}>{trNearby("Loading photos...")}</Text>
               </View>
             )}
 
@@ -716,9 +755,7 @@ export default function NearbyScreen() {
                 style={styles.galleryError}
                 onPress={() => void loadGallery(place)}
               >
-                <Text style={styles.galleryErrorText}>
-                  Gallery unavailable. Tap to retry.
-                </Text>
+                <Text style={styles.galleryErrorText}>{trNearby('Gallery unavailable. Tap to retry.')}</Text>
               </TouchableOpacity>
             )}
 
@@ -731,9 +768,7 @@ export default function NearbyScreen() {
 
             {place.description && (
               <View style={styles.infoCard}>
-                <AutoTranslatedText style={styles.infoHeading}>
-                  About This Place
-                </AutoTranslatedText>
+                <Text style={styles.infoHeading}>{trNearby("About This Place")}</Text>
                 <Text style={styles.fullDescription}>
                   {place.description}
                 </Text>
@@ -742,9 +777,7 @@ export default function NearbyScreen() {
 
             {place.address && (
               <View style={styles.infoCard}>
-                <AutoTranslatedText style={styles.infoHeading}>
-                  Location & Address
-                </AutoTranslatedText>
+                <Text style={styles.infoHeading}>{trNearby("Location & Address")}</Text>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoEmoji}>📍</Text>
                   <Text style={styles.infoValue}>
@@ -756,9 +789,7 @@ export default function NearbyScreen() {
 
             {place.phone && (
               <View style={styles.infoCard}>
-                <AutoTranslatedText style={styles.infoHeading}>
-                  Contact Information
-                </AutoTranslatedText>
+                <Text style={styles.infoHeading}>{trNearby("Contact Information")}</Text>
                 <TouchableOpacity
                   style={styles.infoRow}
                   onPress={() => void callPlace(place.phone)}
@@ -776,9 +807,7 @@ export default function NearbyScreen() {
                   activeOpacity={0.85}
                   onPress={() => void openDirections(place.google_maps_url)}
                 >
-                  <AutoTranslatedText style={styles.directionsText}>
-                    🗺️ Get Directions
-                  </AutoTranslatedText>
+                  <Text style={styles.directionsText}>{"🗺️ " + trNearby("Get Directions")}</Text>
                 </TouchableOpacity>
               )}
 
@@ -797,9 +826,7 @@ export default function NearbyScreen() {
               style={styles.morePlaces}
               onPress={goBack}
             >
-              <AutoTranslatedText style={styles.morePlacesText}>
-                ← Explore More Places
-              </AutoTranslatedText>
+              <Text style={styles.morePlacesText}>{"← " + trNearby("Explore More Places")}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -809,9 +836,7 @@ export default function NearbyScreen() {
             style={styles.homeButton}
             onPress={() => router.replace('/(tabs)')}
           >
-            <AutoTranslatedText style={styles.homeText}>
-              Back to Home
-            </AutoTranslatedText>
+            <Text style={styles.homeText}>{trNearby("Back to Home")}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

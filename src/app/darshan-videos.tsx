@@ -1,7 +1,8 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
 
 import React, {
   useEffect,
+  useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -35,7 +36,14 @@ type DarshanVideo = {
 
 export default function DarshanVideosScreen() {
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // DARSHAN_VIDEOS_LANGUAGE_V2
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const requestId = useRef(0);
 
   const [videos, setVideos] =
     useState<DarshanVideo[]>([]);
@@ -43,21 +51,20 @@ export default function DarshanVideosScreen() {
   const [loading, setLoading] =
     useState(true);
 
-  useEffect(() => {
-    loadVideos();
-  }, []);
 
-  const loadVideos = async () => {
-
+  const loadVideos = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     try {
-
       setLoading(true);
-
       const response = await apiRequest<{
         success: boolean;
         data: DarshanVideo[];
-      }>('/darshan-videos');
-
+      }>(
+        `/darshan-videos?lang=${encodeURIComponent(language)}`
+      );
+      if (currentRequest !== requestId.current) {
+        return;
+      }
       if (
         response.success &&
         Array.isArray(response.data)
@@ -66,24 +73,27 @@ export default function DarshanVideosScreen() {
       } else {
         setVideos([]);
       }
-
     } catch (error) {
-
+      if (currentRequest !== requestId.current) {
+        return;
+      }
       console.error(
         'Darshan Videos error:',
         error
       );
-
       setVideos([]);
-
     } finally {
-
-      setLoading(false);
-
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+      }
     }
-
-  };
-
+  }, [language]);
+  useEffect(() => {
+    void loadVideos();
+    return () => {
+      requestId.current++;
+    };
+  }, [loadVideos]);
   const getYoutubeThumbnail = (url: string) => {
 
     try {
@@ -176,9 +186,9 @@ export default function DarshanVideosScreen() {
 
             <View style={styles.noImage}>
 
-              <AutoTranslatedText style={styles.noImageText}>
+              <Text style={styles.noImageText}>
                 YouTube
-              </AutoTranslatedText>
+              </Text>
 
             </View>
 
@@ -297,6 +307,7 @@ export default function DarshanVideosScreen() {
 
         <FlatList
           data={videos}
+          extraData={language}
           keyExtractor={(item) =>
             String(item.id)
           }

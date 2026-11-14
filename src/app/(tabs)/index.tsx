@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Animated,
+   AppState,
   Easing,
   Image,
   Linking,
@@ -120,6 +121,9 @@ type DarshanVideo = {
   thumbnail_url?: string | null;
   is_active: boolean;
 };
+
+// Welcome audio session tracking
+let hasPlayedWelcomeAudio = false;
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
@@ -254,18 +258,57 @@ export default function HomeScreen() {
     };
   }, [heroPulse, omRotate]);
 
-  // A new Home visit permits exactly one playback start.
+    // Reset welcome audio when the app returns
+  // from the phone's background.
+  useEffect(() => {
+    let previousState = AppState.currentState;
+
+    const subscription = AppState.addEventListener(
+      'change',
+      nextState => {
+        if (nextState === 'background') {
+          welcomePlaybackTokenRef.current += 1;
+          welcomeStartedRef.current = false;
+
+          try {
+            player.pause();
+          } catch (error) {
+            console.warn('Welcome audio pause error:', error);
+          }
+        }
+
+        if (
+          previousState === 'background' &&
+          nextState === 'active'
+        ) {
+          hasPlayedWelcomeAudio = false;
+          welcomeStartedRef.current = false;
+          welcomePlaybackTokenRef.current += 1;
+
+          setWelcomeVisit(visit => visit + 1);
+        }
+
+        previousState = nextState;
+      }
+    );
+
+    return () => subscription.remove();
+  }, [player]);
+
+  // Track Home screen navigation.
   useFocusEffect(
     useCallback(() => {
       welcomeFocusedRef.current = true;
       welcomeStartedRef.current = false;
       welcomePlaybackTokenRef.current += 1;
+
       setWelcomeVisit(visit => visit + 1);
 
       return () => {
         welcomeFocusedRef.current = false;
         welcomeStartedRef.current = false;
         welcomePlaybackTokenRef.current += 1;
+
         try {
           player.pause();
         } catch (error) {
@@ -275,10 +318,12 @@ export default function HomeScreen() {
     }, [player])
   );
 
-  // Wait until the selected audio is loaded before starting playback.
-  // Player status updates must not restart audio while it is already playing.
+  // Play only once per foreground session,
+  // and only when the Home screen is visible.
   useEffect(() => {
     if (
+      hasPlayedWelcomeAudio ||
+      AppState.currentState !== 'active' ||
       !welcomeFocusedRef.current ||
       welcomeStartedRef.current ||
       !welcomeAudioReady ||
@@ -288,7 +333,14 @@ export default function HomeScreen() {
     }
 
     welcomeStartedRef.current = true;
+
     const token = welcomePlaybackTokenRef.current;
+
+    const canPlay = () =>
+      !hasPlayedWelcomeAudio &&
+      AppState.currentState === 'active' &&
+      welcomeFocusedRef.current &&
+      welcomePlaybackTokenRef.current === token;
 
     const playWelcomeSlokam = async () => {
       try {
@@ -297,28 +349,37 @@ export default function HomeScreen() {
           interruptionMode: 'doNotMix',
         });
 
-        if (
-          !welcomeFocusedRef.current ||
-          welcomePlaybackTokenRef.current !== token
-        ) return;
+        if (!canPlay()) return;
 
         player.volume = 1;
+        player.loop = false;
+
         await player.seekTo(0);
 
-        if (
-          !welcomeFocusedRef.current ||
-          welcomePlaybackTokenRef.current !== token
-        ) return;
+        if (!canPlay()) return;
 
         player.play();
-        console.log('Welcome Slokam started for this Home visit');
+
+        hasPlayedWelcomeAudio = true;
+
+        console.log(
+          'Welcome Slokam started for foreground session'
+        );
       } catch (error) {
-        console.error('Welcome Slokam playback error:', error);
+        console.error(
+          'Welcome Slokam playback error:',
+          error
+        );
       }
     };
 
     void playWelcomeSlokam();
-  }, [player, playerStatus.isLoaded, welcomeAudioReady, welcomeVisit]);
+  }, [
+    player,
+    playerStatus.isLoaded,
+    welcomeAudioReady,
+    welcomeVisit,
+  ]);
 
   // Refresh public content whenever Home gains focus or the language changes.
   // A generation ID prevents stale requests from replacing newer translations.

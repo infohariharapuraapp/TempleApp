@@ -1,4 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+import dharmaI18n from '@/localization/i18n';
 
 import React, {
   useCallback,
@@ -33,6 +34,20 @@ import {
 // COLORS
 // ========================================
 
+
+function localizeDharmaError(value: string): string {
+  const key = value.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const translationKey = 'dharmaLocal.' + key;
+  return dharmaI18n.exists(translationKey)
+    ? String(dharmaI18n.t(translationKey))
+    : String(dharmaI18n.t(
+        'dharmaLocal.something_went_wrong_please_try_again'
+      ));
+}
+
 const COLORS = {
   background: '#FFFDF8',
   maroon: '#6B1720',
@@ -61,7 +76,10 @@ function formatDate(value?: string) {
     return '';
   }
 
-  return date.toLocaleDateString('en-IN', {
+  return date.toLocaleDateString(
+      (dharmaI18n.resolvedLanguage ||
+        dharmaI18n.language ||
+        'en').split('-')[0] + '-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -79,6 +97,11 @@ function getErrorMessage(error: unknown) {
 // ========================================
 
 export default function DharmaScreen() {
+  // DHARMA_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language =
+    (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
+
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [status, setStatus] = useState<StatusFilter>('Latest');
@@ -95,6 +118,7 @@ export default function DharmaScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
+  const categoryRequestRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(false);
   const pageRef = useRef(1);
@@ -105,16 +129,21 @@ export default function DharmaScreen() {
   // ========================================
 
   const loadCategories = useCallback(async () => {
+    const requestId = ++categoryRequestRef.current;
     try {
       const response = await fetchDharmaCategories();
-
+      if (requestId !== categoryRequestRef.current) {
+        return;
+      }
       if (response.success) {
         setCategories(response.categories ?? []);
       }
     } catch (err) {
-      console.error('Dharma categories error:', err);
+      if (requestId === categoryRequestRef.current) {
+        console.error('Dharma categories error:', err);
+      }
     }
-  }, []);
+  }, [language]);
 
   // ========================================
   // FETCH QUESTIONS
@@ -222,7 +251,7 @@ export default function DharmaScreen() {
         }
       }
     },
-    [categoryId, status]
+    [categoryId, status, language]
   );
 
   // ========================================
@@ -255,6 +284,7 @@ export default function DharmaScreen() {
 
       return () => {
         requestIdRef.current += 1;
+        categoryRequestRef.current += 1;
       };
     }, [loadCategories, loadQuestions, search])
   );
@@ -302,7 +332,7 @@ export default function DharmaScreen() {
       >
         <View style={styles.cardTopRow}>
           <Text style={styles.categoryLabel}>
-            {item.category_name || 'General Questions'}
+            {item.category_name || t('dharmaLocal.general_questions')}
           </Text>
 
           <Text style={styles.date}>
@@ -315,7 +345,7 @@ export default function DharmaScreen() {
         </Text>
 
         <Text style={styles.author}>
-          Asked by {item.devotee_name || 'Devotee'}
+          {t('dharmaLocal.asked_by_name', { name: item.devotee_name || t('dharmaLocal.devotee') })}
         </Text>
 
         <View style={styles.cardFooter}>
@@ -327,7 +357,7 @@ export default function DharmaScreen() {
             />
 
             <Text style={styles.answerCount}>
-              {answerCount} answers
+              {t('dharmaLocal.count_answers', { count: answerCount })}
             </Text>
           </View>
 
@@ -338,8 +368,8 @@ export default function DharmaScreen() {
             ]}
           >
             {answerCount === 0
-              ? 'Needs answer'
-              : 'View answers'}
+              ? t('dharmaLocal.needs_answer')
+              : t('dharmaLocal.view_answers')}
           </Text>
 
           <Ionicons
@@ -365,7 +395,7 @@ export default function DharmaScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('dharmaLocal.go_back')}
         >
           <Ionicons
             name="arrow-back"
@@ -375,13 +405,9 @@ export default function DharmaScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerText}>
-          <AutoTranslatedText style={styles.headerEyebrow}>
-            DEVOTEE COMMUNITY
-          </AutoTranslatedText>
+          <Text style={styles.headerEyebrow}>{t('dharmaLocal.devotee_community')}</Text>
 
-          <AutoTranslatedText style={styles.headerTitle}>
-            Dharma Sandeham
-          </AutoTranslatedText>
+          <Text style={styles.headerTitle}>{t('dharmaLocal.dharma_sandeham')}</Text>
         </View>
 
         <View style={styles.omCircle}>
@@ -391,6 +417,7 @@ export default function DharmaScreen() {
 
       <FlatList
         data={questions}
+        extraData={language}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderQuestion}
         contentContainerStyle={styles.listContent}
@@ -408,16 +435,9 @@ export default function DharmaScreen() {
         ListHeaderComponent={
           <View>
             <View style={styles.introCard}>
-              <AutoTranslatedText style={styles.introTitle}>
-                Ask. Learn. Share Dharma.
-              </AutoTranslatedText>
+              <Text style={styles.introTitle}>{t('dharmaLocal.ask_learn_share_dharma')}</Text>
 
-              <Text style={styles.introDescription}>
-                Ask questions about temple traditions,
-                pooja and spiritual practices.
-                Up to 10 different devotees can answer
-                each question.
-              </Text>
+              <Text style={styles.introDescription}>{t('dharmaLocal.ask_questions_about_temple_traditions_pooja_and_spiritual_practices_up_to_10_different_devotees_can_answer_each_question')}</Text>
             </View>
 
             <View style={styles.searchBox}>
@@ -430,7 +450,7 @@ export default function DharmaScreen() {
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search questions..."
+                placeholder={t('dharmaLocal.search_questions')}
                 placeholderTextColor={COLORS.muted}
                 style={styles.searchInput}
                 returnKeyType="search"
@@ -439,7 +459,7 @@ export default function DharmaScreen() {
               {search.length > 0 && (
                 <TouchableOpacity
                   onPress={() => setSearch('')}
-                  accessibilityLabel="Clear search"
+                  accessibilityLabel={t('dharmaLocal.clear_search')}
                 >
                   <Ionicons
                     name="close-circle"
@@ -450,13 +470,11 @@ export default function DharmaScreen() {
               )}
             </View>
 
-            <AutoTranslatedText style={styles.sectionLabel}>
-              CATEGORIES
-            </AutoTranslatedText>
+            <Text style={styles.sectionLabel}>{t('dharmaLocal.categories')}</Text>
 
             <FlatList
               data={[
-                { id: 0, name: 'All', description: null },
+                { id: 0, name: t('dharmaLocal.all'), description: null },
                 ...categories,
               ]}
               horizontal
@@ -516,19 +534,16 @@ export default function DharmaScreen() {
                         styles.statusTextActive,
                     ]}
                   >
-                    {item}
-                  </Text>
+                    {t('dharmaLocal.' + item.toLowerCase())}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <View style={styles.listHeadingRow}>
-              <AutoTranslatedText style={styles.listHeading}>
-                Community Questions
-              </AutoTranslatedText>
+              <Text style={styles.listHeading}>{t('dharmaLocal.community_questions')}</Text>
 
               <Text style={styles.questionCount}>
-                {questions.length} shown
+                {t('dharmaLocal.count_shown', { count: questions.length })}
               </Text>
             </View>
           </View>
@@ -540,9 +555,7 @@ export default function DharmaScreen() {
                 size="large"
                 color={COLORS.maroon}
               />
-              <AutoTranslatedText style={styles.emptyDescription}>
-                Loading questions...
-              </AutoTranslatedText>
+              <Text style={styles.emptyDescription}>{t('dharmaLocal.loading_questions')}</Text>
             </View>
           ) : error ? (
             <View style={styles.emptyState}>
@@ -552,21 +565,17 @@ export default function DharmaScreen() {
                 color={COLORS.gold}
               />
 
-              <AutoTranslatedText style={styles.emptyTitle}>
-                Unable to load questions
-              </AutoTranslatedText>
+              <Text style={styles.emptyTitle}>{t('dharmaLocal.unable_to_load_questions')}</Text>
 
               <Text style={styles.emptyDescription}>
-                {error}
+                {error ? localizeDharmaError(error) : ""}
               </Text>
 
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={() => loadQuestions(1)}
               >
-                <AutoTranslatedText style={styles.retryText}>
-                  Try Again
-                </AutoTranslatedText>
+                <Text style={styles.retryText}>{t('dharmaLocal.try_again')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -577,14 +586,9 @@ export default function DharmaScreen() {
                 color={COLORS.gold}
               />
 
-              <AutoTranslatedText style={styles.emptyTitle}>
-                No questions found
-              </AutoTranslatedText>
+              <Text style={styles.emptyTitle}>{t('dharmaLocal.no_questions_found')}</Text>
 
-              <AutoTranslatedText style={styles.emptyDescription}>
-                Try a different search or category,
-                or be the first to ask a question.
-              </AutoTranslatedText>
+              <Text style={styles.emptyDescription}>{t('dharmaLocal.try_a_different_search_or_category_or_be_the_first_to_ask_a_question')}</Text>
             </View>
           )
         }
@@ -599,9 +603,7 @@ export default function DharmaScreen() {
               style={styles.loadMoreButton}
               onPress={loadMore}
             >
-              <AutoTranslatedText style={styles.loadMoreText}>
-                Load more questions
-              </AutoTranslatedText>
+              <Text style={styles.loadMoreText}>{t('dharmaLocal.load_more_questions')}</Text>
             </TouchableOpacity>
           ) : null
         }
@@ -621,9 +623,7 @@ export default function DharmaScreen() {
             color={COLORS.white}
           />
 
-          <AutoTranslatedText style={styles.askButtonText}>
-            Ask a Question
-          </AutoTranslatedText>
+          <Text style={styles.askButtonText}>{t('dharmaLocal.ask_a_question')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

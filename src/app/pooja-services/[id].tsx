@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -71,7 +72,13 @@ const COLORS = {
 // ========================================
 
 export default function PoojaDetailsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0].toLowerCase();
+  const requestIdRef = useRef(0);
   const { id, name } = useLocalSearchParams<{
     id: string;
     name?: string;
@@ -84,6 +91,7 @@ export default function PoojaDetailsScreen() {
 
   const loadPoojas = useCallback(
     async (isRefresh = false) => {
+      const requestId = ++requestIdRef.current;
       const sectionId = Number(id);
 
       if (!Number.isSafeInteger(sectionId) || sectionId <= 0) {
@@ -97,6 +105,8 @@ export default function PoojaDetailsScreen() {
         setRefreshing(true);
       } else {
         setLoading(true);
+        setRefreshing(false);
+        setPoojas([]);
       }
 
       setError('');
@@ -104,8 +114,9 @@ export default function PoojaDetailsScreen() {
       try {
         const response = await apiRequest<
           ApiResponse<Pooja[]>
-        >(`/poojas?section_id=${sectionId}`);
+        >(`/poojas?section_id=${sectionId}&lang=${encodeURIComponent(currentLanguage)}`);
 
+        if (requestId !== requestIdRef.current) return;
         if (!response.success) {
           throw new Error(
             response.message || t('poojaDetails.loadError')
@@ -124,22 +135,26 @@ export default function PoojaDetailsScreen() {
           )
         );
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : t('poojaDetails.loadError')
-        );
+        if (requestId !== requestIdRef.current) return;
+        console.error(err);
+        setError(t('poojaDetails.loadError'));
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [id, t]
+    [id, t, currentLanguage]
   );
+  
 
   useFocusEffect(
     useCallback(() => {
       void loadPoojas();
+      return () => {
+        requestIdRef.current += 1;
+      };
     }, [loadPoojas])
   );
 

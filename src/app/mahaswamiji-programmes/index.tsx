@@ -1,4 +1,6 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import i18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
+
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -81,38 +83,54 @@ function getYouTubeId(url: string | null): string | null {
   }
 }
 
-function formatDate(date: string | null) {
-  if (!date) return '';
-
-  const value = date.slice(0, 10);
-  const parts = value.split('-');
-
-  if (parts.length !== 3) return value;
-
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+function formatDate(value: string | null) {
+  if (!value) return '';
+  try {
+    const date = new Date(
+      value.slice(0, 10) + 'T12:00:00'
+    );
+    return new Intl.DateTimeFormat(
+      getSpiritualLocale(),
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }
+    ).format(date);
+  } catch {
+    return value;
+  }
 }
-
-
-function formatTime(time: string | null) {
-  if (!time) return '';
-
-  const parts = time.split(':');
-  const hour = Number(parts[0]);
-  const minute = Number(parts[1]);
-
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+function formatTime(value: string | null) {
+  if (!value) return '';
+  const [hour, minute] = value
+    .split(':')
+    .map(Number);
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute)
+  ) {
     return '';
   }
-
-  // Do not display 00:00 or 00:00:00.
+  // Preserve existing hidden midnight time.
   if (hour === 0 && minute === 0) {
     return '';
   }
-
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const h = hour % 12 || 12;
-
-  return `${h}:${String(minute).padStart(2, '0')} ${suffix}`;
+  try {
+    const date = new Date(
+      2000, 0, 1, hour, minute
+    );
+    return new Intl.DateTimeFormat(
+      getSpiritualLocale(),
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }
+    ).format(date);
+  } catch {
+    return value;
+  }
 }
 
 
@@ -152,7 +170,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
         activeOpacity={0.9}
         onPress={openDetails}
         accessibilityRole="button"
-        accessibilityLabel={`View ${item.title} details`}
+        accessibilityLabel={i18n.t('spiritualContent.view_details', { title: item.title })}
       >
         {thumbnail ? (
           <Image
@@ -166,9 +184,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
             style={styles.posterPlaceholder}
           >
             <Text style={styles.placeholderOm}>ॐ</Text>
-            <AutoTranslatedText style={styles.placeholderText}>
-              MAHASWAMIJI PROGRAMMES
-            </AutoTranslatedText>
+            <Text style={styles.placeholderText}>{tr("MAHASWAMIJI PROGRAMMES")}</Text>
           </LinearGradient>
         )}
       </TouchableOpacity>
@@ -177,15 +193,13 @@ function ProgrammeCard({ item }: { item: Programme }) {
         <View style={styles.badgeRow}>
           <View style={styles.statusBadge}>
             <Text style={styles.statusText}>
-              {item.status.toUpperCase()}
+              {tr(item.status).toUpperCase()}
             </Text>
           </View>
 
           {videoId && (
             <View style={styles.videoBadge}>
-              <AutoTranslatedText style={styles.videoBadgeText}>
-                ▶ VIDEO
-              </AutoTranslatedText>
+              <Text style={styles.videoBadgeText}>{tr("▶ VIDEO")}</Text>
             </View>
           )}
         </View>
@@ -212,25 +226,21 @@ function ProgrammeCard({ item }: { item: Programme }) {
             style={styles.readMoreButton}
           >
             <Text style={styles.readMore}>
-              {expanded ? 'Show Less' : 'Read More'}
+              {tr(expanded ? 'Show Less' : 'Read More')}
             </Text>
           </TouchableOpacity>
         )}
 
         {hasSchedule && (
           <View style={styles.infoSection}>
-            <AutoTranslatedText style={styles.infoHeading}>
-              PROGRAMME SCHEDULE
-            </AutoTranslatedText>
+            <Text style={styles.infoHeading}>{tr("PROGRAMME SCHEDULE")}</Text>
 
             {(item.start_date || item.start_time) && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>📅</Text>
 
                 <View style={styles.infoContent}>
-                  <AutoTranslatedText style={styles.infoLabel}>
-                    Starts
-                  </AutoTranslatedText>
+                  <Text style={styles.infoLabel}>{tr("Starts")}</Text>
 
                   <Text style={styles.infoValue}>
                     {[
@@ -249,9 +259,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
                 <Text style={styles.infoIcon}>🕒</Text>
 
                 <View style={styles.infoContent}>
-                  <AutoTranslatedText style={styles.infoLabel}>
-                    Ends
-                  </AutoTranslatedText>
+                  <Text style={styles.infoLabel}>{tr("Ends")}</Text>
 
                   <Text style={styles.infoValue}>
                     {[
@@ -272,9 +280,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
             <Text style={styles.infoIcon}>📍</Text>
 
             <View style={styles.infoContent}>
-              <AutoTranslatedText style={styles.infoLabel}>
-                Venue
-              </AutoTranslatedText>
+              <Text style={styles.infoLabel}>{tr("Venue")}</Text>
 
               <Text style={styles.infoValue}>
                 {item.venue}
@@ -291,9 +297,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
             activeOpacity={0.85}
             accessibilityRole="button"
           >
-            <AutoTranslatedText style={styles.videoButtonText}>
-              View Programme Details
-            </AutoTranslatedText>
+            <Text style={styles.videoButtonText}>{tr("View Programme Details")}</Text>
 
             <Text style={styles.buttonArrow}>
               →
@@ -301,9 +305,7 @@ function ProgrammeCard({ item }: { item: Programme }) {
           </TouchableOpacity>
 
           {videoId && (
-            <AutoTranslatedText style={styles.videoHint}>
-              Programme video available in details
-            </AutoTranslatedText>
+            <Text style={styles.videoHint}>{tr("Programme video available in details")}</Text>
           )}
         </View>
       </View>
@@ -315,7 +317,46 @@ function ProgrammeCard({ item }: { item: Programme }) {
 // MAIN SCREEN
 // ========================================
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  const translated = i18n.t(
+    'spiritualContent.' + key,
+    { defaultValue: text }
+  );
+  if (text.startsWith('←')) {
+    return '← ' + translated.replace(/^←\s*/, '');
+  }
+  if (text.startsWith('▶')) {
+    return '▶ ' + translated.replace(/^▶\s*/, '');
+  }
+  return translated;
+}
+function getSpiritualLocale(): string {
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
 export default function MahaswamijiProgrammesScreen() {
+  const { i18n: selectedI18n } = useTranslation();
+  const language =
+    selectedI18n.resolvedLanguage ||
+    selectedI18n.language ||
+    'en';
+
   const [items, setItems] = useState<Programme[]>([]);
   const [activeTab, setActiveTab] =
     useState<Status>('upcoming');
@@ -363,7 +404,7 @@ export default function MahaswamijiProgrammesScreen() {
         setRefreshing(false);
       }
     },
-    []
+    [language]
   );
 
   useFocusEffect(
@@ -410,9 +451,7 @@ export default function MahaswamijiProgrammesScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <AutoTranslatedText style={styles.backText}>
-            ← Back
-          </AutoTranslatedText>
+          <Text style={styles.backText}>{tr("← Back")}</Text>
         </TouchableOpacity>
 
         {/* Hero banner */}
@@ -422,19 +461,13 @@ export default function MahaswamijiProgrammesScreen() {
         >
           <Text style={styles.heroIcon}>ॐ</Text>
 
-          <AutoTranslatedText style={styles.heroEyebrow}>
-            DIVINE PROGRAMMES
-          </AutoTranslatedText>
+          <Text style={styles.heroEyebrow}>{tr("DIVINE PROGRAMMES")}</Text>
 
           <Text style={styles.heroTitle}>
-            Mahaswamiji{'\n'}Programmes
+            {tr('Mahaswamiji Programmes')}
           </Text>
 
-          <AutoTranslatedText style={styles.heroSubtitle}>
-            Stay connected with sacred gatherings,
-            spiritual discourses and programmes
-            of Mahaswamiji.
-          </AutoTranslatedText>
+          <Text style={styles.heroSubtitle}>{tr("Stay connected with sacred gatherings, spiritual discourses and programmes of Mahaswamiji.")}</Text>
 
           <View style={styles.heroLine} />
         </LinearGradient>
@@ -458,7 +491,7 @@ export default function MahaswamijiProgrammesScreen() {
                     styles.activeTabText,
                 ]}
               >
-                {tab.title}
+                {tr(tab.title)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -466,15 +499,10 @@ export default function MahaswamijiProgrammesScreen() {
 
         <View style={styles.headingRow}>
           <View>
-            <AutoTranslatedText style={styles.sectionEyebrow}>
-              SPIRITUAL GATHERINGS
-            </AutoTranslatedText>
+            <Text style={styles.sectionEyebrow}>{tr("SPIRITUAL GATHERINGS")}</Text>
 
             <Text style={styles.sectionTitle}>
-              {TABS.find(
-                (tab) => tab.key === activeTab
-              )?.title}{' '}
-              Programmes
+              {tr(activeTab + ' programmes')}
             </Text>
           </View>
 
@@ -492,9 +520,7 @@ export default function MahaswamijiProgrammesScreen() {
               color={COLORS.maroon}
             />
 
-            <AutoTranslatedText style={styles.stateText}>
-              Loading programmes...
-            </AutoTranslatedText>
+            <Text style={styles.stateText}>{tr("Loading programmes...")}</Text>
           </View>
         ) : error ? (
           <View style={styles.stateCard}>
@@ -502,10 +528,7 @@ export default function MahaswamijiProgrammesScreen() {
               ⚠️
             </Text>
 
-            <AutoTranslatedText style={styles.stateText}>
-              Unable to load programmes.
-              Please try again.
-            </AutoTranslatedText>
+            <Text style={styles.stateText}>{tr("Unable to load programmes. Please try again.")}</Text>
 
             <TouchableOpacity
               style={styles.retryButton}
@@ -513,9 +536,7 @@ export default function MahaswamijiProgrammesScreen() {
                 void loadProgrammes()
               }
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{tr("Try Again")}</Text>
             </TouchableOpacity>
           </View>
         ) : filtered.length === 0 ? (
@@ -525,13 +546,10 @@ export default function MahaswamijiProgrammesScreen() {
             </Text>
 
             <Text style={styles.emptyTitle}>
-              No {activeTab} programmes
+              {tr('No ' + activeTab + ' programmes')}
             </Text>
 
-            <AutoTranslatedText style={styles.stateText}>
-              Programme information will appear here
-              when published by the temple administration.
-            </AutoTranslatedText>
+            <Text style={styles.stateText}>{tr("Programme information will appear here when published by the temple administration.")}</Text>
           </View>
         ) : (
           filtered.map((item) => (

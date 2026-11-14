@@ -74,10 +74,15 @@ const CATEGORY_LANGUAGES: CategoryLanguage[] = [
   'hi',
   'ta',
 ];
-function validEventTime(value?: string | null): string {
-  if (!value) return '';
+function validEventTime(value: unknown): string {
+  if (typeof value !== 'string') return '';
 
-  const time = value.slice(0, 5);
+  const time = value.trim().slice(0, 5);
+
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return '';
+  }
+
   return time === '00:00' ? '' : time;
 }
 export default function EventDetailsScreen() {
@@ -103,7 +108,7 @@ export default function EventDetailsScreen() {
   const galleryWidth = Math.max(screenWidth - 40, 1);
 
   const currentLanguage = (
-    i18n.resolvedLanguage || i18n.language
+    i18n.resolvedLanguage || i18n.language || 'en'
   ).split('-')[0];
 
   const locale = LOCALES[currentLanguage] || 'en-IN';
@@ -183,9 +188,9 @@ export default function EventDetailsScreen() {
 
         const [firstResponse, categoryResponse] = await Promise.all([
           apiRequest<ApiResponse<TempleEvent[]>>(
-            `/events?type=${firstPeriod}`
+            `/events?type=${firstPeriod}&lang=${encodeURIComponent(currentLanguage)}`
           ),
-          apiRequest<ApiResponse<Category[]>>('/event-categories'),
+          apiRequest<ApiResponse<Category[]>>(`/event-categories?lang=${encodeURIComponent(currentLanguage)}`),
         ]);
 
         if (!firstResponse.success || !categoryResponse.success) {
@@ -212,7 +217,7 @@ export default function EventDetailsScreen() {
 
           const otherResponse =
             await apiRequest<ApiResponse<TempleEvent[]>>(
-              `/events?type=${otherPeriod}`
+              `/events?type=${otherPeriod}&lang=${encodeURIComponent(currentLanguage)}`
             );
 
           if (!otherResponse.success) {
@@ -243,7 +248,7 @@ export default function EventDetailsScreen() {
         setRefreshing(false);
       }
     },
-    [id, period, t]
+    [id, period, t, currentLanguage]
   );
 
   useFocusEffect(
@@ -252,57 +257,67 @@ export default function EventDetailsScreen() {
     }, [loadEvent])
   );
 
-  function formatDate(value?: string | null): string {
-    if (!value) return '—';
+   function normalizeEventDate(value: unknown): string {
+    if (!value) return '';
 
-    const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return '';
 
-    if (Number.isNaN(date.getTime())) {
-      return value.slice(0, 10);
+      value = value.toISOString();
     }
 
-    return date.toLocaleDateString(locale, {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    });
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const text = value.trim();
+    const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+
+    if (!match) return '';
+
+    const normalized = match[0];
+    const date = new Date(`${normalized}T12:00:00`);
+
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.getFullYear() !== Number(normalized.slice(0, 4)) ||
+      date.getMonth() + 1 !== Number(normalized.slice(5, 7)) ||
+      date.getDate() !== Number(normalized.slice(8, 10))
+    ) {
+      return '';
+    }
+
+    return normalized;
   }
 
- function formatDateRange(eventItem: TempleEvent): string {
-  const formatShortDate = (value?: string | null): string => {
-    if (!value) return '—';
+  function formatDate(value: unknown): string {
+    const normalized = normalizeEventDate(value);
 
-    const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+    if (!normalized) return '—';
 
-    if (Number.isNaN(date.getTime())) {
-      return value.slice(0, 10);
-    }
+    const date = new Date(`${normalized}T12:00:00`);
 
     return date.toLocaleDateString(locale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
     });
-  };
-
-  const start = formatShortDate(eventItem.event_date);
-  const end = eventItem.event_end_date;
-
-  if (
-    !end ||
-    end.slice(0, 10) === eventItem.event_date?.slice(0, 10)
-  ) {
-    return start;
   }
 
-  return `${start} – ${formatShortDate(end)}`;
-}
+  function formatDateRange(eventItem: TempleEvent): string {
+    const start = normalizeEventDate(eventItem.event_date);
+    const end = normalizeEventDate(eventItem.event_end_date);
 
-  function formatTime(value?: string | null): string {
-    return value ? value.slice(0, 5) : '';
+    if (!start && !end) return '—';
+
+    if (!start) return formatDate(end);
+
+    if (!end || start === end) {
+      return formatDate(start);
+    }
+
+    return `${formatDate(start)} – ${formatDate(end)}`;
   }
-
   const openViewer = (index: number) => {
     setActiveImageIndex(index);
     setViewerVisible(true);
@@ -467,8 +482,8 @@ export default function EventDetailsScreen() {
       validEventTime(event.end_time)
         ? `${validEventTime(event.start_time)} – ${validEventTime(event.end_time)}`
         : validEventTime(event.start_time)
-          ? `Starts at ${validEventTime(event.start_time)}`
-          : `Ends at ${validEventTime(event.end_time)}`}
+          ? t('events.startsAt', { time: validEventTime(event.start_time) })
+          : t('events.endsAt', { time: validEventTime(event.end_time) })}
     </Text>
   </View>
 ) : null}

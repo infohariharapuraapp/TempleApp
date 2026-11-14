@@ -20,6 +20,8 @@
     "sharing": "Sharing...",
     "download": "Download",
     "saving": "Saving...",
-    "shareImage": "Share Temple Image"
+    "shareImage": "Share Temple Image",
+    "photoCount_one": "{{count}} photo",
+    "photoCount_other": "{{count}} photos"
   }
 }

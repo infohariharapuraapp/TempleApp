@@ -1,4 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+import dharmaI18n from '@/localization/i18n';
 
   import React, {
     useCallback,
@@ -47,7 +48,21 @@ import AutoTranslatedText from '@/components/AutoTranslatedText';
   // COLORS
   // ========================================
 
-  const COLORS = {
+  
+function localizeDharmaError(value: string): string {
+  const key = value.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const translationKey = 'dharmaLocal.' + key;
+  return dharmaI18n.exists(translationKey)
+    ? String(dharmaI18n.t(translationKey))
+    : String(dharmaI18n.t(
+        'dharmaLocal.something_went_wrong_please_try_again'
+      ));
+}
+
+const COLORS = {
     background: '#FFFDF8',
     white: '#FFFFFF',
     maroon: '#6B1720',
@@ -74,7 +89,10 @@ import AutoTranslatedText from '@/components/AutoTranslatedText';
       return '';
     }
 
-    return date.toLocaleDateString('en-IN', {
+    return date.toLocaleDateString(
+      (dharmaI18n.resolvedLanguage ||
+        dharmaI18n.language ||
+        'en').split('-')[0] + '-IN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -96,6 +114,11 @@ import AutoTranslatedText from '@/components/AutoTranslatedText';
   // ========================================
 
   export default function DharmaQuestionDetailsScreen() {
+  // DHARMA_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language =
+    (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
+
     const { id } = useLocalSearchParams<{ id: string }>();
     const questionId = Number(id);
 
@@ -335,7 +358,7 @@ setVotedIds(
           }
         }
       },
-      [questionId]
+      [questionId, language]
     );
 
     useFocusEffect(
@@ -359,9 +382,7 @@ setVotedIds(
       }
 
       if (isFull) {
-        Alert.alert(
-          'Answers Full',
-          'This question has reached the maximum number of community answer submissions.'
+        Alert.alert(t('dharmaLocal.answers_full'), t('dharmaLocal.this_question_has_reached_the_maximum_number_of_community_answer_submissions')
         );
         return;
       }
@@ -369,17 +390,13 @@ setVotedIds(
       const text = answerText.trim();
 
       if (text.length < 10) {
-        Alert.alert(
-          'Invalid Answer',
-          'Please enter at least 10 characters.'
+        Alert.alert(t('dharmaLocal.invalid_answer'), t('dharmaLocal.please_enter_at_least_10_characters')
         );
         return;
       }
 
       if (text.length > 2000) {
-        Alert.alert(
-          'Answer Too Long',
-          'Your answer must not exceed 2000 characters.'
+        Alert.alert(t('dharmaLocal.answer_too_long'), t('dharmaLocal.your_answer_must_not_exceed_2000_characters')
         );
         return;
       }
@@ -407,14 +424,11 @@ setVotedIds(
 
         await loadQuestion(true);
 
-        Alert.alert(
-          'Answer Submitted',
-          'Your answer has been submitted for temple admin review. It will appear publicly after approval.'
+        Alert.alert(t('dharmaLocal.answer_submitted'), t('dharmaLocal.your_answer_has_been_submitted_for_temple_admin_review_it_will_appear_publicly_after_approval')
         );
       } catch (err) {
-        Alert.alert(
-          'Submission Failed',
-          getErrorMessage(err)
+        Alert.alert(t('dharmaLocal.submission_failed'),
+          localizeDharmaError(getErrorMessage(err))
         );
       } finally {
         submittingRef.current = false;
@@ -493,9 +507,8 @@ setVotedIds(
           );
         }
       } catch (err) {
-        Alert.alert(
-          'Unable to Vote',
-          getErrorMessage(err)
+        Alert.alert(t('dharmaLocal.unable_to_vote'),
+          localizeDharmaError(getErrorMessage(err))
         );
       } finally {
         votingRef.current.delete(answerId);
@@ -552,8 +565,8 @@ setVotedIds(
             <View style={styles.answerAuthorInfo}>
               <Text style={styles.answerAuthor}>
                 {official
-                  ? 'Temple Administration'
-                  : item.devotee_name || 'Devotee'}
+                  ? t('dharmaLocal.temple_administration')
+                  : item.devotee_name || t('dharmaLocal.devotee')}
               </Text>
 
               <Text style={styles.answerDate}>
@@ -580,9 +593,7 @@ setVotedIds(
                 color={COLORS.green}
               />
 
-              <AutoTranslatedText style={styles.verifiedText}>
-                Official Temple Answer — Verified
-              </AutoTranslatedText>
+              <Text style={styles.verifiedText}>{t('dharmaLocal.official_temple_answer_verified')}</Text>
             </View>
           )}
 
@@ -598,7 +609,7 @@ setVotedIds(
             style={styles.helpfulButton}
             onPress={() => handleHelpful(item.id)}
             disabled={voting}
-            accessibilityLabel="Mark answer as helpful"
+            accessibilityLabel={t('dharmaLocal.mark_answer_as_helpful')}
           >
             {voting ? (
               <ActivityIndicator
@@ -629,8 +640,7 @@ setVotedIds(
                 },
               ]}
             >
-              Helpful (
-              {Number(item.helpful_count ?? 0)})
+              {t('dharmaLocal.helpful_count', { count: Number(item.helpful_count ?? 0) })}
             </Text>
           </TouchableOpacity>
 
@@ -639,7 +649,7 @@ setVotedIds(
           <TouchableOpacity
             style={styles.reportAnswerButton}
             onPress={() => openAnswerReport(item.id)}
-            accessibilityLabel="Report answer"
+            accessibilityLabel={t('dharmaLocal.report_answer')}
           >
             <Ionicons
               name="flag-outline"
@@ -647,9 +657,7 @@ setVotedIds(
               color={COLORS.muted}
             />
 
-            <AutoTranslatedText style={styles.reportButtonText}>
-              Report Answer
-            </AutoTranslatedText>
+            <Text style={styles.reportButtonText}>{t('dharmaLocal.report_answer')}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -668,7 +676,7 @@ setVotedIds(
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('dharmaLocal.go_back')}
           >
             <Ionicons
               name="arrow-back"
@@ -677,9 +685,7 @@ setVotedIds(
             />
           </TouchableOpacity>
 
-          <AutoTranslatedText style={styles.headerTitle}>
-            Dharma Sandeham
-          </AutoTranslatedText>
+          <Text style={styles.headerTitle}>{t('dharmaLocal.dharma_sandeham')}</Text>
 
           <View style={{ width: 40 }} />
         </View>
@@ -703,9 +709,7 @@ setVotedIds(
                 color={COLORS.maroon}
               />
 
-              <AutoTranslatedText style={styles.stateText}>
-                Loading question...
-              </AutoTranslatedText>
+              <Text style={styles.stateText}>{t('dharmaLocal.loading_question')}</Text>
             </View>
 
           ) : error && !question ? (
@@ -720,16 +724,14 @@ setVotedIds(
               />
 
               <Text style={styles.stateText}>
-                {error}
+                {error ? localizeDharmaError(error) : ""}
               </Text>
 
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={() => loadQuestion()}
               >
-                <AutoTranslatedText style={styles.retryText}>
-                  Try Again
-                </AutoTranslatedText>
+                <Text style={styles.retryText}>{t('dharmaLocal.try_again')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -769,7 +771,7 @@ setVotedIds(
                     <View style={styles.categoryBadge}>
                       <Text style={styles.categoryText}>
                         {question.category_name ||
-                          'General Questions'}
+                          t('dharmaLocal.general_questions')}
                       </Text>
                     </View>
 
@@ -790,7 +792,7 @@ setVotedIds(
                     <TouchableOpacity
                       style={styles.reportQuestionButton}
                       onPress={openQuestionReport}
-                      accessibilityLabel="Report question"
+                      accessibilityLabel={t('dharmaLocal.report_question')}
                     >
                       <Ionicons
                         name="flag-outline"
@@ -798,9 +800,7 @@ setVotedIds(
                         color={COLORS.muted}
                       />
 
-                      <AutoTranslatedText style={styles.reportButtonText}>
-                        Report Question
-                      </AutoTranslatedText>
+                      <Text style={styles.reportButtonText}>{t('dharmaLocal.report_question')}</Text>
                     </TouchableOpacity>
 
                     {/* QUESTION AUTHOR */}
@@ -813,9 +813,7 @@ setVotedIds(
                       />
 
                       <Text style={styles.authorText}>
-                        Asked by{' '}
-                        {question.devotee_name ||
-                          'Devotee'}
+                        {t('dharmaLocal.asked_by_name', { name: question.devotee_name || t('dharmaLocal.devotee') })}
                       </Text>
 
                       <Text style={styles.dateText}>
@@ -829,14 +827,9 @@ setVotedIds(
                   {officialAnswers.length > 0 && (
                     <View style={styles.officialSection}>
 
-                      <AutoTranslatedText style={styles.sectionTitle}>
-                        Official Temple Guidance
-                      </AutoTranslatedText>
+                      <Text style={styles.sectionTitle}>{t('dharmaLocal.official_temple_guidance')}</Text>
 
-                      <AutoTranslatedText style={styles.sectionSubtitle}>
-                        Verified answers from temple
-                        administration
-                      </AutoTranslatedText>
+                      <Text style={styles.sectionSubtitle}>{t('dharmaLocal.verified_answers_from_temple_administration')}</Text>
 
                       <View style={{ marginTop: 16 }}>
                         {officialAnswers.map(
@@ -851,13 +844,9 @@ setVotedIds(
 
                   <View style={styles.answersHeader}>
                     <View>
-                      <AutoTranslatedText style={styles.sectionTitle}>
-                        Community Answers
-                      </AutoTranslatedText>
+                      <Text style={styles.sectionTitle}>{t('dharmaLocal.community_answers')}</Text>
 
-                      <AutoTranslatedText style={styles.sectionSubtitle}>
-                        Shared by fellow devotees
-                      </AutoTranslatedText>
+                      <Text style={styles.sectionSubtitle}>{t('dharmaLocal.shared_by_fellow_devotees')}</Text>
                     </View>
 
                     <View style={styles.answerCountBadge}>
@@ -888,8 +877,8 @@ setVotedIds(
 
                   <Text style={styles.remainingText}>
                     {isFull
-                      ? 'All community answer submission slots are occupied.'
-                      : `${remaining} community answer submission slots remain.`}
+                      ? t('dharmaLocal.all_community_answer_submission_slots_are_occupied')
+                      : t('dharmaLocal.count_community_answer_submission_slots_remain', { count: remaining })}
                   </Text>
 
                   {/* COMMUNITY ANSWER CARDS */}
@@ -902,14 +891,9 @@ setVotedIds(
                         color={COLORS.gold}
                       />
 
-                      <AutoTranslatedText style={styles.noAnswersText}>
-                        No approved community answers yet.
-                      </AutoTranslatedText>
+                      <Text style={styles.noAnswersText}>{t('dharmaLocal.no_approved_community_answers_yet')}</Text>
 
-                      <AutoTranslatedText style={styles.sectionSubtitle}>
-                        Be the first to share your
-                        knowledge.
-                      </AutoTranslatedText>
+                      <Text style={styles.sectionSubtitle}>{t('dharmaLocal.be_the_first_to_share_your_knowledge')}</Text>
                     </View>
                   ) : (
                     communityAnswers.map(
@@ -932,14 +916,9 @@ setVotedIds(
         answerSectionY.current = event.nativeEvent.layout.y;
       }}
     >
-                    <AutoTranslatedText style={styles.sectionTitle}>
-                      Share Your Answer
-                    </AutoTranslatedText>
+                    <Text style={styles.sectionTitle}>{t('dharmaLocal.share_your_answer')}</Text>
 
-                    <AutoTranslatedText style={styles.sectionSubtitle}>
-                      Help another devotee by sharing
-                      your knowledge.
-                    </AutoTranslatedText>
+                    <Text style={styles.sectionSubtitle}>{t('dharmaLocal.help_another_devotee_by_sharing_your_knowledge')}</Text>
 
                     {isFull ? (
                       <View style={styles.fullNotice}>
@@ -950,9 +929,7 @@ setVotedIds(
                         />
 
                         <Text style={styles.fullNoticeText}>
-                          This question has reached the
-                          maximum of {maxAnswers} community
-                          answer submissions.
+                          {t('dharmaLocal.this_question_has_reached_the_maximum_of_count_community_answer_submissions', { count: maxAnswers })}
                         </Text>
                       </View>
                     ) : (
@@ -963,7 +940,7 @@ setVotedIds(
                           scrollEnabled
                           multiline
                           textAlignVertical="top"
-                          placeholder="Write your answer here..."
+                          placeholder={t('dharmaLocal.write_your_answer_here')}
                           placeholderTextColor={COLORS.muted}
                           value={answerText}
                           onChangeText={setAnswerText}
@@ -982,9 +959,7 @@ setVotedIds(
                               size={19}
                               color={COLORS.white}
                             />
-                            <AutoTranslatedText style={styles.doneTypingText}>
-                              Done Typing
-                            </AutoTranslatedText>
+                            <Text style={styles.doneTypingText}>{t('dharmaLocal.done_typing')}</Text>
                           </TouchableOpacity>
                         )}
 
@@ -1018,8 +993,8 @@ setVotedIds(
                             style={styles.submitButtonText}
                           >
                             {submitting
-                              ? 'Submitting...'
-                              : 'Submit Answer'}
+                              ? t('dharmaLocal.submitting')
+                              : t('dharmaLocal.submit_answer')}
                           </Text>
                         </TouchableOpacity>
                       </>
@@ -1038,14 +1013,7 @@ setVotedIds(
                       color={COLORS.maroon}
                     />
 
-                    <Text style={styles.disclaimerText}>
-                      Community answers represent
-                      individual devotees' knowledge.
-                      For official temple procedures,
-                      please follow temple authority
-                      guidance. All community answers
-                      require admin approval.
-                    </Text>
+                    <Text style={styles.disclaimerText}>{t('dharmaLocal.community_answers_represent_individual_devotees_knowledge_for_official_temple_procedures_please_follow_temple_authority_guidance_all_community_answers_require_admin_approval')}</Text>
                   </View>
 
                 </>

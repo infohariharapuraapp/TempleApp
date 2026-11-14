@@ -20,6 +20,8 @@
     "eventUnavailable": "ಈ ಕಾರ್ಯಕ್ರಮ ಈಗ ಲಭ್ಯವಿಲ್ಲ.",
     "detailsLoading": "ಕಾರ್ಯಕ್ರಮದ ವಿವರಗಳು ಲೋಡ್ ಆಗುತ್ತಿವೆ...",
     "detailsDate": "ಕಾರ್ಯಕ್ರಮದ ದಿನಾಂಕ",
-    "detailsDescriptionFallback": "ಹೆಚ್ಚಿನ ವಿವರಗಳು ಶೀಘ್ರದಲ್ಲೇ ಲಭ್ಯವಾಗುತ್ತವೆ."
+    "detailsDescriptionFallback": "ಹೆಚ್ಚಿನ ವಿವರಗಳು ಶೀಘ್ರದಲ್ಲೇ ಲಭ್ಯವಾಗುತ್ತವೆ.",
+    "startsAt": "{{time}} ಗಂಟೆಗೆ ಪ್ರಾರಂಭ",
+    "endsAt": "{{time}} ಗಂಟೆಗೆ ಮುಕ್ತಾಯ"
   }
 }

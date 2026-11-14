@@ -1,5 +1,20 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
 
+import {
+  translatePanchangamValue,
+  translatePanchangamTime,
+  translatePanchangamLocation,
+  translatePanchangamObservance,
+  translateObservanceName,
+  translateObservanceDescription,
+} from '@/localization/panchangamTranslator';
+import type {
+  PanchangamField,
+  PanchangamObservance,
+} from '@/localization/panchangamTranslator';
+// PANCHANGAM_DYNAMIC_V2
+
+import panchangamI18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -80,7 +95,7 @@ type PanchangamData = {
   paksha: string | null;
   ayana: string | null;
   ritu: string | null;
-  observances?: string[];
+  observances?: Array<string | PanchangamObservance>;
   calculationStatus?: string;
   calculationNote?: string;
 };
@@ -155,25 +170,30 @@ function validDate(date: Date): boolean {
   );
 }
 
-function displayValue(value?: string | null): string {
-  return value?.trim() || 'Not available';
-}
+function displayValue(
+    value?: string | null,
+    field?: PanchangamField,
+  ): string {
+    return translatePanchangamValue(value, field);
+  }
 
 function DetailCard({
-  icon,
-  label,
-  value,
-}: {
+    icon,
+    label,
+    value,
+    field,
+  }: {
   icon: string;
   label: string;
   value?: string | null;
+  field: PanchangamField;
 }) {
   return (
     <View style={styles.detailCard}>
       <Text style={styles.detailIcon}>{icon}</Text>
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailLabel}>{trPanchangam(label)}</Text>
       <Text style={styles.detailValue}>
-        {displayValue(value)}
+        {displayValue(value, field)}
       </Text>
     </View>
   );
@@ -190,6 +210,9 @@ function TimingRow({
   value?: string | null;
   last?: boolean;
 }) {
+  // TIMING_LANGUAGE_FIX
+  const { t } = useTranslation();
+
   return (
     <View
       style={[
@@ -199,16 +222,56 @@ function TimingRow({
     >
       <View style={styles.timingLeft}>
         <Text style={styles.timingIcon}>{icon}</Text>
-        <Text style={styles.timingLabel}>{label}</Text>
+        <Text style={styles.timingLabel}>
+    {t('dailyPanchangam.' +
+      label.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+      { defaultValue: label }
+    )}
+  </Text>
       </View>
       <Text style={styles.timingValue}>
-        {displayValue(value)}
+        {value
+    ? translatePanchangamTime(value)
+    : trPanchangam("Not available")}
       </Text>
     </View>
   );
 }
 
+
+// PANCHANGAM_LOCALIZATION_V1
+function trPanchangam(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  return panchangamI18n.t(
+    'dailyPanchangam.' + key,
+    { defaultValue: text }
+  );
+}
+function panchangamLocale(): string {
+  const lang = (
+    panchangamI18n.resolvedLanguage ||
+    panchangamI18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[lang] || 'en-IN';
+}
 export default function PanchangamScreen() {
+  const { i18n } = useTranslation();
+  const language =
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en';
+
 
 
 
@@ -276,15 +339,14 @@ export default function PanchangamScreen() {
 
   const locationLabel =
     selectedPlace.source === 'gps'
-      ? 'My Current Location (GPS)'
+      ? trPanchangam("My Current Location (GPS)")
       : selectedPlace.source === 'default'
         ? locating
-          ? 'Detecting Current Location...'
-          : 'Select Current Location'
-        : `${selectedPlace.name}, ${selectedPlace.state}`;
+          ? trPanchangam("Detecting Current Location...")
+          : trPanchangam("Select Current Location")
+        : translatePanchangamLocation(`${selectedPlace.name}, ${selectedPlace.state}`);
 
-  const dateText = selectedDate.toLocaleDateString(
-    'en-IN',
+  const dateText = selectedDate.toLocaleDateString(panchangamLocale(),
     {
       weekday: 'long',
       day: 'numeric',
@@ -321,7 +383,7 @@ export default function PanchangamScreen() {
   useEffect(() => {
     const updateClock = () => {
       setClock(
-        new Intl.DateTimeFormat('en-IN', {
+        new Intl.DateTimeFormat(panchangamLocale(), {
           timeZone: 'Asia/Kolkata',
           hour: '2-digit',
           minute: '2-digit',
@@ -336,7 +398,7 @@ export default function PanchangamScreen() {
     const timer = setInterval(updateClock, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [language]);
 
   // Get GPS coordinates.
   const detectLocation = async (
@@ -445,7 +507,10 @@ export default function PanchangamScreen() {
       setLocationError(message);
 
       if (!automatic) {
-        Alert.alert('Location Unavailable', message);
+        Alert.alert(
+    trPanchangam("Location Unavailable"),
+    trPanchangam(message)
+  );
       }
     } finally {
       if (mounted.current && id === gpsRequestId.current) {
@@ -563,8 +628,8 @@ export default function PanchangamScreen() {
 
     if (term.length < 2) {
       Alert.alert(
-        'Enter Location',
-        'Please enter at least 2 characters.',
+        trPanchangam("Enter Location"),
+        trPanchangam("Please enter at least 2 characters."),
       );
       return;
     }
@@ -573,8 +638,8 @@ export default function PanchangamScreen() {
 
     if (Date.now() - lastSearchAt.current < 1200) {
       Alert.alert(
-        'Please Wait',
-        'Wait a moment before searching again.',
+        trPanchangam("Please Wait"),
+        trPanchangam("Wait a moment before searching again."),
       );
       return;
     }
@@ -685,8 +750,8 @@ export default function PanchangamScreen() {
         searchRequestId.current === id
       ) {
         Alert.alert(
-          'Search Unavailable',
-          'Could not search locations. Check your internet connection.',
+          trPanchangam("Search Unavailable"),
+          trPanchangam("Could not search locations. Check your internet connection."),
         );
       }
     } finally {
@@ -720,7 +785,7 @@ export default function PanchangamScreen() {
         <>
           <ActivityIndicator color={C.maroon} />
           <Text style={styles.noticeText}>
-            {'  '}Detecting your current location...
+            {'  '}{trPanchangam("Detecting your current location...")}
           </Text>
         </>
       );
@@ -731,8 +796,7 @@ export default function PanchangamScreen() {
         <>
           <ActivityIndicator color={C.maroon} />
           <Text style={styles.noticeText}>
-            {'  '}Calculating Panchangam for the selected
-            date and location...
+            {'  '}{trPanchangam("Calculating Panchangam for the selected date and location...")}
           </Text>
         </>
       );
@@ -742,7 +806,7 @@ export default function PanchangamScreen() {
       return (
         <View style={{ flex: 1 }}>
           <Text style={styles.noticeText}>
-            {panchangamError}
+            {trPanchangam(panchangamError)}
           </Text>
           <TouchableOpacity
             style={{ marginTop: 10 }}
@@ -750,9 +814,7 @@ export default function PanchangamScreen() {
               setRetryCount(count => count + 1)
             }
           >
-            <AutoTranslatedText style={styles.retryText}>
-              ↻ Retry Calculation
-            </AutoTranslatedText>
+            <Text style={styles.retryText}>{"↻ " + trPanchangam("Retry Calculation")}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -763,9 +825,10 @@ export default function PanchangamScreen() {
         <>
           <Text style={styles.noticeIcon}>✓</Text>
           <Text style={styles.noticeText}>
-            Panchangam loaded for {selectedDateKey}.
-            Timings are calculated for your selected
-            location and shown in Indian Standard Time.
+            {panchangamI18n.t(
+    'dailyPanchangam.loaded_notice',
+    { date: dateText }
+  )}
           </Text>
         </>
       );
@@ -774,16 +837,14 @@ export default function PanchangamScreen() {
     return (
       <View style={{ flex: 1 }}>
         <Text style={styles.noticeText}>
-          {locationError ||
-            'Select a city or use GPS to calculate Panchangam.'}
+          {(locationError && trPanchangam(locationError)) ||
+            trPanchangam("Select a city or use GPS to calculate Panchangam.")}
         </Text>
         <TouchableOpacity
           style={{ marginTop: 10 }}
           onPress={() => setLocationVisible(true)}
         >
-          <AutoTranslatedText style={styles.retryText}>
-            📍 Select Location
-          </AutoTranslatedText>
+          <Text style={styles.retryText}>{"📍 " + trPanchangam("Select Location")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -805,7 +866,7 @@ export default function PanchangamScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <AutoTranslatedText style={styles.backText}>‹ Back</AutoTranslatedText>
+          <Text style={styles.backText}>{"‹ " + trPanchangam("Back")}</Text>
         </TouchableOpacity>
 
         <Animated.View
@@ -817,17 +878,13 @@ export default function PanchangamScreen() {
           <View style={styles.header}>
             <Text style={styles.headerSymbol}>ॐ</Text>
 
-            <AutoTranslatedText style={styles.eyebrow}>
-              DIVYAKSHETRA HARIHARAPURA
-            </AutoTranslatedText>
+            <Text style={styles.eyebrow}>
+      {panchangamI18n.t('dailyPanchangam.divyakshetra_hariharapura')}
+    </Text>
 
-            <AutoTranslatedText style={styles.title}>
-              Daily Panchangam
-            </AutoTranslatedText>
+            <Text style={styles.title}>{trPanchangam("Daily Panchangam")}</Text>
 
-            <AutoTranslatedText style={styles.subtitle}>
-              Sacred Time • Traditional Wisdom
-            </AutoTranslatedText>
+            <Text style={styles.subtitle}>{trPanchangam("Sacred Time • Traditional Wisdom")}</Text>
 
             <View style={styles.headerDivider} />
 
@@ -838,7 +895,7 @@ export default function PanchangamScreen() {
             <Text style={styles.clockText}>
               {clock
                 ? `${clock} IST`
-                : 'Indian Standard Time'}
+                : trPanchangam("Indian Standard Time")}
             </Text>
 
             <TouchableOpacity
@@ -852,9 +909,7 @@ export default function PanchangamScreen() {
                 📍 {locationLabel}
               </Text>
 
-              <AutoTranslatedText style={styles.locationChange}>
-                Change ›
-              </AutoTranslatedText>
+              <Text style={styles.locationChange}>{trPanchangam("Change") + " ›"}</Text>
             </TouchableOpacity>
 
             {hasLocation && (
@@ -880,13 +935,12 @@ export default function PanchangamScreen() {
             >
               <Text style={styles.dateNavigatorLabel}>
                 {isToday
-                  ? "TODAY'S PANCHANGAM"
-                  : 'SELECTED DATE'}
+                  ? trPanchangam("Today's Panchangam")
+                  : trPanchangam("SELECTED DATE")}
               </Text>
 
               <Text style={styles.dateNavigatorValue}>
-                {selectedDate.toLocaleDateString(
-                  'en-IN',
+                {selectedDate.toLocaleDateString(panchangamLocale(),
                   {
                     day: 'numeric',
                     month: 'short',
@@ -895,9 +949,7 @@ export default function PanchangamScreen() {
                 )}
               </Text>
 
-              <AutoTranslatedText style={styles.calendarHint}>
-                📅 Tap to choose date
-              </AutoTranslatedText>
+              <Text style={styles.calendarHint}>{"📅 " + trPanchangam("Tap to choose date")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -914,9 +966,7 @@ export default function PanchangamScreen() {
             style={styles.calendarButton}
             onPress={openCalendar}
           >
-            <AutoTranslatedText style={styles.calendarButtonText}>
-              📅 Open Calendar
-            </AutoTranslatedText>
+            <Text style={styles.calendarButtonText}>{"📅 " + trPanchangam("Open Calendar")}</Text>
           </TouchableOpacity>
 
           {!isToday && (
@@ -926,9 +976,7 @@ export default function PanchangamScreen() {
                 setSelectedDate(indiaToday())
               }
             >
-              <AutoTranslatedText style={styles.todayButtonText}>
-                Return to Today
-              </AutoTranslatedText>
+              <Text style={styles.todayButtonText}>{trPanchangam("Return to Today")}</Text>
             </TouchableOpacity>
           )}
 
@@ -937,12 +985,8 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <AutoTranslatedText style={styles.sectionTitle}>
-              ✦ Hindu Calendar
-            </AutoTranslatedText>
-            <AutoTranslatedText style={styles.sectionSubtitle}>
-              Traditional calendar details
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{"✦ " + trPanchangam("Hindu Calendar")}</Text>
+            <Text style={styles.sectionSubtitle}>{trPanchangam("Traditional calendar details")}</Text>
 
             <View style={styles.calendarCard}>
               {(
@@ -962,11 +1006,11 @@ export default function PanchangamScreen() {
                   ]}
                 >
                   <Text style={styles.calendarLabel}>
-                    {label}
+                    {trPanchangam(label)}
                   </Text>
 
                   <Text style={styles.calendarValue}>
-                    {displayValue(panchangam?.[key])}
+                    {displayValue(panchangam?.[key], key)}
                   </Text>
                 </View>
               ))}
@@ -974,83 +1018,72 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <AutoTranslatedText style={styles.sectionTitle}>
-              ☀️ Sun Timings
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{"☀️ " + trPanchangam("Sun Timings")}</Text>
 
-            <AutoTranslatedText style={styles.sectionSubtitle}>
-              Based on selected date and location
-            </AutoTranslatedText>
+            <Text style={styles.sectionSubtitle}>{trPanchangam("Based on selected date and location")}</Text>
 
             <View style={styles.sunRow}>
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌅</Text>
-                <AutoTranslatedText style={styles.sunLabel}>
-                  SUNRISE
-                </AutoTranslatedText>
+                <Text style={styles.sunLabel}>{trPanchangam("SUNRISE")}</Text>
                 <Text style={styles.sunValue}>
-                  {panchangam?.sunrise || '--:--'}
+                  {translatePanchangamTime(panchangam?.sunrise)}
                 </Text>
               </View>
 
               <View style={styles.sunCard}>
                 <Text style={styles.sunIcon}>🌇</Text>
-                <AutoTranslatedText style={styles.sunLabel}>
-                  SUNSET
-                </AutoTranslatedText>
+                <Text style={styles.sunLabel}>{trPanchangam("SUNSET")}</Text>
                 <Text style={styles.sunValue}>
-                  {panchangam?.sunset || '--:--'}
+                  {translatePanchangamTime(panchangam?.sunset)}
                 </Text>
               </View>
             </View>
           </View>
 
           <View style={styles.section}>
-            <AutoTranslatedText style={styles.sectionTitle}>
-              🪷 Panchanga
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{"🪷 " + trPanchangam("Panchanga")}</Text>
 
-            <AutoTranslatedText style={styles.sectionSubtitle}>
-              The five traditional elements
-            </AutoTranslatedText>
+            <Text style={styles.sectionSubtitle}>{trPanchangam("The five traditional elements")}</Text>
 
             <View style={styles.detailsGrid}>
               <DetailCard
                 icon="🌙"
                 label="TITHI"
+                field="tithi"
                 value={panchangam?.tithi}
               />
               <DetailCard
                 icon="⭐"
                 label="NAKSHATRA"
+                field="nakshatra"
                 value={panchangam?.nakshatra}
               />
               <DetailCard
                 icon="☀️"
                 label="VARA"
+                field="vara"
                 value={panchangam?.vara}
               />
               <DetailCard
                 icon="✨"
                 label="YOGA"
+                field="yoga"
                 value={panchangam?.yoga}
               />
               <DetailCard
                 icon="🪔"
                 label="KARANA"
+                field="karana"
                 value={panchangam?.karana}
               />
             </View>
           </View>
 
           <View style={styles.section}>
-            <AutoTranslatedText style={styles.sectionTitle}>
-              ⏳ Daily Timings
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{"⏳ " + trPanchangam("Daily Timings")}</Text>
 
-            <AutoTranslatedText style={styles.sectionSubtitle}>
-              Auspicious and inauspicious periods
-            </AutoTranslatedText>
+            <Text style={styles.sectionSubtitle}>{trPanchangam("Auspicious and inauspicious periods")}</Text>
 
             <View style={styles.timingsCard}>
               <TimingRow
@@ -1078,45 +1111,62 @@ export default function PanchangamScreen() {
           </View>
 
           <View style={styles.section}>
-            <AutoTranslatedText style={styles.sectionTitle}>
-              🙏 Special Observances
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{"🙏 " + trPanchangam("Special Observances")}</Text>
 
             <View style={styles.observanceCard}>
               <Text style={styles.observanceIcon}>
                 🛕
               </Text>
 
-              <AutoTranslatedText style={styles.observanceTitle}>
-                Temple Festivals & Observances
-              </AutoTranslatedText>
+              <Text style={styles.observanceTitle}>{trPanchangam("Temple Festivals & Observances")}</Text>
 
               {panchangam?.observances?.length ? (
                 <>
-                  {panchangam.observances.map(
-                    (item, index) => (
-                      <Text
-                        key={`${index}-${item}`}
-                        style={styles.observanceDescription}
-                      >
-                        • {item}
-                      </Text>
-                    ),
-                  )}
-                  <AutoTranslatedText style={styles.observanceDescription}>
-                    Preliminary observances. Confirm
-                    fasting and festival dates with
-                    the temple calendar.
-                  </AutoTranslatedText>
+                  {panchangam.observances.map((item, index) => {
+    if (typeof item === 'string') {
+      return (
+        <Text
+          key={index}
+          style={styles.observanceDescription}
+        >
+          • {translateObservanceDescription(
+            translateObservanceName(item)
+          )}
+        </Text>
+      );
+    }
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const translated =
+      translatePanchangamObservance(item);
+    return (
+      <View key={index}>
+        <Text
+          style={[
+            styles.observanceDescription,
+            {
+              fontWeight: '700',
+              color: C.maroon,
+            },
+          ]}
+        >
+          • {translated.name}
+        </Text>
+        {!!translated.description && (
+          <Text style={styles.observanceDescription}>
+            {translated.description}
+          </Text>
+        )}
+      </View>
+    );
+  })}
+                  <Text style={styles.observanceDescription}>{trPanchangam("Preliminary observances. Confirm fasting and festival dates with the temple calendar.")}</Text>
                 </>
               ) : (
-                <AutoTranslatedText
+                <Text
                   style={styles.observanceDescription}
-                >
-                  No preliminary observances available
-                  for the selected date. Temple-specific
-                  festivals require confirmation.
-                </AutoTranslatedText>
+                >{trPanchangam("No preliminary observances available for the selected date. Temple-specific festivals require confirmation.")}</Text>
               )}
             </View>
           </View>
@@ -1125,9 +1175,9 @@ export default function PanchangamScreen() {
             हरिः ॐ तत् सत्
           </Text>
 
-          <AutoTranslatedText style={styles.footerNote}>
-            Divyakshetra Hariharapura
-          </AutoTranslatedText>
+          <Text style={styles.footerNote}>
+      {panchangamI18n.t('dailyPanchangam.divyakshetra_hariharapura')}
+    </Text>
         </Animated.View>
       </ScrollView>
 
@@ -1145,9 +1195,7 @@ export default function PanchangamScreen() {
             <View style={styles.modalHandle} />
 
             <View style={styles.modalHeader}>
-              <AutoTranslatedText style={styles.modalTitle}>
-                Select Panchangam Location
-              </AutoTranslatedText>
+              <Text style={styles.modalTitle}>{trPanchangam("Select Panchangam Location")}</Text>
 
               <TouchableOpacity
                 onPress={() =>
@@ -1160,9 +1208,7 @@ export default function PanchangamScreen() {
               </TouchableOpacity>
             </View>
 
-            <AutoTranslatedText style={styles.modalSubtitle}>
-              Search across India or use your GPS location.
-            </AutoTranslatedText>
+            <Text style={styles.modalSubtitle}>{trPanchangam("Search across India or use your GPS location.")}</Text>
 
             <TouchableOpacity
               style={[
@@ -1183,26 +1229,24 @@ export default function PanchangamScreen() {
               <View style={styles.gpsContent}>
                 <Text style={styles.gpsTitle}>
                   {locating
-                    ? 'Detecting location...'
-                    : 'Use My Current Location'}
+                    ? trPanchangam("Detecting location...")
+                    : trPanchangam("Use My Current Location")}
                 </Text>
 
                 <Text style={styles.gpsSubtitle}>
                   {locating
-                    ? 'Waiting for GPS...'
-                    : 'Use phone location with permission'}
+                    ? trPanchangam("Waiting for GPS...")
+                    : trPanchangam("Use phone location with permission")}
                 </Text>
               </View>
             </TouchableOpacity>
 
-            <AutoTranslatedText style={styles.orText}>
-              OR SEARCH ANYWHERE IN INDIA
-            </AutoTranslatedText>
+            <Text style={styles.orText}>{trPanchangam("OR SEARCH ANYWHERE IN INDIA")}</Text>
 
             <View style={styles.searchBar}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="City, village, town or district"
+                placeholder={trPanchangam("City, village, town or district")}
                 placeholderTextColor="#9D8B7C"
                 value={query}
                 onChangeText={setQuery}
@@ -1226,11 +1270,9 @@ export default function PanchangamScreen() {
                     color={C.white}
                   />
                 ) : (
-                  <AutoTranslatedText
+                  <Text
                     style={styles.searchButtonText}
-                  >
-                    Search
-                  </AutoTranslatedText>
+                  >{trPanchangam("Search")}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1241,9 +1283,7 @@ export default function PanchangamScreen() {
             >
               {!searched && !searching && (
                 <>
-                  <AutoTranslatedText style={styles.resultsHeading}>
-                    POPULAR LOCATIONS
-                  </AutoTranslatedText>
+                  <Text style={styles.resultsHeading}>{trPanchangam("POPULAR LOCATIONS")}</Text>
 
                   {POPULAR_PLACES.map(place => (
                     <TouchableOpacity
@@ -1255,15 +1295,11 @@ export default function PanchangamScreen() {
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={styles.cityName}>
-                          {place.split(',')[0]}
+                          {translatePanchangamLocation(place.split(',')[0])}
                         </Text>
 
                         <Text style={styles.cityState}>
-                          {place
-                            .split(',')
-                            .slice(1)
-                            .join(',')
-                            .trim()}
+                          {translatePanchangamLocation(place.split(',').slice(1).join(',').trim())}
                         </Text>
                       </View>
 
@@ -1280,16 +1316,17 @@ export default function PanchangamScreen() {
                   <ActivityIndicator
                     color={C.maroon}
                   />
-                  <AutoTranslatedText style={styles.loadingText}>
-                    Searching Indian locations...
-                  </AutoTranslatedText>
+                  <Text style={styles.loadingText}>{trPanchangam("Searching Indian locations...")}</Text>
                 </View>
               )}
 
               {searched && !searching && (
                 <>
                   <Text style={styles.resultsHeading}>
-                    {results.length} LOCATION RESULTS
+                    {panchangamI18n.t(
+    'dailyPanchangam.location_results',
+    { count: results.length }
+  )}
                   </Text>
 
                   {results.map(place => {
@@ -1310,11 +1347,11 @@ export default function PanchangamScreen() {
                       >
                         <View style={{ flex: 1 }}>
                           <Text style={styles.cityName}>
-                            📍 {place.name}
+                            📍 {translatePanchangamLocation(place.name)}
                           </Text>
 
                           <Text style={styles.cityState}>
-                            {place.state}
+                            {translatePanchangamLocation(place.state)}
                           </Text>
 
                           {place.latitude !== null &&
@@ -1343,26 +1380,19 @@ export default function PanchangamScreen() {
                       <Text style={styles.emptyIcon}>
                         🔎
                       </Text>
-                      <AutoTranslatedText style={styles.emptyTitle}>
-                        No matching places found
-                      </AutoTranslatedText>
-                      <AutoTranslatedText
+                      <Text style={styles.emptyTitle}>{trPanchangam("No matching places found")}</Text>
+                      <Text
                         style={styles.emptyDescription}
-                      >
-                        Try adding the state name or
-                        searching a nearby town.
-                      </AutoTranslatedText>
+                      >{trPanchangam("Try adding the state name or searching a nearby town.")}</Text>
                     </View>
                   )}
                 </>
               )}
             </ScrollView>
 
-            <AutoTranslatedText style={styles.modalFootnote}>
-              Search data © OpenStreetMap contributors.
-              Public search service for testing;
-              subject to usage limits.
-            </AutoTranslatedText>
+            <Text style={styles.modalFootnote}>
+      {panchangamI18n.t('dailyPanchangam.osm_notice')}
+    </Text>
           </View>
         </View>
       </Modal>

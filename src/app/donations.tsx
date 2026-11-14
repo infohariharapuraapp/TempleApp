@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, { useCallback, useRef, useState } from 'react';
 
@@ -31,6 +31,9 @@ const COLORS = {
 };
 
 export default function DonationsScreen() {
+  // TEMPLE_SERVICES_LANGUAGE_V1
+  const { t } = useTranslation();
+
   const webViewRef = useRef<WebView>(null);
 
   const [loading, setLoading] = useState(true);
@@ -85,16 +88,14 @@ export default function DonationsScreen() {
         </View>
 
         <View style={styles.headerContent}>
-          <AutoTranslatedText style={styles.headerTitle}>Donations</AutoTranslatedText>
-          <AutoTranslatedText style={styles.headerSubtitle}>
-            Support our temple with devotion
-          </AutoTranslatedText>
+          <Text style={styles.headerTitle}>{t('templeServicesLocal.donations')}</Text>
+          <Text style={styles.headerSubtitle}>{t('templeServicesLocal.support_our_temple_with_devotion')}</Text>
         </View>
 
         <TouchableOpacity
           style={styles.browserButton}
           onPress={openInBrowser}
-          accessibilityLabel="Open donations in browser"
+          accessibilityLabel={t('templeServicesLocal.open_donations_in_browser')}
         >
           <Ionicons
             name="open-outline"
@@ -193,14 +194,9 @@ export default function DonationsScreen() {
               color={COLORS.gold}
             />
 
-            <AutoTranslatedText style={styles.errorTitle}>
-              Unable to load Donations
-            </AutoTranslatedText>
+            <Text style={styles.errorTitle}>{t('templeServicesLocal.unable_to_load_donations')}</Text>
 
-            <AutoTranslatedText style={styles.errorText}>
-              Please check your internet connection
-              and try again.
-            </AutoTranslatedText>
+            <Text style={styles.errorText}>{t('templeServicesLocal.please_check_your_internet_connection_and_try_again')}</Text>
 
             <TouchableOpacity
               style={styles.retryButton}
@@ -211,15 +207,11 @@ export default function DonationsScreen() {
                 size={18}
                 color="#FFFFFF"
               />
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{t('templeServicesLocal.try_again')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={openInBrowser}>
-              <AutoTranslatedText style={styles.browserText}>
-                Open in Browser
-              </AutoTranslatedText>
+              <Text style={styles.browserText}>{t('templeServicesLocal.open_in_browser')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -230,9 +222,7 @@ export default function DonationsScreen() {
               size="large"
               color={COLORS.maroon}
             />
-            <AutoTranslatedText style={styles.loadingText}>
-              Loading donation services...
-            </AutoTranslatedText>
+            <Text style={styles.loadingText}>{t('templeServicesLocal.loading_donation_services')}</Text>
           </View>
         )}
       </View>

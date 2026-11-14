@@ -1,5 +1,6 @@
 
 import { Request, Response } from 'express';
+import { withTranslationDeadline } from '../services/translationDeadline';
 import { pool } from '../db';
 import {
   translateTextOrOriginal,
@@ -190,16 +191,21 @@ export async function getAnnouncements(
 
     // Limit concurrent translation operations
     // to reduce provider pressure.
-    const translatedAnnouncements = [];
-
-    for (const announcement of announcements) {
-      translatedAnnouncements.push(
-        await localizeAnnouncement(
-          announcement,
-          language
-        )
-      );
-    }
+    const translatedAnnouncements = await withTranslationDeadline(
+      (async () => {
+        const output = [...announcements];
+        const deadline = Date.now() + 3500;
+        for (let index = 0; index < announcements.length; index++) {
+          if (Date.now() >= deadline) break;
+          output[index] = await localizeAnnouncement(
+            announcements[index],
+            language
+          );
+        }
+        return output;
+      })(),
+      announcements
+    );
 
     return res.status(200).json({
       success: true,
@@ -289,9 +295,12 @@ export async function getAnnouncementById(
     }
 
     const translatedAnnouncement =
-      await localizeAnnouncement(
-        announcement,
-        language
+      await withTranslationDeadline(
+        localizeAnnouncement(
+          announcement,
+          language
+        ),
+        announcement
       );
 
     return res.status(200).json({

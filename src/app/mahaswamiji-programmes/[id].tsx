@@ -1,4 +1,6 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import i18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
+
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -77,26 +79,52 @@ function youtubeId(url: string | null): string | null {
 
 function formatDate(value: string | null) {
   if (!value) return '';
-
-  const date = value.slice(0, 10).split('-');
-
-  return date.length === 3
-    ? `${date[2]}/${date[1]}/${date[0]}`
-    : value;
-}
-
-function formatTime(value: string | null) {
-  if (!value) return '';
-
-  const [h, m] = value.split(':').map(Number);
-
-  if (!Number.isFinite(h) || !Number.isFinite(m)) {
+  try {
+    const date = new Date(
+      value.slice(0, 10) + 'T12:00:00'
+    );
+    return new Intl.DateTimeFormat(
+      getSpiritualLocale(),
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }
+    ).format(date);
+  } catch {
     return value;
   }
-
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${
-    h >= 12 ? 'PM' : 'AM'
-  }`;
+}
+function formatTime(value: string | null) {
+  if (!value) return '';
+  const [hour, minute] = value
+    .split(':')
+    .map(Number);
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute)
+  ) {
+    return '';
+  }
+  // Preserve existing hidden midnight time.
+  if (hour === 0 && minute === 0) {
+    return '';
+  }
+  try {
+    const date = new Date(
+      2000, 0, 1, hour, minute
+    );
+    return new Intl.DateTimeFormat(
+      getSpiritualLocale(),
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }
+    ).format(date);
+  } catch {
+    return value;
+  }
 }
 
 function InfoRow({
@@ -123,7 +151,46 @@ function InfoRow({
   );
 }
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  const translated = i18n.t(
+    'spiritualContent.' + key,
+    { defaultValue: text }
+  );
+  if (text.startsWith('←')) {
+    return '← ' + translated.replace(/^←\s*/, '');
+  }
+  if (text.startsWith('▶')) {
+    return '▶ ' + translated.replace(/^▶\s*/, '');
+  }
+  return translated;
+}
+function getSpiritualLocale(): string {
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
 export default function ProgrammeDetails() {
+  const { i18n: selectedI18n } = useTranslation();
+  const language =
+    selectedI18n.resolvedLanguage ||
+    selectedI18n.language ||
+    'en';
+
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
@@ -161,7 +228,7 @@ export default function ProgrammeDetails() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -200,14 +267,14 @@ export default function ProgrammeDetails() {
         >
           <Ionicons name="arrow-back" size={23} color={C.white} />
         </TouchableOpacity>
-        <AutoTranslatedText style={styles.headerTitle}>Programme Details</AutoTranslatedText>
+        <Text style={styles.headerTitle}>{tr("Programme Details")}</Text>
         <Text style={styles.om}>ॐ</Text>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.maroon} />
-          <AutoTranslatedText style={styles.muted}>Loading programme...</AutoTranslatedText>
+          <Text style={styles.muted}>{tr("Loading programme...")}</Text>
         </View>
       ) : error || !programme ? (
         <View style={styles.center}>
@@ -217,10 +284,10 @@ export default function ProgrammeDetails() {
             color={C.maroon}
           />
           <Text style={styles.muted}>
-            {error || 'Programme not found.'}
+            {tr(error || 'Programme not found.')}
           </Text>
           <TouchableOpacity onPress={() => void load()}>
-            <AutoTranslatedText style={styles.retry}>Try Again</AutoTranslatedText>
+            <Text style={styles.retry}>{tr("Try Again")}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -241,16 +308,14 @@ export default function ProgrammeDetails() {
                 style={styles.placeholder}
               >
                 <Text style={styles.placeholderOm}>ॐ</Text>
-                <AutoTranslatedText style={styles.placeholderLabel}>
-                  MAHASWAMIJI PROGRAMMES
-                </AutoTranslatedText>
+                <Text style={styles.placeholderLabel}>{tr("MAHASWAMIJI PROGRAMMES")}</Text>
               </LinearGradient>
             )}
 
             <View style={styles.body}>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
-                  {programme.status.toUpperCase()}
+                  {tr(programme.status).toUpperCase()}
                 </Text>
               </View>
 
@@ -258,9 +323,7 @@ export default function ProgrammeDetails() {
 
               <View style={styles.separator} />
 
-              <AutoTranslatedText style={styles.sectionTitle}>
-                About the Programme
-              </AutoTranslatedText>
+              <Text style={styles.sectionTitle}>{tr("About the Programme")}</Text>
 
               <Text style={styles.description}>
                 {programme.description}
@@ -269,23 +332,21 @@ export default function ProgrammeDetails() {
               {!!(starts || ends || programme.venue) && (
                 <>
                   <View style={styles.separator} />
-                  <AutoTranslatedText style={styles.sectionTitle}>
-                    Programme Information
-                  </AutoTranslatedText>
+                  <Text style={styles.sectionTitle}>{tr("Programme Information")}</Text>
 
                   <InfoRow
                     icon="calendar-outline"
-                    label="Starts"
+                    label={tr("Starts")}
                     value={starts}
                   />
                   <InfoRow
                     icon="time-outline"
-                    label="Ends"
+                    label={tr("Ends")}
                     value={ends}
                   />
                   <InfoRow
                     icon="location-outline"
-                    label="Venue"
+                    label={tr("Venue")}
                     value={programme.venue || ''}
                   />
                 </>
@@ -295,13 +356,9 @@ export default function ProgrammeDetails() {
                 <>
                   <View style={styles.separator} />
 
-                  <AutoTranslatedText style={styles.sectionTitle}>
-                    Watch Programme Video
-                  </AutoTranslatedText>
+                  <Text style={styles.sectionTitle}>{tr("Watch Programme Video")}</Text>
 
-                  <AutoTranslatedText style={styles.videoHint}>
-                    Watch the programme within the app.
-                  </AutoTranslatedText>
+                  <Text style={styles.videoHint}>{tr("Watch the programme within the app.")}</Text>
 
                   <View style={styles.videoFrame}>
                     {playing ? (
@@ -364,9 +421,7 @@ export default function ProgrammeDetails() {
                         size={20}
                         color={C.maroon}
                       />
-                      <AutoTranslatedText style={styles.closeText}>
-                        Close Video
-                      </AutoTranslatedText>
+                      <Text style={styles.closeText}>{tr("Close Video")}</Text>
                     </TouchableOpacity>
                   )}
                 </>

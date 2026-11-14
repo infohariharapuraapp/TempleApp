@@ -89,5 +89,45 @@
     "descriptionFallback": "More information about this activity will be available soon.",
     "blessing": "May this sacred activity bring peace, devotion, and blessings to all.",
     "backToActivities": "Back to Activities"
+  },
+  "activityCategories": {
+    "yearly": {
+      "title": "Yearly Activities",
+      "subtitle": "Annual festivals and important celebrations of Sri Adi Shankaracharya Sharada Lakshminarasimha Peetam.",
+      "shankaraJayanti": "SHANKARA JAYANTI",
+      "vardhanthi": "VARDHANTHI MAHOTSAVA",
+      "navaratri": "NAVARATHIRI",
+      "narasimhaJayanti": "NARASIMHA JAYANTI",
+      "chaturmasa": "CHATHURMASA",
+      "brahmotsava": "BRAHMOTSAVA"
+    },
+    "services": {
+      "title": "Services",
+      "subtitle": "Educational, charitable and community-service initiatives of Sreemath Hariharapura.",
+      "cowTitle": "GOSAMRAKSHANA (COW PROTECTION PROGRAM)",
+      "cowDescription": "The Vedic tradition respects and worships every cow as the universal Mother Goddess. Taking good care of cows is believed to immensely please the Supreme. Moreover, every product from the cow - the Go-Mutra (cow’s urine), cow dung, cow milk, etc possess religious significance as well as high medicinal properties. But, sadly, in recent times, cows that are meant to be worshipped and revered are cruelly slaughtered. The increasing rate of cow slaughter and beef export is a very depressing and shocking truth prevailing in the present days. Hence, to protect and nourish cows, Sreemath Hariharapura conducts Cow Protection Programmes at many places in and around South India. Volunteers from Sreemath campaign against cow slaughter, creating awareness among people about the need to protect cows. Plans are on to set up Goshalas at various locations, where cows can be protected and nourished in the best possible manner. Presently, there is a Goshala at Hariharapura, called the Brindaavana Goshaala, where cows whether barren or old, young or milking, calves or infants - ALL are nourished and taken care under best medical facilities. Presently there are about 100 cows in this Goshala.",
+      "vedaTitle": "VEDA PATASHALA",
+      "vedaDescription": "Preserving Vedic knowledge is very important in securing universal welfare and peace. The Vedapatashala at Hariharapura, an exclusive residential school with modern amenities, educates young Brahmacharis in Sanskrit, Veda-Sastras along with basic-modern education/computer skills.",
+      "educationTitle": "EDUCATIONAL INSTITUTIONS",
+      "educationDescription": "Sreemath runs schools and colleges at many villages in Karnataka. Very nominal fee is charged in these institutions. Free education is also provided to children who are from financially backward families.",
+      "school1": "Sri Sachidananda Saraswathi Institution, a High School at Hariharapura, Karnataka.",
+      "school2": "Sri Ramananda Saraswathi PU College (Pre-University College) at Hariharapura, Karnataka.",
+      "school3": "Swayamprakasha Samste, a school at Narve, Karnataka.",
+      "school4": "Sri Ramananda Saraswathi High School at Kigga, Karnataka.",
+      "educationEnd": "These are a few educational institutions run by Sreemath for the past 60 years.",
+      "foodTitle": "ANNADANAM (FREE FOOD FOR ALL)",
+      "foodDescription": "Everyday, Annadanam (free food) is provided for around 500 and more people at the premises of Sreemath Hariharapura. To feed more and more people in future, Sri Lakshmi Narasimha Prasada Mandiram - a large modern kitchen with dining facility to accommodate around 2000 people at a time is presently under construction."
+    },
+    "social": {
+      "title": "Social Activities",
+      "subtitle": "Initiatives that promote Sanatana Dharma, spiritual learning and community participation.",
+      "shivaTitle": "SHIVA DEEKSHA PROGRAMME",
+      "shivaParagraph1": "The Glories of Guru Upadesha are boundless. Initiation from a Sadguru is a very rare treasure and indeed the greatest boon of life. Guru Upadesha becomes the best Saadhana to achieve Chittha Shudhhi (internal purity). It breaks the cage of worldliness and leads to the Supreme Atma Gnyaana.",
+      "shivaParagraph2": "The Shiva Deeksha program is a unique initiative that reveals MahaSwamiji’s compassion and care to enlighten individuals and nurture their sense of belonging to Sanatana Dharma. In the Shiva Deeksha Programme, MahaSwamiji blesses people with the sacred Shiva Panchakshari Mantra initiation as per Sastras, irrespective of caste, creed, age or sex. This Mantra Deeksha stays lifelong and grants spiritual and materialistic welfare.",
+      "shivaParagraph3": "The Shiva Deeksha programme does not end at a mere one day celebration. Sreemath Hariharapura ensures an all time bond with the devotees who take part in this programme. Every year, for the Shivarathri Pooja, Mruthika Lingas are sent to all the locations where the Shiva Deeksha programme had been conducted. Devotees at the locality perform Pooja to this Shiva Linga with their own hands on the auspicious Shivarathri night.",
+      "shivaParagraph4": "The Shiva Deeksha Program brings together people from innumerable walks of life in understanding and practicing Sanatana Dharma. This also plants the sense of equanimity and unity in people. Presently, the Shiva Deeksha programme has been conducted at about 1000 centres across the four Indian states of Karnataka, Andhra, Tamil Nadu and Maharashtra, and around 10,00,000 people have benefitted due to this.",
+      "gayatriTitle": "VISHWA GAYATRI UPASAK PARISHAT",
+      "gayatriDescription": "Gayatri Upasana is a very ancient worship that is said to bestow prosperity, courage and harmony. It is also believed that this Upasana improves the memory power, grasping capacity, brilliance and intellect of an individual. The Vishwa Gayatri Upaasak Parishat is a scheme in which women are taught to perform the Gayathri Upasana, by worshipping Vedamatha Gayathri Devi based on Sastras, with Gayathri Sahasranama. Presently around 1,00,000 women in and around South India have learnt this Upaasana."
+    }
   }
 }

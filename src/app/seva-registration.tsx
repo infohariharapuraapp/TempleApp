@@ -1,4 +1,6 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/localization/i18n';
+
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
@@ -50,7 +52,73 @@ const blankMember = (id: number): Member => ({
   country: 'India', pincode: '', state: '', district: '', mandal: '', city: '', street: '', door: '',
 });
 
+
+function tr(text: string): string {
+  const key = text.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  return i18n.t(
+    'sevaRegistration.' + key,
+    { defaultValue: text }
+  );
+}
+
+function getSevaLocale(): string {
+  const lang = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[lang] || 'en-IN';
+}
+function formatSevaDate(
+  value: string,
+  options: Intl.DateTimeFormatOptions
+): string {
+  try {
+    const date = new Date(value + 'T12:00:00');
+    return new Intl.DateTimeFormat(
+      getSevaLocale(),
+      options
+    ).format(date);
+  } catch {
+    return value;
+  }
+}
+function formatSevaTime(value: string): string {
+  try {
+    const match = value.match(
+      /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+    );
+    if (!match) return value;
+    let hours = Number(match[1]) % 12;
+    if (match[3].toUpperCase() === 'PM') {
+      hours += 12;
+    }
+    const date = new Date(
+      2026, 0, 1, hours, Number(match[2])
+    );
+    return new Intl.DateTimeFormat(
+      getSevaLocale(),
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }
+    ).format(date);
+  } catch {
+    return value;
+  }
+}
 export default function SevaRegistrationScreen() {
+  useTranslation();
   const [type, setType] = useState<Type | null>(null);
   const [step, setStep] = useState(0);
 
@@ -94,20 +162,20 @@ export default function SevaRegistrationScreen() {
 
   const validateIndividual = () => {
     if (step === 1 && (!name || mobile.replace(/\D/g, '').length !== 10 || aadhaar.replace(/\D/g, '').length !== 12 || !aadhaarFile || !dob || !age || !gender || !mentallyFit || !physicallyFit)) {
-      Alert.alert('Required Details', 'Please complete personal details, 12-digit Aadhaar number, Aadhaar file, DOB, gender and fitness declarations.'); return false;
+      Alert.alert(tr("Required Details"), tr("Please complete personal details, 12-digit Aadhaar number, Aadhaar file, DOB, gender and fitness declarations.")); return false;
     }
-    if (step === 2 && (!pincode || !state || !district || !city || !street || !door)) { Alert.alert('Required Details', 'Please complete all required address details.'); return false; }
-    if (step === 3 && (!qualification || !profession || !interest)) { Alert.alert('Required Details', 'Please complete profession and education details.'); return false; }
-    if (step === 4 && !selectedDate) { Alert.alert('Date Required', 'Please select a seva date.'); return false; }
+    if (step === 2 && (!pincode || !state || !district || !city || !street || !door)) { Alert.alert(tr("Required Details"), tr("Please complete all required address details.")); return false; }
+    if (step === 3 && (!qualification || !profession || !interest)) { Alert.alert(tr("Required Details"), tr("Please complete profession and education details.")); return false; }
+    if (step === 4 && !selectedDate) { Alert.alert(tr("Date Required"), tr("Please select a seva date.")); return false; }
     return true;
   };
 
   const validateGroup = () => {
     const size = Number(teamSize);
-    if (step === 1 && (!Number.isInteger(size) || size < 10)) { Alert.alert('Minimum Team Size', 'Group Seva registration starts with a minimum of 10 members.'); return false; }
-    if (step === 2 && members.length < size) { Alert.alert('Add Members', `Please add all ${size} member profiles before continuing.`); return false; }
-    if (step === 3 && leaderId === null) { Alert.alert('Team Leader', 'Please select one team leader from the added member profiles.'); return false; }
-    if (step === 4 && !selectedDate) { Alert.alert('Date Required', 'Please select a seva date.'); return false; }
+    if (step === 1 && (!Number.isInteger(size) || size < 10)) { Alert.alert(tr("Minimum Team Size"), tr("Group Seva registration starts with a minimum of 10 members.")); return false; }
+    if (step === 2 && members.length < size) { Alert.alert(tr('Add Members'), i18n.t('sevaRegistration.add_all_members', { size })); return false; }
+    if (step === 3 && leaderId === null) { Alert.alert(tr("Team Leader"), tr("Please select one team leader from the added member profiles.")); return false; }
+    if (step === 4 && !selectedDate) { Alert.alert(tr("Date Required"), tr("Please select a seva date.")); return false; }
     return true;
   };
 
@@ -134,23 +202,23 @@ export default function SevaRegistrationScreen() {
     if (!editingMember) return;
     const m = editingMember;
     if (!m.name || m.mobile.replace(/\D/g, '').length !== 10 || m.aadhaar.replace(/\D/g, '').length !== 12 || !m.aadhaarFile || !m.dob || !m.age || !m.gender || !m.pincode || !m.state || !m.district || !m.city || !m.street || !m.door) {
-      Alert.alert('Member Details', 'Complete the member personal details, Aadhaar number/file and address before saving.'); return;
+      Alert.alert(tr("Member Details"), tr("Complete the member personal details, Aadhaar number/file and address before saving.")); return;
     }
     setMembers(old => { const exists = old.some(x => x.id === m.id); return exists ? old.map(x => x.id === m.id ? m : x) : [...old, m]; });
     setEditingMember(null);
   };
 
-  if (registered && type) return <Confirmation type={type} id={registrationId} name={type === 'individual' ? name : (members.find(m => m.id === leaderId)?.name || 'Group')} groupSize={members.length} groupName={groupName} date={date} time={selectedTime} />;
+  if (registered && type) return <Confirmation type={type} id={registrationId} name={type === 'individual' ? name : (members.find(m => m.id === leaderId)?.name || tr('Group'))} groupSize={members.length} groupName={groupName} date={date} time={selectedTime} />;
 
   if (!type) return (
     <SafeAreaView style={styles.screen}>
-      <TopBar title="Seva Registration" onBack={() => router.back()} />
+      <TopBar title={tr("Seva Registration")} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.typeContent}>
-        <AutoTranslatedText style={styles.pageTitle}>Seva Registration</AutoTranslatedText>
-        <AutoTranslatedText style={styles.pageSubtitle}>Select Individual or Group Seva registration to continue.</AutoTranslatedText>
+        <Text style={styles.pageTitle}>{tr("Seva Registration")}</Text>
+        <Text style={styles.pageSubtitle}>{tr("Select Individual or Group Seva registration to continue.")}</Text>
         {SEVA_TYPES.map(item => <TouchableOpacity key={item.id} style={styles.typeCard} activeOpacity={0.88} onPress={() => chooseType(item.id as Type)}>
           <View style={styles.typeIcon}><Text style={styles.typeIconText}>{item.icon}</Text></View>
-          <View style={styles.typeText}><Text style={styles.typeTitle}>{item.title}</Text><Text style={styles.typeDescription}>{item.description}</Text><AutoTranslatedText style={styles.registerLink}>Click here for Registration</AutoTranslatedText></View><Text style={styles.typeArrow}>›</Text>
+          <View style={styles.typeText}><Text style={styles.typeTitle}>{tr(item.title)}</Text><Text style={styles.typeDescription}>{tr(item.description)}</Text><Text style={styles.registerLink}>{tr("Click here for Registration")}</Text></View><Text style={styles.typeArrow}>›</Text>
         </TouchableOpacity>)}
       </ScrollView>
     </SafeAreaView>
@@ -163,9 +231,9 @@ export default function SevaRegistrationScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <TopBar title={group ? 'Group Seva' : 'Individual Seva'} onBack={back} />
+      <TopBar title={tr(group ? 'Group Seva' : 'Individual Seva')} onBack={back} />
       <ScrollView contentContainerStyle={styles.formPage} showsVerticalScrollIndicator={false}>
-        <View style={styles.stepHeader}><Text style={styles.stepTitle}>{stepTitle}</Text><Text style={styles.stepCount}>STEP {step} OF 4</Text></View>
+        <View style={styles.stepHeader}><Text style={styles.stepTitle}>{tr(stepTitle)}</Text><Text style={styles.stepCount}>{i18n.t('sevaRegistration.step_count', { step })}</Text></View>
 
         {!group && step === 1 && <IndividualPersonal {...{name,setName,mobile,setMobile,aadhaar,setAadhaar,dob,setDob,age,setAge,email,setEmail,blood,setBlood,gender,setGender,mentallyFit,setMentallyFit,physicallyFit,setPhysicallyFit,openPicker,attachIndividualAadhaar,aadhaarFile,formatDob}} />}
         {!group && step === 2 && <AddressForm {...{pincode,setPincode,state,setState,district,setDistrict,mandal,setMandal,city,setCity,street,setStreet,door,setDoor,openPicker}} />}
@@ -178,13 +246,13 @@ export default function SevaRegistrationScreen() {
         {step === 4 && <DateTime {...{selectedDate,setSelectedDate,selectedTime,setSelectedTime}} />}
 
         <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.bottomBack} onPress={back}><AutoTranslatedText style={styles.bottomBackText}>Back</AutoTranslatedText></TouchableOpacity>
-          <TouchableOpacity style={styles.continueButton} onPress={next}><Text style={styles.continueText}>{step === 4 ? 'Submit Registration' : 'Continue'}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.bottomBack} onPress={back}><Text style={styles.bottomBackText}>{tr("Back")}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.continueButton} onPress={next}><Text style={styles.continueText}>{tr(step === 4 ? 'Submit Registration' : 'Continue')}</Text></TouchableOpacity>
         </View>
       </ScrollView>
 
       <Modal transparent visible={picker.visible} animationType="slide" onRequestClose={closePicker}>
-        <View style={styles.modalOverlay}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>{picker.title}</Text><TouchableOpacity onPress={closePicker}><Text style={styles.modalClose}>×</Text></TouchableOpacity></View>{picker.options.map(o => <TouchableOpacity key={o} style={styles.modalOption} onPress={() => { picker.onSelect(o); closePicker(); }}><Text style={styles.modalOptionText}>{o}</Text></TouchableOpacity>)}</View></View>
+        <View style={styles.modalOverlay}><View style={styles.modalCard}><View style={styles.modalHeader}><Text style={styles.modalTitle}>{tr(picker.title)}</Text><TouchableOpacity onPress={closePicker}><Text style={styles.modalClose}>×</Text></TouchableOpacity></View>{picker.options.map(o => <TouchableOpacity key={o} style={styles.modalOption} onPress={() => { picker.onSelect(o); closePicker(); }}><Text style={styles.modalOptionText}>{tr(o)}</Text></TouchableOpacity>)}</View></View>
       </Modal>
 
       {editingMember && <MemberModal member={editingMember} setMember={setEditingMember} onSave={saveMember} onCancel={() => setEditingMember(null)} />}
@@ -195,52 +263,52 @@ export default function SevaRegistrationScreen() {
 function TopBar({ title, onBack }: { title: string; onBack: () => void }) { return <View style={styles.topBar}><TouchableOpacity onPress={onBack} style={styles.backTop}><Text style={styles.backArrow}>‹</Text></TouchableOpacity><Text style={styles.topTitle}>{title}</Text></View>; }
 
 function IndividualPersonal(p: any) { return <View style={styles.formCard}>
-  <Field label="Full Name" required value={p.name} placeholder="Enter full name" onChangeText={p.setName} />
-  <Field label="Mobile Number" required value={p.mobile} placeholder="Enter 10-digit mobile number" onChangeText={p.setMobile} keyboardType="phone-pad" maxLength={10} />
-  <Field label="Aadhaar Card Number" required value={p.aadhaar} placeholder="Enter 12-digit Aadhaar number" onChangeText={p.setAadhaar} keyboardType="number-pad" maxLength={12} />
+  <Field label={tr("Full Name")} required value={p.name} placeholder={tr("Enter full name")} onChangeText={p.setName} />
+  <Field label={tr("Mobile Number")} required value={p.mobile} placeholder={tr("Enter 10-digit mobile number")} onChangeText={p.setMobile} keyboardType="phone-pad" maxLength={10} />
+  <Field label={tr("Aadhaar Card Number")} required value={p.aadhaar} placeholder={tr("Enter 12-digit Aadhaar number")} onChangeText={p.setAadhaar} keyboardType="number-pad" maxLength={12} />
   <UploadField file={p.aadhaarFile} onPress={p.attachIndividualAadhaar} />
-  <Field label="Date of Birth" required value={p.dob} placeholder="DD/MM/YYYY" onChangeText={(v: string) => p.formatDob(v, p.setDob)} keyboardType="number-pad" maxLength={10} />
-  <Field label="Age" required value={p.age} placeholder="Enter age" onChangeText={p.setAge} keyboardType="number-pad" maxLength={3} />
-  <Field label="Email Id" value={p.email} placeholder="Enter email" onChangeText={p.setEmail} keyboardType="email-address" />
-  <Field label="Blood Group" value={p.blood} dropdown onPress={() => p.openPicker('Blood Group', BLOOD, p.setBlood)} />
-  <Text style={styles.label}>Gender<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Radio label="Male" selected={p.gender === 'Male'} onPress={() => p.setGender('Male')} /><Radio label="Female" selected={p.gender === 'Female'} onPress={() => p.setGender('Female')} /></View>
-  <Text style={styles.label}>Fitness<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Checkbox label="Mentally Fit" selected={p.mentallyFit} onPress={() => p.setMentallyFit(!p.mentallyFit)} /><Checkbox label="Physically Fit" selected={p.physicallyFit} onPress={() => p.setPhysicallyFit(!p.physicallyFit)} /></View>
+  <Field label={tr("Date of Birth")} required value={p.dob} placeholder="DD/MM/YYYY" onChangeText={(v: string) => p.formatDob(v, p.setDob)} keyboardType="number-pad" maxLength={10} />
+  <Field label={tr("Age")} required value={p.age} placeholder={tr("Enter age")} onChangeText={p.setAge} keyboardType="number-pad" maxLength={3} />
+  <Field label={tr("Email Id")} value={p.email} placeholder={tr("Enter email")} onChangeText={p.setEmail} keyboardType="email-address" />
+  <Field label={tr("Blood Group")} value={p.blood} dropdown onPress={() => p.openPicker('Blood Group', BLOOD, p.setBlood)} />
+  <Text style={styles.label}>{tr("Gender")}<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Radio label={tr("Male")} selected={p.gender === 'Male'} onPress={() => p.setGender('Male')} /><Radio label={tr("Female")} selected={p.gender === 'Female'} onPress={() => p.setGender('Female')} /></View>
+  <Text style={styles.label}>{tr("Fitness")}<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Checkbox label={tr("Mentally Fit")} selected={p.mentallyFit} onPress={() => p.setMentallyFit(!p.mentallyFit)} /><Checkbox label={tr("Physically Fit")} selected={p.physicallyFit} onPress={() => p.setPhysicallyFit(!p.physicallyFit)} /></View>
 </View>; }
 
 function AddressForm(p: any) { return <View style={styles.formCard}>
-  <Field label="Country" required value="India" dropdown onPress={() => {}} />
-  <Field label="Pincode" required value={p.pincode} placeholder="Enter pincode" onChangeText={p.setPincode} keyboardType="number-pad" maxLength={6} />
-  <Field label="State" required value={p.state} dropdown onPress={() => p.openPicker('State', STATES, p.setState)} />
-  <Field label="District" required value={p.district} dropdown onPress={() => p.openPicker('District', DISTRICTS, p.setDistrict)} />
-  <Field label="Mandal (Optional)" value={p.mandal} placeholder="Enter mandal" onChangeText={p.setMandal} />
-  <Field label="City" required value={p.city} placeholder="Enter city" onChangeText={p.setCity} />
-  <Field label="Street" required value={p.street} placeholder="Enter street" onChangeText={p.setStreet} />
-  <Field label="Door Number" required value={p.door} placeholder="Enter door number" onChangeText={p.setDoor} />
+  <Field label={tr("Country")} required value="India" dropdown onPress={() => {}} />
+  <Field label={tr("Pincode")} required value={p.pincode} placeholder={tr("Enter pincode")} onChangeText={p.setPincode} keyboardType="number-pad" maxLength={6} />
+  <Field label={tr("State")} required value={p.state} dropdown onPress={() => p.openPicker('State', STATES, p.setState)} />
+  <Field label={tr("District")} required value={p.district} dropdown onPress={() => p.openPicker('District', DISTRICTS, p.setDistrict)} />
+  <Field label={tr("Mandal (Optional)")} value={p.mandal} placeholder={tr("Enter mandal")} onChangeText={p.setMandal} />
+  <Field label={tr("City")} required value={p.city} placeholder={tr("Enter city")} onChangeText={p.setCity} />
+  <Field label={tr("Street")} required value={p.street} placeholder={tr("Enter street")} onChangeText={p.setStreet} />
+  <Field label={tr("Door Number")} required value={p.door} placeholder={tr("Enter door number")} onChangeText={p.setDoor} />
 </View>; }
 
-function ProfessionForm(p: any) { return <View style={styles.formCard}><Field label="Qualification" required value={p.qualification} dropdown onPress={() => p.openPicker('Qualification', QUALIFICATIONS, p.setQualification)} /><Field label="Profession" required value={p.profession} placeholder="Enter profession" onChangeText={p.setProfession} /><Field label="Area Of Interest" required value={p.interest} placeholder="Enter area of interest" onChangeText={p.setInterest} /></View>; }
+function ProfessionForm(p: any) { return <View style={styles.formCard}><Field label={tr("Qualification")} required value={p.qualification} dropdown onPress={() => p.openPicker('Qualification', QUALIFICATIONS, p.setQualification)} /><Field label={tr("Profession")} required value={p.profession} placeholder={tr("Enter profession")} onChangeText={p.setProfession} /><Field label={tr("Area Of Interest")} required value={p.interest} placeholder={tr("Enter area of interest")} onChangeText={p.setInterest} /></View>; }
 
-function GroupSize(p: any) { return <View style={styles.formCard}><AutoTranslatedText style={styles.groupInfoTitle}>Group Seva Registration</AutoTranslatedText><AutoTranslatedText style={styles.groupInfo}>Group registration starts with a minimum team size of 10 members. Enter the required team size first. Member profiles will be collected next.</AutoTranslatedText><Field label="Team Size" required value={p.teamSize} placeholder="Minimum 10" onChangeText={(v: string) => p.setTeamSize(v.replace(/\D/g, '').slice(0,3))} keyboardType="number-pad" maxLength={3} /><Field label="Group Name" value={p.groupName} placeholder="Enter group name" onChangeText={p.setGroupName} /><View style={styles.minimumBadge}><AutoTranslatedText style={styles.minimumBadgeText}>MINIMUM 10 MEMBERS</AutoTranslatedText></View></View>; }
+function GroupSize(p: any) { return <View style={styles.formCard}><Text style={styles.groupInfoTitle}>{tr("Group Seva Registration")}</Text><Text style={styles.groupInfo}>{tr("Group registration starts with a minimum team size of 10 members. Enter the required team size first. Member profiles will be collected next.")}</Text><Field label={tr("Team Size")} required value={p.teamSize} placeholder={tr("Minimum 10")} onChangeText={(v: string) => p.setTeamSize(v.replace(/\D/g, '').slice(0,3))} keyboardType="number-pad" maxLength={3} /><Field label={tr("Group Name")} value={p.groupName} placeholder={tr("Enter group name")} onChangeText={p.setGroupName} /><View style={styles.minimumBadge}><Text style={styles.minimumBadgeText}>{tr("MINIMUM 10 MEMBERS")}</Text></View></View>; }
 
 function MemberProfiles({ members, teamSize, onAdd, onEdit, leaderId }: { members: Member[]; teamSize: number; onAdd: () => void; onEdit: (m: Member) => void; leaderId: number | null }) { return <View>
-  <View style={styles.memberProgress}><AutoTranslatedText style={styles.memberProgressTitle}>Member Profiles</AutoTranslatedText><Text style={styles.memberProgressCount}>{members.length} / {teamSize} added</Text></View>
-  <AutoTranslatedText style={styles.groupInfo}>Add each member's personal details, Aadhaar number/file and address. Seva services will open only after all selected members are added.</AutoTranslatedText>
-  {members.map((m, i) => <TouchableOpacity key={m.id} style={styles.memberCard} onPress={() => onEdit(m)}><View style={styles.memberNumber}><Text style={styles.memberNumberText}>{i + 1}</Text></View><View style={{flex:1}}><Text style={styles.memberName}>{m.name}</Text><Text style={styles.memberMeta}>{m.mobile} • Aadhaar ending {m.aadhaar.slice(-4)}</Text></View>{leaderId === m.id && <AutoTranslatedText style={styles.leaderTag}>TEAM LEADER</AutoTranslatedText>}<Text style={styles.editArrow}>›</Text></TouchableOpacity>)}
-  {members.length < teamSize && <TouchableOpacity style={styles.addMemberButton} onPress={onAdd}><Text style={styles.addMemberPlus}>＋</Text><Text style={styles.addMemberText}>Add Member {members.length + 1}</Text></TouchableOpacity>}
+  <View style={styles.memberProgress}><Text style={styles.memberProgressTitle}>{tr("Member Profiles")}</Text><Text style={styles.memberProgressCount}>{i18n.t('sevaRegistration.members_added', { added: members.length, total: teamSize })}</Text></View>
+  <Text style={styles.groupInfo}>{tr("Add each member's personal details, Aadhaar number/file and address. Seva services will open only after all selected members are added.")}</Text>
+  {members.map((m, i) => <TouchableOpacity key={m.id} style={styles.memberCard} onPress={() => onEdit(m)}><View style={styles.memberNumber}><Text style={styles.memberNumberText}>{i + 1}</Text></View><View style={{flex:1}}><Text style={styles.memberName}>{m.name}</Text><Text style={styles.memberMeta}>{m.mobile} • {i18n.t('sevaRegistration.aadhaar_ending', { digits: m.aadhaar.slice(-4) })}</Text></View>{leaderId === m.id && <Text style={styles.leaderTag}>{tr("TEAM LEADER")}</Text>}<Text style={styles.editArrow}>›</Text></TouchableOpacity>)}
+  {members.length < teamSize && <TouchableOpacity style={styles.addMemberButton} onPress={onAdd}><Text style={styles.addMemberPlus}>＋</Text><Text style={styles.addMemberText}>{i18n.t('sevaRegistration.add_member_number', { number: members.length + 1 })}</Text></TouchableOpacity>}
 </View>; }
 
-function LeaderPicker({ members, leaderId, setLeaderId }: { members: Member[]; leaderId: number | null; setLeaderId: (id: number) => void }) { return <View><AutoTranslatedText style={styles.groupInfo}>Select one member as the Team Leader. The selected leader will be shown on the final Group Seva registration.</AutoTranslatedText>{members.map(m => <TouchableOpacity key={m.id} style={[styles.leaderCard, leaderId === m.id && styles.leaderCardSelected]} onPress={() => setLeaderId(m.id)}><View style={[styles.radio, leaderId === m.id && styles.radioSelected]}>{leaderId === m.id && <View style={styles.radioDot}/>}</View><View style={{flex:1}}><Text style={styles.memberName}>{m.name}</Text><Text style={styles.memberMeta}>{m.mobile}</Text></View>{leaderId === m.id && <AutoTranslatedText style={styles.leaderTag}>TEAM LEADER</AutoTranslatedText>}</TouchableOpacity>)}</View>; }
+function LeaderPicker({ members, leaderId, setLeaderId }: { members: Member[]; leaderId: number | null; setLeaderId: (id: number) => void }) { return <View><Text style={styles.groupInfo}>{tr("Select one member as the Team Leader. The selected leader will be shown on the final Group Seva registration.")}</Text>{members.map(m => <TouchableOpacity key={m.id} style={[styles.leaderCard, leaderId === m.id && styles.leaderCardSelected]} onPress={() => setLeaderId(m.id)}><View style={[styles.radio, leaderId === m.id && styles.radioSelected]}>{leaderId === m.id && <View style={styles.radioDot}/>}</View><View style={{flex:1}}><Text style={styles.memberName}>{m.name}</Text><Text style={styles.memberMeta}>{m.mobile}</Text></View>{leaderId === m.id && <Text style={styles.leaderTag}>{tr("TEAM LEADER")}</Text>}</TouchableOpacity>)}</View>; }
 
-function DateTime(p: any) { return <View><Text style={styles.label}>Select Date<Text style={styles.required}> *</Text></Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:25}}>{DATES.map(x => <TouchableOpacity key={x.id} onPress={() => p.setSelectedDate(x.id)} style={[styles.dateCard,p.selectedDate===x.id&&styles.dateCardSelected]}><Text style={[styles.dateDay,p.selectedDate===x.id&&styles.whiteText]}>{x.day}</Text><Text style={[styles.dateNumber,p.selectedDate===x.id&&styles.whiteText]}>{x.date}</Text><Text style={[styles.dateMonth,p.selectedDate===x.id&&styles.whiteText]}>{x.month}</Text></TouchableOpacity>)}</ScrollView><Text style={styles.label}>Select Time<Text style={styles.required}> *</Text></Text><View style={styles.timeGrid}>{TIMES.map(t => <TouchableOpacity key={t} onPress={() => p.setSelectedTime(t)} style={[styles.timeChip,p.selectedTime===t&&styles.timeChipSelected]}><Text style={[styles.timeText,p.selectedTime===t&&styles.whiteText]}>{t}</Text></TouchableOpacity>)}</View><View style={styles.lockCard}><Text style={styles.lockIcon}>🛕</Text><View style={{flex:1}}><AutoTranslatedText style={styles.lockTitle}>Seva will be assigned by Admin</AutoTranslatedText><AutoTranslatedText style={styles.lockText}>Submit your preferred date and time. Temple admin will review the registration and assign the suitable seva later.</AutoTranslatedText></View></View></View>; }
+function DateTime(p: any) { return <View><Text style={styles.label}>{tr("Select Date")}<Text style={styles.required}> *</Text></Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:25}}>{DATES.map(x => <TouchableOpacity key={x.id} onPress={() => p.setSelectedDate(x.id)} style={[styles.dateCard,p.selectedDate===x.id&&styles.dateCardSelected]}><Text style={[styles.dateDay,p.selectedDate===x.id&&styles.whiteText]}>{formatSevaDate(x.id, { weekday: 'short' })}</Text><Text style={[styles.dateNumber,p.selectedDate===x.id&&styles.whiteText]}>{x.date}</Text><Text style={[styles.dateMonth,p.selectedDate===x.id&&styles.whiteText]}>{formatSevaDate(x.id, { month: 'short' })}</Text></TouchableOpacity>)}</ScrollView><Text style={styles.label}>{tr("Select Time")}<Text style={styles.required}> *</Text></Text><View style={styles.timeGrid}>{TIMES.map(t => <TouchableOpacity key={t} onPress={() => p.setSelectedTime(t)} style={[styles.timeChip,p.selectedTime===t&&styles.timeChipSelected]}><Text style={[styles.timeText,p.selectedTime===t&&styles.whiteText]}>{formatSevaTime(t)}</Text></TouchableOpacity>)}</View><View style={styles.lockCard}><Text style={styles.lockIcon}>🛕</Text><View style={{flex:1}}><Text style={styles.lockTitle}>{tr("Seva will be assigned by Admin")}</Text><Text style={styles.lockText}>{tr("Submit your preferred date and time. Temple admin will review the registration and assign the suitable seva later.")}</Text></View></View></View>; }
 
-function UploadField({ file, onPress }: { file: string; onPress: () => void }) { return <View style={styles.uploadBox}><View style={{flex:1}}><Text style={styles.uploadTitle}>Aadhaar Card File<Text style={styles.required}> *</Text></Text><Text style={styles.uploadHint}>{file || 'Upload PDF or JPG of Aadhaar card'}</Text></View><TouchableOpacity style={styles.uploadButton} onPress={onPress}><Text style={styles.uploadButtonText}>{file ? 'Attached' : 'Upload'}</Text></TouchableOpacity></View>; }
+function UploadField({ file, onPress }: { file: string; onPress: () => void }) { return <View style={styles.uploadBox}><View style={{flex:1}}><Text style={styles.uploadTitle}>{tr('Aadhaar Card File')}<Text style={styles.required}> *</Text></Text><Text style={styles.uploadHint}>{file ? file.replace('attached (mock)', i18n.t('sevaRegistration.attached_mock')) : i18n.t('sevaRegistration.upload_aadhaar_hint')}</Text></View><TouchableOpacity style={styles.uploadButton} onPress={onPress}><Text style={styles.uploadButtonText}>{tr(file ? 'Attached' : 'Upload')}</Text></TouchableOpacity></View>; }
 
-function MemberModal({ member, setMember, onSave, onCancel }: { member: Member; setMember: (m: Member|null)=>void; onSave:()=>void; onCancel:()=>void }) { const update=(key:keyof Member,v:string)=>setMember({...member,[key]:v}); const dob=(v:string)=>{const d=v.replace(/\D/g,'').slice(0,8);let o=d;if(d.length>2)o=`${d.slice(0,2)}/${d.slice(2)}`;if(d.length>4)o=`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`;update('dob',o)}; return <Modal visible transparent animationType="slide"><View style={styles.modalOverlay}><View style={styles.memberModal}><Text style={styles.modalTitle}>Member {member.id} Profile</Text><ScrollView showsVerticalScrollIndicator={false}><Field label="Full Name" required value={member.name} placeholder="Enter full name" onChangeText={(v: string)=>update('name',v)} /><Field label="Mobile Number" required value={member.mobile} placeholder="10-digit mobile" onChangeText={(v: string)=>update('mobile',v)} keyboardType="phone-pad" maxLength={10}/><Field label="Aadhaar Card Number" required value={member.aadhaar} placeholder="12-digit Aadhaar" onChangeText={(v: string)=>update('aadhaar',v)} keyboardType="number-pad" maxLength={12}/><UploadField file={member.aadhaarFile} onPress={()=>update('aadhaarFile','aadhaar-member-'+member.id+'.pdf • attached (mock)')} /><Field label="Date of Birth" required value={member.dob} placeholder="DD/MM/YYYY" onChangeText={dob} keyboardType="number-pad" maxLength={10}/><Field label="Age" required value={member.age} placeholder="Age" onChangeText={(v: string)=>update('age',v)} keyboardType="number-pad" maxLength={3}/><Text style={styles.label}>Gender<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Radio label="Male" selected={member.gender==='Male'} onPress={()=>update('gender','Male')}/><Radio label="Female" selected={member.gender==='Female'} onPress={()=>update('gender','Female')}/></View><AutoTranslatedText style={styles.modalSection}>Address Details</AutoTranslatedText><Field label="Pincode" required value={member.pincode} placeholder="Pincode" onChangeText={(v: string)=>update('pincode',v)} keyboardType="number-pad" maxLength={6}/><Field label="State" required value={member.state} placeholder="State" onChangeText={(v: string)=>update('state',v)}/><Field label="District" required value={member.district} placeholder="District" onChangeText={(v: string)=>update('district',v)}/><Field label="Mandal" value={member.mandal} placeholder="Mandal" onChangeText={(v: string)=>update('mandal',v)}/><Field label="City" required value={member.city} placeholder="City" onChangeText={(v: string)=>update('city',v)}/><Field label="Street" required value={member.street} placeholder="Street" onChangeText={(v: string)=>update('street',v)}/><Field label="Door Number" required value={member.door} placeholder="Door number" onChangeText={(v: string)=>update('door',v)}/></ScrollView><View style={styles.modalButtons}><TouchableOpacity style={styles.bottomBack} onPress={onCancel}><AutoTranslatedText style={styles.bottomBackText}>Cancel</AutoTranslatedText></TouchableOpacity><TouchableOpacity style={styles.continueButton} onPress={onSave}><AutoTranslatedText style={styles.continueText}>Save Member</AutoTranslatedText></TouchableOpacity></View></View></View></Modal>; }
+function MemberModal({ member, setMember, onSave, onCancel }: { member: Member; setMember: (m: Member|null)=>void; onSave:()=>void; onCancel:()=>void }) { const update=(key:keyof Member,v:string)=>setMember({...member,[key]:v}); const dob=(v:string)=>{const d=v.replace(/\D/g,'').slice(0,8);let o=d;if(d.length>2)o=`${d.slice(0,2)}/${d.slice(2)}`;if(d.length>4)o=`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`;update('dob',o)}; return <Modal visible transparent animationType="slide"><View style={styles.modalOverlay}><View style={styles.memberModal}><Text style={styles.modalTitle}>{i18n.t('sevaRegistration.member_profile', { id: member.id })}</Text><ScrollView showsVerticalScrollIndicator={false}><Field label={tr("Full Name")} required value={member.name} placeholder={tr("Enter full name")} onChangeText={(v: string)=>update('name',v)} /><Field label={tr("Mobile Number")} required value={member.mobile} placeholder={tr("10-digit mobile")} onChangeText={(v: string)=>update('mobile',v)} keyboardType="phone-pad" maxLength={10}/><Field label={tr("Aadhaar Card Number")} required value={member.aadhaar} placeholder={tr("12-digit Aadhaar")} onChangeText={(v: string)=>update('aadhaar',v)} keyboardType="number-pad" maxLength={12}/><UploadField file={member.aadhaarFile} onPress={()=>update('aadhaarFile','aadhaar-member-'+member.id+'.pdf • attached (mock)')} /><Field label={tr("Date of Birth")} required value={member.dob} placeholder="DD/MM/YYYY" onChangeText={dob} keyboardType="number-pad" maxLength={10}/><Field label={tr("Age")} required value={member.age} placeholder={tr("Age")} onChangeText={(v: string)=>update('age',v)} keyboardType="number-pad" maxLength={3}/><Text style={styles.label}>{tr("Gender")}<Text style={styles.required}> *</Text></Text><View style={styles.optionRow}><Radio label={tr("Male")} selected={member.gender==='Male'} onPress={()=>update('gender','Male')}/><Radio label={tr("Female")} selected={member.gender==='Female'} onPress={()=>update('gender','Female')}/></View><Text style={styles.modalSection}>{tr("Address Details")}</Text><Field label={tr("Pincode")} required value={member.pincode} placeholder={tr("Pincode")} onChangeText={(v: string)=>update('pincode',v)} keyboardType="number-pad" maxLength={6}/><Field label={tr("State")} required value={member.state} placeholder={tr("State")} onChangeText={(v: string)=>update('state',v)}/><Field label={tr("District")} required value={member.district} placeholder={tr("District")} onChangeText={(v: string)=>update('district',v)}/><Field label={tr("Mandal")} value={member.mandal} placeholder={tr("Mandal")} onChangeText={(v: string)=>update('mandal',v)}/><Field label={tr("City")} required value={member.city} placeholder={tr("City")} onChangeText={(v: string)=>update('city',v)}/><Field label={tr("Street")} required value={member.street} placeholder={tr("Street")} onChangeText={(v: string)=>update('street',v)}/><Field label={tr("Door Number")} required value={member.door} placeholder={tr("Door number")} onChangeText={(v: string)=>update('door',v)}/></ScrollView><View style={styles.modalButtons}><TouchableOpacity style={styles.bottomBack} onPress={onCancel}><Text style={styles.bottomBackText}>{tr("Cancel")}</Text></TouchableOpacity><TouchableOpacity style={styles.continueButton} onPress={onSave}><Text style={styles.continueText}>{tr("Save Member")}</Text></TouchableOpacity></View></View></View></Modal>; }
 
-function Field({ label, required, value, placeholder, onChangeText, keyboardType, maxLength, dropdown, onPress, multiline }: any) { return <View style={styles.field}><Text style={styles.label}>{label}{required&&<Text style={styles.required}> *</Text>}</Text>{dropdown?<TouchableOpacity style={styles.fieldLine} onPress={onPress}><Text style={[styles.fieldValue,!value&&styles.placeholder]}>{value||placeholder||''}</Text><Text style={styles.fieldIcon}>⌄</Text></TouchableOpacity>:<TextInput style={[styles.inputLine,multiline&&styles.multiline]} value={value} placeholder={placeholder} placeholderTextColor={C.muted} onChangeText={onChangeText} keyboardType={keyboardType} maxLength={maxLength} multiline={multiline}/>}</View>; }
+function Field({ label, required, value, placeholder, onChangeText, keyboardType, maxLength, dropdown, onPress, multiline }: any) { return <View style={styles.field}><Text style={styles.label}>{label}{required&&<Text style={styles.required}> *</Text>}</Text>{dropdown?<TouchableOpacity style={styles.fieldLine} onPress={onPress}><Text style={[styles.fieldValue,!value&&styles.placeholder]}>{tr(value || placeholder || '')}</Text><Text style={styles.fieldIcon}>⌄</Text></TouchableOpacity>:<TextInput style={[styles.inputLine,multiline&&styles.multiline]} value={value} placeholder={placeholder} placeholderTextColor={C.muted} onChangeText={onChangeText} keyboardType={keyboardType} maxLength={maxLength} multiline={multiline}/>}</View>; }
 function Radio({label,selected,onPress}:{label:string;selected:boolean;onPress:()=>void}){return <TouchableOpacity style={styles.choice} onPress={onPress}><View style={[styles.radio,selected&&styles.radioSelected]}>{selected&&<View style={styles.radioDot}/>}</View><Text style={styles.choiceText}>{label}</Text></TouchableOpacity>}
 function Checkbox({label,selected,onPress}:{label:string;selected:boolean;onPress:()=>void}){return <TouchableOpacity style={styles.choice} onPress={onPress}><View style={[styles.checkbox,selected&&styles.checkboxSelected]}>{selected&&<Text style={styles.checkboxTick}>✓</Text>}</View><Text style={styles.choiceText}>{label}</Text></TouchableOpacity>}
-function Confirmation({type,id,name,groupSize,groupName,date,time}:{type:Type;id:string;name:string;groupSize:number;groupName:string;date:any;time:string}){return <SafeAreaView style={styles.screen}><ScrollView contentContainerStyle={styles.confirmContent}><View style={styles.successCircle}><Text style={styles.successTick}>✓</Text></View><AutoTranslatedText style={styles.confirmTitle}>Registration Submitted</AutoTranslatedText><Text style={styles.confirmSubtitle}>Your {type==='individual'?'Individual':'Group'} Seva registration has been submitted for admin review.</Text><View style={styles.confirmCard}><AutoTranslatedText style={styles.confirmSmall}>REGISTRATION ID</AutoTranslatedText><Text style={styles.confirmId}>{id}</Text><ConfirmRow label="Registration Type" value={type==='individual'?'Individual Seva':'Group Seva'}/><ConfirmRow label={type==='individual'?'Devotee':'Team Leader'} value={name}/>{type==='group'&&<ConfirmRow label="Team Size" value={`${groupSize} members`}/>} {type==='group'&&groupName?<ConfirmRow label="Group Name" value={groupName}/>:null}<ConfirmRow label="Seva" value="To be assigned by Admin"/><ConfirmRow label="Date" value={`${date.day}, ${date.date} ${date.month} 2026`}/><ConfirmRow label="Time" value={time}/><ConfirmRow label="Status" value="Pending Admin Assignment"/></View><View style={styles.infoBox}><AutoTranslatedText style={styles.infoTitle}>Important</AutoTranslatedText><AutoTranslatedText style={styles.infoText}>Temple admin will review your registration and assign a suitable seva. The assigned seva will appear in My Sevas after approval.</AutoTranslatedText></View><TouchableOpacity style={styles.continueButton} onPress={()=>router.push('/my-sevas')}><AutoTranslatedText style={styles.continueText}>View My Sevas</AutoTranslatedText></TouchableOpacity><TouchableOpacity style={styles.outlineButton} onPress={()=>router.replace('/seva-registration')}><AutoTranslatedText style={styles.outlineText}>Register Another Seva</AutoTranslatedText></TouchableOpacity></ScrollView></SafeAreaView>}
+function Confirmation({type,id,name,groupSize,groupName,date,time}:{type:Type;id:string;name:string;groupSize:number;groupName:string;date:any;time:string}){return <SafeAreaView style={styles.screen}><ScrollView contentContainerStyle={styles.confirmContent}><View style={styles.successCircle}><Text style={styles.successTick}>✓</Text></View><Text style={styles.confirmTitle}>{tr("Registration Submitted")}</Text><Text style={styles.confirmSubtitle}>{i18n.t(type === 'individual' ? 'sevaRegistration.individual_confirmation' : 'sevaRegistration.group_confirmation')}</Text><View style={styles.confirmCard}><Text style={styles.confirmSmall}>{tr("REGISTRATION ID")}</Text><Text style={styles.confirmId}>{id}</Text><ConfirmRow label={tr("Registration Type")} value={tr(type === 'individual' ? 'Individual Seva' : 'Group Seva')}/><ConfirmRow label={tr(type === 'individual' ? 'Devotee' : 'Team Leader')} value={name}/>{type==='group'&&<ConfirmRow label={tr("Team Size")} value={i18n.t('sevaRegistration.member_count', { number: groupSize })}/>} {type==='group'&&groupName?<ConfirmRow label={tr("Group Name")} value={groupName}/>:null}<ConfirmRow label={tr("Seva")} value={tr('To be assigned by Admin')}/><ConfirmRow label={tr("Date")} value={formatSevaDate(date.id, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}/><ConfirmRow label={tr("Time")} value={formatSevaTime(time)}/><ConfirmRow label={tr("Status")} value={tr('Pending Admin Assignment')}/></View><View style={styles.infoBox}><Text style={styles.infoTitle}>{tr("Important")}</Text><Text style={styles.infoText}>{tr("Temple admin will review your registration and assign a suitable seva. The assigned seva will appear in My Sevas after approval.")}</Text></View><TouchableOpacity style={styles.continueButton} onPress={()=>router.push('/my-sevas')}><Text style={styles.continueText}>{tr("View My Sevas")}</Text></TouchableOpacity><TouchableOpacity style={styles.outlineButton} onPress={()=>router.replace('/seva-registration')}><Text style={styles.outlineText}>{tr("Register Another Seva")}</Text></TouchableOpacity></ScrollView></SafeAreaView>}
 function ConfirmRow({label,value}:{label:string;value:string}){return <View style={styles.confirmRow}><Text style={styles.confirmLabel}>{label}</Text><Text style={styles.confirmValue}>{value}</Text></View>}
 
 const styles=StyleSheet.create({

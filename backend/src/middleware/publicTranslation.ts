@@ -1,4 +1,6 @@
 import { Request, RequestHandler, Response } from 'express';
+import { withTranslationDeadline } from '../services/translationDeadline';
+// TRANSLATION_DEADLINE_V1
 import {
   SUPPORTED_LANGUAGES,
   TranslationLanguage,
@@ -17,16 +19,22 @@ const TRANSLATABLE_ROUTES: Record<string, readonly string[]> = {
   '/api/guru-parampara': ['name', 'title', 'translation'],
   '/api/guru-vani': ['title', 'meaning', 'guru_name'],
   '/api/mahaswamiji-programmes': ['title', 'description', 'venue', 'location'],
-  '/api/nearby': ['name', 'title', 'description', 'address'],
+  '/api/nearby': ['name', 'title', 'description', 'address', 'category_name'],
   '/api/poojas': ['name', 'title', 'description', 'significance'],
   '/api/pravachanas': ['title', 'description', 'speaker_name'],
-  '/api/publications': ['title', 'description', 'author'],
+  '/api/publications': ['name', 'title', 'description', 'author', 'category_name'],
   '/api/quotes': ['title', 'meaning', 'description'],
   '/api/buildings': ['name', 'title', 'description'],
   '/api/welcome-screen': ['title', 'description'],
   '/api/welcome-slokams': ['title', 'description'],
   '/api/darshan-videos': ['title', 'description'],
-  '/api/temple-contact': ['description'],
+  '/api/darshan/today': ['name'],
+  '/api/temple-contact': [
+    'description',
+    'temple_name',
+    'temple_address',
+    'bangalore_address',
+  ],
 };
 
 const MAX_FIELDS = 300;
@@ -66,7 +74,30 @@ function collectTasks(
   const seen = new WeakMap<object, unknown>();
 
   function visit(value: unknown, depth: number): unknown {
-    if (value === null || typeof value !== 'object' || depth > 12) return value;
+
+    // Preserve dates and timestamps from PostgreSQL.
+    if (value instanceof Date) {
+      return value.toJSON();
+    }
+
+    // Preserve null values and primitive data types.
+    if (
+      value === null ||
+      typeof value !== 'object' ||
+      depth > 12
+    ) {
+      return value;
+    }
+
+    // Preserve special objects without recursive conversion.
+    if (
+      !Array.isArray(value) &&
+      Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null
+    ) {
+      return value;
+    }
+
     if (seen.has(value)) return seen.get(value);
     if (Array.isArray(value)) {
       const array: unknown[] = [];
@@ -96,9 +127,10 @@ async function translateResponse(body: unknown, language: TranslationLanguage, f
   const uniqueTexts = [...new Set(tasks.map(task => task.text))];
   const translated = new Map<string, string>();
   let cursor = 0;
+  const deadline = Date.now() + 3500;
 
   async function worker() {
-    while (cursor < uniqueTexts.length) {
+    while (cursor < uniqueTexts.length && Date.now() < deadline) {
       const index = cursor++;
       const original = uniqueTexts[index];
       try {
@@ -118,6 +150,11 @@ async function translateResponse(body: unknown, language: TranslationLanguage, f
 export const publicTranslationMiddleware: RequestHandler = (req, res, next) => {
   if (req.method !== 'GET') return next();
   const path = req.path;
+  // PUBLIC_TRANSLATION_V3
+  // Never translate nested administrative endpoints.
+  if (path.toLowerCase().split('/').includes('admin')) {
+    return next();
+  }
   if (
     ['/api/admin', '/api/auth', '/api/dharma', '/api/notifications', '/api/translate', '/api/announcements']
       .some(prefix => path === prefix || path.startsWith(`${prefix}/`))
@@ -137,7 +174,10 @@ export const publicTranslationMiddleware: RequestHandler = (req, res, next) => {
     sent = true;
     void (async () => {
       try {
-        const translated = await translateResponse(body, language, fields);
+        const translated = await withTranslationDeadline(
+          translateResponse(body, language, fields),
+          body
+        );
         if (!res.headersSent && !res.writableEnded) originalJson(translated);
       } catch (error) {
         console.error('Public translation middleware error:', error);

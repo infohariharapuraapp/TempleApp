@@ -77,8 +77,9 @@ export default function ActivityDetailsScreen() {
   const [loading, setLoading] =
     useState(true);
 
-  const language =
-    i18n.resolvedLanguage || i18n.language;
+  const language = (
+    i18n.resolvedLanguage || i18n.language || 'en'
+  ).split('-')[0].toLowerCase();
 
   const dateLocale =
     DATE_LOCALES[language] || 'en-IN';
@@ -88,10 +89,14 @@ export default function ActivityDetailsScreen() {
   // ========================================
 
   useEffect(() => {
-    loadActivity();
-  }, [id]);
+    let active = true;
+    loadActivity(() => active);
+    return () => {
+      active = false;
+    };
+  }, [id, language]);
 
-  const loadActivity = async () => {
+  const loadActivity = async (isActive: () => boolean) => {
 
     try {
 
@@ -102,13 +107,11 @@ export default function ActivityDetailsScreen() {
         success: boolean;
         data: Activity;
       }>(
-        `/activities/${encodeURIComponent(id)}`
+        `/activities/${encodeURIComponent(id)}?lang=${encodeURIComponent(language)}`
       );
 
-      if (
-        response.success &&
-        response.data
-      ) {
+      if (!isActive()) return;
+      if (response.success && response.data) {
         setActivity(response.data);
       }
 
@@ -120,8 +123,7 @@ export default function ActivityDetailsScreen() {
       );
 
     } finally {
-
-      setLoading(false);
+      if (isActive()) setLoading(false);
 
     }
 

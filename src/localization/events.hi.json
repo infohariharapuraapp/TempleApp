@@ -20,6 +20,8 @@
     "eventUnavailable": "यह कार्यक्रम अब उपलब्ध नहीं है।",
     "detailsLoading": "कार्यक्रम का विवरण लोड हो रहा है...",
     "detailsDate": "कार्यक्रम की तारीख",
-    "detailsDescriptionFallback": "अधिक जानकारी जल्द उपलब्ध होगी।"
+    "detailsDescriptionFallback": "अधिक जानकारी जल्द उपलब्ध होगी।",
+    "startsAt": "{{time}} बजे प्रारंभ",
+    "endsAt": "{{time}} बजे समाप्त"
   }
 }

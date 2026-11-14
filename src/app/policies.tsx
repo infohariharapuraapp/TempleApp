@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, { useState } from 'react';
 
@@ -242,6 +242,20 @@ No refund will be provided for a no-show, subject to applicable law.`,
 ];
 
 export default function PoliciesScreen() {
+  // POLICIES_LANGUAGE_V1
+  // POLICY_CONTENT_LANGUAGE_V1
+  const { t } = useTranslation();
+  const translatePolicyLabel = (value: string) => {
+    const key = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return t('templePoliciesLocal.' + key, {
+      defaultValue: value,
+    });
+  };
+
   const [expanded, setExpanded] = useState<number | null>(0);
 
   return (
@@ -251,14 +265,11 @@ export default function PoliciesScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.header}>
-          <AutoTranslatedText style={styles.label}>SREEMATH HARIHARAPURA</AutoTranslatedText>
+          <Text style={styles.label}>{t('templePoliciesLocal.sreemath_hariharapura')}</Text>
 
-          <AutoTranslatedText style={styles.title}>Temple Policies</AutoTranslatedText>
+          <Text style={styles.title}>{t('templePoliciesLocal.temple_policies')}</Text>
 
-          <AutoTranslatedText style={styles.subtitle}>
-            Please review our policies before using temple
-            bookings, accommodation and other services.
-          </AutoTranslatedText>
+          <Text style={styles.subtitle}>{t('templePoliciesLocal.please_review_our_policies_before_using_temple_bookings_accommodation_and_other_services')}</Text>
         </View>
 
         {policies.map((policy, index) => {
@@ -277,11 +288,11 @@ export default function PoliciesScreen() {
               >
                 <View style={styles.policyHeaderText}>
                   <Text style={styles.policyTitle}>
-                    {policy.title}
+                    {translatePolicyLabel(policy.title)}
                   </Text>
 
                   <Text style={styles.policySubtitle}>
-                    {policy.subtitle}
+                    {translatePolicyLabel(policy.subtitle)}
                   </Text>
                 </View>
 
@@ -292,17 +303,21 @@ export default function PoliciesScreen() {
 
               {isExpanded && (
                 <View style={styles.policyBody}>
-                  {policy.sections.map((section) => (
+                  {policy.sections.map((section, sectionIndex) => (
                     <View
                       key={section.title}
                       style={styles.section}
                     >
                       <Text style={styles.sectionTitle}>
-                        {section.title}
+                        {translatePolicyLabel(section.title)}
                       </Text>
 
                       <Text style={styles.sectionText}>
-                        {section.content}
+                        {t(
+                          'policyContent.p' + index +
+                          '_s' + sectionIndex + '_content',
+                          { defaultValue: section.content }
+                        )}
                       </Text>
                     </View>
                   ))}
@@ -313,28 +328,15 @@ export default function PoliciesScreen() {
         })}
 
         <View style={styles.noticeCard}>
-          <AutoTranslatedText style={styles.noticeTitle}>
-            Important Booking Notice
-          </AutoTranslatedText>
+          <Text style={styles.noticeTitle}>{t('templePoliciesLocal.important_booking_notice')}</Text>
 
-          <Text style={styles.noticeText}>
-            Room and guest-house bookings are strictly
-            non-cancellable and non-refundable, subject
-            to applicable law. Please verify all details
-            before making payment.
-          </Text>
+          <Text style={styles.noticeText}>{t('templePoliciesLocal.room_and_guest_house_bookings_are_strictly_non_cancellable_and_non_refundable_subject_to_applicable_law_please_verify_all_details_before_making_payment')}</Text>
         </View>
 
         <View style={styles.contactCard}>
-          <AutoTranslatedText style={styles.contactTitle}>
-            Need Assistance?
-          </AutoTranslatedText>
+          <Text style={styles.contactTitle}>{t('templePoliciesLocal.need_assistance')}</Text>
 
-          <AutoTranslatedText style={styles.contactDescription}>
-            For questions regarding privacy, bookings,
-            refunds or temple services, please contact
-            Sreemath Hariharapura.
-          </AutoTranslatedText>
+          <Text style={styles.contactDescription}>{t('templePoliciesLocal.for_questions_regarding_privacy_bookings_refunds_or_temple_services_please_contact_sreemath_hariharapura')}</Text>
 
           <Text style={styles.phone}>
             +91 90199 77466
@@ -345,24 +347,20 @@ export default function PoliciesScreen() {
           style={styles.contactButton}
           onPress={() => router.push('/contact')}
         >
-          <AutoTranslatedText style={styles.contactButtonText}>
-            Contact Temple
-          </AutoTranslatedText>
+          <Text style={styles.contactButtonText}>{t('templePoliciesLocal.contact_temple')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.homeButton}
           onPress={() => router.replace('/(tabs)')}
         >
-          <AutoTranslatedText style={styles.homeButtonText}>
-            Back to Home
-          </AutoTranslatedText>
+          <Text style={styles.homeButtonText}>{t('templePoliciesLocal.back_to_home')}</Text>
         </TouchableOpacity>
 
         <Text style={styles.footer}>
-          © Sreemath Hariharapura
+          {t('templePoliciesLocal.copyright_sreemath')}
           {'\n'}
-          Hariharapura, Karnataka – 577120
+          {t('templePoliciesLocal.hariharapura_karnataka_577120')}
         </Text>
       </ScrollView>
     </SafeAreaView>

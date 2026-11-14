@@ -1,5 +1,6 @@
 
 import { Request, Response } from 'express';
+import { withTranslationDeadline } from '../services/translationDeadline';
 
 import {
   translateText,
@@ -155,15 +156,21 @@ export const translatePublicBatch = async (
 
     // Sequential requests avoid overwhelming
     // the free translation provider.
-    for (const text of uniqueTexts) {
-      const translated = await translateTextOrOriginal(
-        text,
-        targetLanguage,
-        sourceLanguage
-      );
-
-      translatedMap.set(text, translated);
-    }
+    await withTranslationDeadline(
+      (async () => {
+        const deadline = Date.now() + 3500;
+        for (const text of uniqueTexts) {
+          if (Date.now() >= deadline) break;
+          const translated = await translateTextOrOriginal(
+            text,
+            targetLanguage,
+            sourceLanguage
+          );
+          translatedMap.set(text, translated);
+        }
+      })(),
+      undefined
+    );
 
     const translations = texts.map(
       (text: string) =>

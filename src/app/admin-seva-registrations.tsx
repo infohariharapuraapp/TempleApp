@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -76,6 +76,85 @@ const INITIAL_REGISTRATIONS: Registration[] = [
 ];
 
 export default function AdminSevaRegistrationsScreen() {
+  // ADMIN_SEVA_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN',
+  };
+  const locale = locales[language] || 'en-IN';
+  const translateLabel = (value: string) => {
+    const key = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return t('adminSevaLocal.' + key, {
+      defaultValue: value,
+    });
+  };
+  const formatDate = (value: string) => {
+    if (language === 'en') return value;
+    const match = value.match(
+      /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/
+    );
+    if (!match) return value;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr',
+      'May', 'Jun', 'Jul', 'Aug',
+      'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    const month = months.indexOf(match[2]);
+    if (month < 0) return value;
+    const date = new Date(
+      Number(match[3]),
+      month,
+      Number(match[1])
+    );
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(date);
+    } catch {
+      return value;
+    }
+  };
+  const formatTime = (value: string) => {
+    if (language === 'en') return value;
+    const match = value.match(
+      /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+    );
+    if (!match) return value;
+    let hours = Number(match[1]) % 12;
+    if (match[3].toUpperCase() === 'PM') {
+      hours += 12;
+    }
+    const date = new Date(
+      2000, 0, 1,
+      hours,
+      Number(match[2])
+    );
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(date);
+    } catch {
+      return value;
+    }
+  };
+
   const [registrations, setRegistrations] = useState(INITIAL_REGISTRATIONS);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
@@ -106,7 +185,12 @@ export default function AdminSevaRegistrationsScreen() {
       )
     );
 
-    Alert.alert('Seva Assigned', `${seva} assigned successfully.`);
+    Alert.alert(
+      t('adminSevaLocal.seva_assigned'),
+      t('adminSevaLocal.assignment_success', {
+        seva: translateLabel(seva),
+      })
+    );
     setAssigningId(null);
   };
 
@@ -125,21 +209,19 @@ export default function AdminSevaRegistrationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <AutoTranslatedText style={styles.eyebrow}>ADMIN • TEMPLE OPERATIONS</AutoTranslatedText>
-        <AutoTranslatedText style={styles.title}>Seva Registrations</AutoTranslatedText>
-        <AutoTranslatedText style={styles.subtitle}>
-          Review registrations and assign the seva after the devotee completes registration.
-        </AutoTranslatedText>
+        <Text style={styles.eyebrow}>{t('adminSevaLocal.admin_temple_operations')}</Text>
+        <Text style={styles.title}>{t('adminSevaLocal.seva_registrations')}</Text>
+        <Text style={styles.subtitle}>{t('adminSevaLocal.review_registrations_and_assign_the_seva_after_the_devotee_completes_registration')}</Text>
 
         <View style={styles.summaryRow}>
-          <Summary value={String(pending).padStart(2, '0')} label="Pending" />
-          <Summary value={String(assigned).padStart(2, '0')} label="Assigned" />
-          <Summary value={String(completed).padStart(2, '0')} label="Completed" />
+          <Summary value={String(pending).padStart(2, '0')} label={t('adminSevaLocal.pending')} />
+          <Summary value={String(assigned).padStart(2, '0')} label={t('adminSevaLocal.assigned')} />
+          <Summary value={String(completed).padStart(2, '0')} label={t('adminSevaLocal.completed')} />
         </View>
 
         <TextInput
           style={styles.search}
-          placeholder="Search registration, name or mobile"
+          placeholder={t('adminSevaLocal.search_registration_name_or_mobile')}
           placeholderTextColor={MUTED}
           value={search}
           onChangeText={setSearch}
@@ -153,7 +235,7 @@ export default function AdminSevaRegistrationsScreen() {
               style={[styles.filter, filter === item && styles.filterSelected]}
             >
               <Text style={[styles.filterText, filter === item && styles.filterTextSelected]}>
-                {item}
+                {translateLabel(item)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -164,30 +246,30 @@ export default function AdminSevaRegistrationsScreen() {
             <View style={styles.top}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.id}>{item.id}</Text>
-                <Text style={styles.type}>{item.type}</Text>
+                <Text style={styles.type}>{translateLabel(item.type)}</Text>
               </View>
 
               <View style={styles.status}>
-                <Text style={styles.statusText}>{item.status}</Text>
+                <Text style={styles.statusText}>{translateLabel(item.status)}</Text>
               </View>
             </View>
 
             <View style={styles.divider} />
 
-            <Row label="Devotee / Group" value={item.name} />
-            <Row label="Mobile" value={item.mobile} />
-            <Row label="City" value={item.city} />
-            {item.members ? <Row label="Group Members" value={String(item.members)} /> : null}
-            <Row label="Preferred Date" value={item.date} />
-            <Row label="Preferred Time" value={item.time} />
-            <Row label="Assigned Seva" value={item.assignedSeva || 'Not Assigned'} />
+            <Row label={t('adminSevaLocal.devotee_group')} value={item.name} />
+            <Row label={t('adminSevaLocal.mobile')} value={item.mobile} />
+            <Row label={t('adminSevaLocal.city')} value={item.city} />
+            {item.members ? <Row label={t('adminSevaLocal.group_members')} value={String(item.members)} /> : null}
+            <Row label={t('adminSevaLocal.preferred_date')} value={formatDate(item.date)} />
+            <Row label={t('adminSevaLocal.preferred_time')} value={formatTime(item.time)} />
+            <Row label={t('adminSevaLocal.assigned_seva')} value={translateLabel(item.assignedSeva || 'Not Assigned')} />
 
             {item.status === 'Pending Admin Assignment' && (
               <TouchableOpacity
                 style={styles.assignButton}
                 onPress={() => setAssigningId(item.id)}
               >
-                <AutoTranslatedText style={styles.assignButtonText}>Assign Seva</AutoTranslatedText>
+                <Text style={styles.assignButtonText}>{t('adminSevaLocal.assign_seva')}</Text>
               </TouchableOpacity>
             )}
 
@@ -197,27 +279,27 @@ export default function AdminSevaRegistrationsScreen() {
                   style={styles.changeButton}
                   onPress={() => setAssigningId(item.id)}
                 >
-                  <AutoTranslatedText style={styles.changeButtonText}>Change Seva</AutoTranslatedText>
+                  <Text style={styles.changeButtonText}>{t('adminSevaLocal.change_seva')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.completeButton}
                   onPress={() => markCompleted(item.id)}
                 >
-                  <AutoTranslatedText style={styles.completeButtonText}>Mark Completed</AutoTranslatedText>
+                  <Text style={styles.completeButtonText}>{t('adminSevaLocal.mark_completed')}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {item.status === 'Completed' && (
               <View style={styles.completedBox}>
-                <AutoTranslatedText style={styles.completedText}>✓ Seva Completed</AutoTranslatedText>
+                <Text style={styles.completedText}>{t('adminSevaLocal.seva_completed_check')}</Text>
               </View>
             )}
           </View>
         ))}
 
-        <AutoTranslatedText style={styles.note}>MOCK DATA • ADMIN UI PREVIEW</AutoTranslatedText>
+        <Text style={styles.note}>{t('adminSevaLocal.mock_data_admin_ui_preview')}</Text>
       </ScrollView>
 
       <Modal
@@ -229,15 +311,17 @@ export default function AdminSevaRegistrationsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <AutoTranslatedText style={styles.modalTitle}>Assign Seva</AutoTranslatedText>
-              <TouchableOpacity onPress={() => setAssigningId(null)}>
+              <Text style={styles.modalTitle}>{t('adminSevaLocal.assign_seva')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('adminSevaLocal.close')}
+                onPress={() => setAssigningId(null)}
+              >
                 <Text style={styles.modalClose}>×</Text>
               </TouchableOpacity>
             </View>
 
-            <AutoTranslatedText style={styles.modalHint}>
-              Select the seva to assign to this registration.
-            </AutoTranslatedText>
+            <Text style={styles.modalHint}>{t('adminSevaLocal.select_the_seva_to_assign_to_this_registration')}</Text>
 
             {SEVAS.map((seva) => (
               <TouchableOpacity
@@ -245,7 +329,7 @@ export default function AdminSevaRegistrationsScreen() {
                 style={styles.sevaOption}
                 onPress={() => assignSeva(seva)}
               >
-                <Text style={styles.sevaOptionText}>{seva}</Text>
+                <Text style={styles.sevaOptionText}>{translateLabel(seva)}</Text>
                 <Text style={styles.sevaArrow}>›</Text>
               </TouchableOpacity>
             ))}

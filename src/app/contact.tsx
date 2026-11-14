@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, { useCallback, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -58,6 +58,15 @@ const DEFAULT_CONTACT: TempleContactSettings = {
 // ========================================
 
 export default function ContactScreen() {
+  // TEMPLE_SERVICES_LANGUAGE_V1
+  // CONTACT_DYNAMIC_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).toLowerCase().split('-')[0];
+
   const [contact, setContact] =
     useState<TempleContactSettings>(DEFAULT_CONTACT);
 
@@ -74,7 +83,7 @@ export default function ContactScreen() {
           const response = await apiRequest<{
             success: boolean;
             data: Partial<TempleContactSettings>;
-          }>('/temple-contact');
+          }>(`/temple-contact?lang=${encodeURIComponent(language)}`);
 
           if (active && response.success && response.data) {
             const updated: TempleContactSettings = {
@@ -111,7 +120,7 @@ export default function ContactScreen() {
       return () => {
         active = false;
       };
-    }, [])
+    }, [language])
   );
 
   // ========================================
@@ -135,9 +144,9 @@ export default function ContactScreen() {
       console.error('Contact link error:', error);
 
       Alert.alert(
-        'Unable to Open',
-        'No compatible application was found. Please check your device settings.'
-      );
+          t('templeServicesLocal.unable_to_open'),
+          t('templeServicesLocal.no_compatible_application_was_found_please_check_your_device_settings')
+        );
     }
   };
 
@@ -254,9 +263,7 @@ export default function ContactScreen() {
 
             <View style={styles.heroTag}>
               <View style={styles.statusDot} />
-              <AutoTranslatedText style={styles.heroTagText}>
-                OFFICIAL CONTACT
-              </AutoTranslatedText>
+              <Text style={styles.heroTagText}>{t('templeServicesLocal.official_contact')}</Text>
             </View>
           </View>
 
@@ -265,25 +272,18 @@ export default function ContactScreen() {
           </Text>
 
           <Text style={styles.heroTitle}>
-            Connect With
+            {t('templeServicesLocal.connect_with')}
             {'\n'}
-            Sreemath
+            {t('templeServicesLocal.sreemath')}
           </Text>
 
-          <AutoTranslatedText style={styles.heroSubtitle}>
-            Reach us for temple services, accommodation,
-            branch information and devotee assistance.
-          </AutoTranslatedText>
+          <Text style={styles.heroSubtitle}>{t('templeServicesLocal.reach_us_for_temple_services_accommodation_branch_information_and_devotee_assistance')}</Text>
 
           <View style={styles.heroBottom}>
             <View>
-              <AutoTranslatedText style={styles.heroLocationLabel}>
-                MAIN LOCATION
-              </AutoTranslatedText>
+              <Text style={styles.heroLocationLabel}>{t('templeServicesLocal.main_location')}</Text>
 
-              <AutoTranslatedText style={styles.heroLocation}>
-                Hariharapura • Karnataka
-              </AutoTranslatedText>
+              <Text style={styles.heroLocation}>{t('templeServicesLocal.hariharapura_karnataka')}</Text>
             </View>
 
             <TouchableOpacity
@@ -295,9 +295,7 @@ export default function ContactScreen() {
                 ⌖
               </Text>
 
-              <AutoTranslatedText style={styles.heroMapText}>
-                MAP
-              </AutoTranslatedText>
+              <Text style={styles.heroMapText}>{t('templeServicesLocal.map')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -321,9 +319,7 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <AutoTranslatedText style={styles.quickText}>
-              Call
-            </AutoTranslatedText>
+            <Text style={styles.quickText}>{t('templeServicesLocal.call')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -342,9 +338,7 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <AutoTranslatedText style={styles.quickText}>
-              Guest House
-            </AutoTranslatedText>
+            <Text style={styles.quickText}>{t('templeServicesLocal.guest_house')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -363,9 +357,7 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <AutoTranslatedText style={styles.quickText}>
-              Email
-            </AutoTranslatedText>
+            <Text style={styles.quickText}>{t('templeServicesLocal.email')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -384,9 +376,7 @@ export default function ContactScreen() {
               </Text>
             </View>
 
-            <AutoTranslatedText style={styles.quickText}>
-              Directions
-            </AutoTranslatedText>
+            <Text style={styles.quickText}>{t('templeServicesLocal.directions')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -394,13 +384,9 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <AutoTranslatedText style={styles.sectionEyebrow}>
-              GET IN TOUCH
-            </AutoTranslatedText>
+            <Text style={styles.sectionEyebrow}>{t('templeServicesLocal.get_in_touch')}</Text>
 
-            <AutoTranslatedText style={styles.sectionTitle}>
-              Contact Sreemath
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{t('templeServicesLocal.contact_sreemath')}</Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -412,34 +398,34 @@ export default function ContactScreen() {
             iconBg="#F9E8D7"
             title={contact.temple_name}
             value={contact.main_phone}
-            description="Tap to call the Sreemath office"
+            description={t('templeServicesLocal.tap_to_call_the_sreemath_office')}
             onPress={openPhone}
           />
 
           <ContactRow
             icon="⌂"
             iconBg="#F4E6CE"
-            title="Guest House"
+            title={t('templeServicesLocal.guest_house')}
             value={contact.guest_house_phone}
-            description="For guest house enquiries"
+            description={t('templeServicesLocal.for_guest_house_enquiries')}
             onPress={openGuestHouse}
           />
 
           <ContactRow
             icon="☎"
             iconBg="#EFE3D4"
-            title="Sreemath Bangalore Branch"
+            title={t('templeServicesLocal.sreemath_bangalore_branch')}
             value={contact.bangalore_phone}
-            description="Tap to call the Bengaluru branch"
+            description={t('templeServicesLocal.tap_to_call_the_bengaluru_branch')}
             onPress={openBangalore}
           />
 
           <ContactRow
             icon="✉"
             iconBg="#F7E7E0"
-            title="Email Address"
+            title={t('templeServicesLocal.email_address')}
             value={contact.email}
-            description="Send us your enquiry by email"
+            description={t('templeServicesLocal.send_us_your_enquiry_by_email')}
             onPress={openEmail}
             last
           />
@@ -449,13 +435,9 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <AutoTranslatedText style={styles.sectionEyebrow}>
-              VISIT US
-            </AutoTranslatedText>
+            <Text style={styles.sectionEyebrow}>{t('templeServicesLocal.visit_us')}</Text>
 
-            <AutoTranslatedText style={styles.sectionTitle}>
-              Sreemath Address
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{t('templeServicesLocal.sreemath_address')}</Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -473,13 +455,9 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.addressHeading}>
-              <AutoTranslatedText style={styles.addressLabel}>
-                HARIHARAPURA
-              </AutoTranslatedText>
+              <Text style={styles.addressLabel}>{t('templeServicesLocal.hariharapura')}</Text>
 
-              <AutoTranslatedText style={styles.addressSmall}>
-                Chikmagalur District
-              </AutoTranslatedText>
+              <Text style={styles.addressSmall}>{t('templeServicesLocal.chikmagalur_district')}</Text>
             </View>
           </View>
 
@@ -501,13 +479,9 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.directionContent}>
-              <AutoTranslatedText style={styles.directionTitle}>
-                Get Directions
-              </AutoTranslatedText>
+              <Text style={styles.directionTitle}>{t('templeServicesLocal.get_directions')}</Text>
 
-              <AutoTranslatedText style={styles.directionSubtitle}>
-                Open this location in Google Maps
-              </AutoTranslatedText>
+              <Text style={styles.directionSubtitle}>{t('templeServicesLocal.open_this_location_in_google_maps')}</Text>
             </View>
 
             <Text style={styles.directionArrow}>
@@ -520,13 +494,9 @@ export default function ContactScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <AutoTranslatedText style={styles.sectionEyebrow}>
-              CITY BRANCH
-            </AutoTranslatedText>
+            <Text style={styles.sectionEyebrow}>{t('templeServicesLocal.city_branch')}</Text>
 
-            <AutoTranslatedText style={styles.sectionTitle}>
-              Bengaluru Office
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{t('templeServicesLocal.bengaluru_office')}</Text>
           </View>
 
           <View style={styles.sectionLine} />
@@ -541,16 +511,12 @@ export default function ContactScreen() {
             </View>
 
             <View style={styles.branchHeading}>
-              <AutoTranslatedText style={styles.branchName}>
-                Sreemath Bangalore Branch
-              </AutoTranslatedText>
+              <Text style={styles.branchName}>{t('templeServicesLocal.sreemath_bangalore_branch')}</Text>
 
               <View style={styles.branchStatus}>
                 <View style={styles.branchStatusDot} />
 
-                <AutoTranslatedText style={styles.branchStatusText}>
-                  BENGALURU
-                </AutoTranslatedText>
+                <Text style={styles.branchStatusText}>{t('templeServicesLocal.bengaluru')}</Text>
               </View>
             </View>
           </View>
@@ -590,13 +556,9 @@ export default function ContactScreen() {
           </View>
 
           <View style={styles.emailFeatureContent}>
-            <AutoTranslatedText style={styles.emailFeatureEyebrow}>
-              WRITE TO US
-            </AutoTranslatedText>
+            <Text style={styles.emailFeatureEyebrow}>{t('templeServicesLocal.write_to_us')}</Text>
 
-            <AutoTranslatedText style={styles.emailFeatureTitle}>
-              hhPura Office
-            </AutoTranslatedText>
+            <Text style={styles.emailFeatureTitle}>{t('templeServicesLocal.hhpura_office')}</Text>
 
             <Text style={styles.emailFeatureAddress}>
               {contact.email}
@@ -624,15 +586,9 @@ export default function ContactScreen() {
           </View>
 
           <View style={styles.noteContent}>
-            <AutoTranslatedText style={styles.noteTitle}>
-              For Devotees
-            </AutoTranslatedText>
+            <Text style={styles.noteTitle}>{t('templeServicesLocal.for_devotees')}</Text>
 
-            <AutoTranslatedText style={styles.noteText}>
-              For temple visits, accommodation and other
-              enquiries, please contact the appropriate
-              number above.
-            </AutoTranslatedText>
+            <Text style={styles.noteText}>{t('templeServicesLocal.for_temple_visits_accommodation_and_other_enquiries_please_contact_the_appropriate_number_above')}</Text>
           </View>
         </View>
 
@@ -647,15 +603,13 @@ export default function ContactScreen() {
             ‹
           </Text>
 
-          <AutoTranslatedText style={styles.homeButtonText}>
-            Back to Home
-          </AutoTranslatedText>
+          <Text style={styles.homeButtonText}>{t('templeServicesLocal.back_to_home')}</Text>
         </TouchableOpacity>
 
         <Text style={styles.footerText}>
           {contact.temple_name}
           {'  •  '}
-          Karnataka
+          {t('templeServicesLocal.karnataka')}
         </Text>
 
         <View style={styles.bottomOrnament}>

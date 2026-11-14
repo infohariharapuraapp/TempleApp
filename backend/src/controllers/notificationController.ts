@@ -3,12 +3,91 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { pool } from '../db';
 import {
+  TranslationLanguage,
+  SUPPORTED_LANGUAGES,
+  translateTextOrOriginal,
+} from '../services/translationService';
+import {
+  withTranslationDeadline,
+  PUBLIC_TRANSLATION_TIMEOUT_MS,
+} from '../services/translationDeadline';
+import {
   sendPushNotificationToUser,
 } from '../services/notificationService';
 
 // Notifications remain visible for 6 days.
 // Older records are retained in PostgreSQL.
 const NOTIFICATION_RETENTION_DAYS = 6;
+// NOTIFICATION_TRANSLATION_V1
+function getNotificationLanguage(
+  value: unknown
+): TranslationLanguage {
+  if (typeof value !== 'string') return 'en';
+  const language = value
+    .trim()
+    .toLowerCase()
+    .split('-')[0] as TranslationLanguage;
+  return SUPPORTED_LANGUAGES.includes(language)
+    ? language
+    : 'en';
+}
+async function localizeNotifications(
+  rows: any[],
+  language: TranslationLanguage
+): Promise<any[]> {
+  if (language === 'en') return rows;
+  const output = rows.map(row => ({ ...row }));
+  const deadline =
+    Date.now() + PUBLIC_TRANSLATION_TIMEOUT_MS;
+  let cursor = 0;
+  let stopped = false;
+  async function worker() {
+    while (
+      !stopped &&
+      cursor < rows.length &&
+      Date.now() < deadline
+    ) {
+      const index = cursor++;
+      const row = rows[index];
+      if (!row.is_public_announcement) {
+        continue;
+      }
+      const [title, body] = await Promise.all([
+        translateTextOrOriginal(
+          row.title,
+          language,
+          'en'
+        ),
+        translateTextOrOriginal(
+          row.body,
+          language,
+          'en'
+        ),
+      ]);
+      if (!stopped && Date.now() < deadline) {
+        output[index] = {
+          ...row,
+          title,
+          body,
+        };
+      }
+    }
+  }
+  try {
+    await withTranslationDeadline(
+      Promise.all(
+        Array.from(
+          { length: Math.min(3, rows.length) },
+          worker
+        )
+      ).then(() => undefined),
+      undefined
+    );
+  } finally {
+    stopped = true;
+  }
+  return output;
+}
 
 // ========================================
 // REGISTER DEVICE FOR PUSH NOTIFICATIONS
@@ -32,7 +111,12 @@ export const registerDevice = async (
       expoPushToken,
       platform,
       deviceName,
+      preferredLanguage,
     } = req.body;
+    const deviceLanguage =
+      typeof preferredLanguage === 'string'
+        ? getNotificationLanguage(preferredLanguage)
+        : null;
 
     if (!expoPushToken) {
       return res.status(400).json({
@@ -54,16 +138,21 @@ export const registerDevice = async (
         expo_push_token,
         platform,
         device_name,
+        preferred_language,
         is_active,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, TRUE, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, COALESCE($5::varchar, 'en'), TRUE, CURRENT_TIMESTAMP)
 
       ON CONFLICT (expo_push_token)
       DO UPDATE SET
         user_id = EXCLUDED.user_id,
         platform = EXCLUDED.platform,
         device_name = EXCLUDED.device_name,
+        preferred_language = COALESCE(
+          $5::varchar,
+          device_tokens.preferred_language
+        ),
         is_active = TRUE,
         updated_at = CURRENT_TIMESTAMP
 
@@ -73,6 +162,7 @@ export const registerDevice = async (
         expo_push_token,
         platform,
         device_name,
+        preferred_language,
         is_active,
         created_at,
         updated_at`,
@@ -81,6 +171,7 @@ export const registerDevice = async (
         expoPushToken,
         platform,
         deviceName || null,
+        deviceLanguage,
       ]
     );
 
@@ -204,6 +295,26 @@ export const getMyNotifications = async (
         n.title,
         n.body,
         n.notification_type,
+        (
+          n.target_type = 'all'
+          AND n.notification_type = 'announcement'
+          AND EXISTS (
+            SELECT 1
+            FROM announcements a
+            WHERE a.id::text = n.data->>'announcementId'
+              AND a.is_active = TRUE
+              AND (
+                a.publish_at IS NULL
+                OR a.publish_at <= CURRENT_TIMESTAMP
+              )
+              AND (
+                a.expires_at IS NULL
+                OR a.expires_at > CURRENT_TIMESTAMP
+              )
+              AND a.title = n.title
+              AND a.message = n.body
+          )
+        ) AS is_public_announcement,
         n.data,
         n.created_at,
         nd.read_at,
@@ -221,10 +332,19 @@ export const getMyNotifications = async (
       ORDER BY n.created_at DESC`,
       [userId, NOTIFICATION_RETENTION_DAYS]
     );
-
+    const language =
+      getNotificationLanguage(req.query.lang);
+    const localizedRows =
+      await localizeNotifications(
+        result.rows,
+        language
+      );
+    const notifications = localizedRows.map(
+      ({ is_public_announcement, ...row }) => row
+    );
     return res.status(200).json({
       success: true,
-      data: result.rows,
+      data: notifications,
     });
   } catch (error) {
     console.error('Get notifications error:', error);

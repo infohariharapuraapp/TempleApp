@@ -19,6 +19,9 @@
     "sharing": "షేర్ అవుతోంది...",
     "download": "డౌన్‌లోడ్",
     "saving": "సేవ్ అవుతోంది...",
-    "shareImage": "ఆలయ చిత్రాన్ని షేర్ చేయండి"
+    "shareImage": "ఆలయ చిత్రాన్ని షేర్ చేయండి",
+    "photoCount_one": "{{count}} ఫోటో",
+    "photoCount_other": "{{count}} ఫోటోలు",
+    "photoCount_plural": "{{count}} ఫోటోలు"
   }
 }

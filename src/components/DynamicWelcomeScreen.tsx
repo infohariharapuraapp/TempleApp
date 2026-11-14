@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { apiRequest } from '@/services/api';
+import { useTranslation } from 'react-i18next';
 
 // ========================================
 // TYPES
@@ -47,6 +48,14 @@ const DEFAULT_DISPLAY_SECONDS = 3;
 export default function DynamicWelcomeScreen({
   onFinish,
 }: Props) {
+  // WELCOME_LANGUAGE_V1
+  const { i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0].toLowerCase();
+
   const [settings, setSettings] =
     useState<WelcomeSettings | null>(null);
 
@@ -63,6 +72,8 @@ export default function DynamicWelcomeScreen({
   useEffect(() => {
     let active = true;
     let finished = false;
+    setLoading(true);
+    setSettings(null);
 
     let apiTimer: ReturnType<typeof setTimeout> | null = null;
     let displayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -108,7 +119,13 @@ export default function DynamicWelcomeScreen({
         );
 
         const response = (await Promise.race([
-          apiRequest('/welcome-screen'),
+          apiRequest(
+            '/welcome-screen?lang=' +
+            encodeURIComponent(language),
+            {
+              timeoutMs: API_TIMEOUT_MS,
+            }
+          ),
           timeoutPromise,
         ])) as {
           success: boolean;
@@ -198,7 +215,7 @@ export default function DynamicWelcomeScreen({
         displayTimer = null;
       }
     };
-  }, []);
+  }, [language]);
 
   // ========================================
   // UI

@@ -19,7 +19,9 @@ export const SUPPORTED_LANGUAGES: TranslationLanguage[] = [
 
 const PROVIDER = 'mymemory';
 const MAX_REQUEST_BYTES = 450;
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 6000;
+const MAX_PROVIDER_WAITERS = 20;
+const MAX_PENDING_TRANSLATIONS = 100;
 
 const ANONYMOUS_DAILY_LIMIT = 4000;
 const EMAIL_DAILY_LIMIT = 45000;
@@ -39,6 +41,12 @@ const providerWaiters: Array<() => void> = [];
 
 async function withProviderSlot<T>(work: () => Promise<T>): Promise<T> {
   if (activeProviderCalls >= MAX_PROVIDER_CONCURRENCY) {
+    if (providerWaiters.length >= MAX_PROVIDER_WAITERS) {
+      throw new TranslationError(
+        'Translation provider is busy.',
+        503
+      );
+    }
     await new Promise<void>((resolve) => providerWaiters.push(resolve));
   } else {
     activeProviderCalls += 1;
@@ -209,9 +217,6 @@ async function translateChunk(
   sourceLanguage: TranslationLanguage,
   targetLanguage: TranslationLanguage
 ): Promise<string> {
-  await reserveQuota(
-    Array.from(text).length
-  );
 
   const url = new URL(
     'https://api.mymemory.translated.net/get'
@@ -234,13 +239,17 @@ async function translateChunk(
   let response: globalThis.Response;
 
   try {
-    response = await withProviderSlot(() =>
-      fetch(url.toString(), {
+    response = await withProviderSlot(async () => {
+      await reserveQuota(Array.from(text).length);
+      return fetch(url.toString(), {
         method: 'GET',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      })
-    );
-  } catch {
+      });
+    });
+  } catch (error) {
+    if (error instanceof TranslationError) {
+      throw error;
+    }
     throw new TranslationError(
       'Translation provider is temporarily unreachable.'
     );
@@ -413,6 +422,12 @@ export async function translateText(
     return existing;
   }
 
+  if (pendingTranslations.size >= MAX_PENDING_TRANSLATIONS) {
+    throw new TranslationError(
+      'Translation service is busy.',
+      503
+    );
+  }
   const task = performTranslation(
     text,
     targetLanguage,

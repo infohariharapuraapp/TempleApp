@@ -15,6 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import {
+  syncPushNotificationLanguage
+} from '@/services/notifications';
 
 import {
   AppLanguage,
@@ -204,6 +207,7 @@ export default function LanguageSettingsScreen() {
       setSaving(true);
 
       await changeAppLanguage(language);
+      void syncPushNotificationLanguage();
 
       console.log(
         'App language changed to:',

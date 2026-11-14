@@ -1,4 +1,5 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
+
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,49 +32,50 @@ const MOCK_MY_SEVAS = [
 ];
 
 export default function MySevasScreen() {
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>‹</Text>
         </TouchableOpacity>
-        <AutoTranslatedText style={styles.title}>My Seva Registrations</AutoTranslatedText>
+        <Text style={styles.title}>{t('bookingScreens.sevaRegistrations')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <AutoTranslatedText style={styles.heading}>My Sevas</AutoTranslatedText>
-        <AutoTranslatedText style={styles.subtitle}>View registrations and the seva assigned by temple admin.</AutoTranslatedText>
+        <Text style={styles.heading}>{t('bookingScreens.mySevas')}</Text>
+        <Text style={styles.subtitle}>{t('bookingScreens.sevaSubtitle')}</Text>
 
         {MOCK_MY_SEVAS.map((item) => (
           <View key={item.id} style={styles.card}>
             <View style={styles.top}>
               <View>
                 <Text style={styles.id}>{item.id}</Text>
-                <Text style={styles.type}>{item.type}</Text>
+                <Text style={styles.type}>{t(item.type === 'Individual Seva' ? 'bookingScreens.individualSeva' : 'bookingScreens.groupSeva')}</Text>
               </View>
-              <View style={styles.status}><Text style={styles.statusText}>{item.status}</Text></View>
+              <View style={styles.status}><Text style={styles.statusText}>{t(item.status === 'Seva Assigned' ? 'bookingScreens.sevaAssigned' : 'bookingScreens.pendingAssignment')}</Text></View>
             </View>
 
             <Text style={styles.name}>{item.name}</Text>
 
             <View style={styles.infoBox}>
-              <Info label="DATE" value={item.date} />
-              <Info label="TIME" value={item.time} />
-              {item.members ? <Info label="MEMBERS" value={String(item.members)} /> : <Info label="TYPE" value="Individual" />}
+              <Info label={t('bookingScreens.date')} value={item.date} />
+              <Info label={t('bookingScreens.time')} value={item.time} />
+              {item.members ? <Info label={t('bookingScreens.members')} value={String(item.members)} /> : <Info label={t('bookingScreens.type')} value={t('bookingScreens.individual')} />}
             </View>
 
             <TouchableOpacity style={styles.details}>
-              <AutoTranslatedText style={styles.detailsText}>Registration Details</AutoTranslatedText>
+              <Text style={styles.detailsText}>{t('bookingScreens.registrationDetails')}</Text>
               <Text style={styles.arrow}>→</Text>
             </TouchableOpacity>
           </View>
         ))}
 
         <TouchableOpacity style={styles.button} onPress={() => router.push('/seva-registration')}>
-          <AutoTranslatedText style={styles.buttonText}>Register New Seva</AutoTranslatedText>
+          <Text style={styles.buttonText}>{t('bookingScreens.registerNewSeva')}</Text>
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.note}>MOCK DATA • BACKEND WILL BE CONNECTED LATER</AutoTranslatedText>
+        <Text style={styles.note}>{t('bookingScreens.mockNote')}</Text>
       </ScrollView>
     </SafeAreaView>
   );

@@ -6,6 +6,15 @@ import {
 } from 'expo-server-sdk';
 
 import { pool } from '../db';
+import {
+  TranslationLanguage,
+  SUPPORTED_LANGUAGES,
+  translateTextOrOriginal,
+} from './translationService';
+import {
+  withTranslationDeadline,
+} from './translationDeadline';
+// MULTILINGUAL_PUSH_V1
 
 const expo = new Expo();
 
@@ -33,6 +42,7 @@ type DeviceToken = {
   user_id: number;
   expo_push_token: string;
   platform: string;
+  preferred_language: string;
 };
 
 type SendResult = {
@@ -101,7 +111,8 @@ async function getAllActiveDevices():
         id,
         user_id,
         expo_push_token,
-        platform
+        platform,
+        preferred_language
       FROM device_tokens
       WHERE is_active = TRUE
       ORDER BY id ASC
@@ -120,7 +131,8 @@ async function getUserActiveDevices(
         id,
         user_id,
         expo_push_token,
-        platform
+        platform,
+        preferred_language
       FROM device_tokens
       WHERE user_id = $1
         AND is_active = TRUE
@@ -309,13 +321,83 @@ function parseNotificationData(
 // BUILD PUSH TARGETS
 // ========================================
 
+function normalizePushLanguage(
+  value: unknown
+): TranslationLanguage {
+  if (typeof value !== 'string') return 'en';
+  const language = value
+    .trim()
+    .toLowerCase()
+    .split('-')[0] as TranslationLanguage;
+  return SUPPORTED_LANGUAGES.includes(language)
+    ? language
+    : 'en';
+}
+type LocalizedPushContent = {
+  title: string;
+  body: string;
+};
+async function getLocalizedPushContent(
+  devices: DeviceToken[],
+  title: string,
+  body: string,
+  allowTranslation: boolean
+): Promise<Map<TranslationLanguage, LocalizedPushContent>> {
+  const translations =
+    new Map<TranslationLanguage, LocalizedPushContent>();
+  translations.set('en', { title, body });
+  if (!allowTranslation) {
+    return translations;
+  }
+  const languages = [
+    ...new Set(
+      devices.map(device =>
+        normalizePushLanguage(device.preferred_language)
+      )
+    )
+  ].filter(language => language !== 'en');
+  let stopped = false;
+  const task = Promise.all(
+    languages.map(async language => {
+      const [translatedTitle, translatedBody] =
+        await Promise.all([
+          translateTextOrOriginal(title, language, 'en'),
+          translateTextOrOriginal(body, language, 'en'),
+        ]);
+      if (!stopped) {
+        translations.set(language, {
+          title: translatedTitle,
+          body: translatedBody,
+        });
+      }
+    })
+  ).then(() => undefined);
+  try {
+    await withTranslationDeadline(
+      task,
+      undefined,
+      8000
+    );
+  } finally {
+    stopped = true;
+  }
+  return translations;
+}
 async function buildPushTargets(
   devices: DeviceToken[],
   title: string,
   body: string,
-  data: NotificationData
+  data: NotificationData,
+  allowTranslation: boolean = false
 ): Promise<PushTarget[]> {
   const targets: PushTarget[] = [];
+  const localizedContent =
+    await getLocalizedPushContent(
+      devices,
+      title,
+      body,
+      allowTranslation
+    );
 
   for (const device of devices) {
     if (
@@ -334,14 +416,20 @@ async function buildPushTargets(
       continue;
     }
 
+    const language = normalizePushLanguage(
+      device.preferred_language
+    );
+    const content =
+      localizedContent.get(language) ??
+      { title, body };
     targets.push({
       device,
       message: {
         to: device.expo_push_token,
         sound: 'default',
         channelId: 'default',
-        title,
-        body,
+        title: content.title,
+        body: content.body,
         data,
       },
     });
@@ -700,11 +788,48 @@ if (notification.status === 'cancelled') {
       notification.data
     );
 
+    let allowTranslation = false;
+    if (
+      notification.target_type === 'all' &&
+      notification.notification_type === 'announcement' &&
+      data.type === 'announcement'
+    ) {
+      try {
+        const publicAnnouncement = await pool.query(
+          `
+          SELECT id
+          FROM announcements
+          WHERE id::text = $1
+            AND is_active = TRUE
+            AND (
+              expires_at IS NULL
+              OR expires_at > CURRENT_TIMESTAMP
+            )
+            AND title = $2
+            AND message = $3
+          LIMIT 1
+          `,
+          [
+            String(data.announcementId ?? ''),
+            notification.title,
+            notification.body,
+          ]
+        );
+        allowTranslation =
+          publicAnnouncement.rows.length > 0;
+      } catch (error) {
+        console.warn(
+          'Announcement translation verification failed:',
+          error
+        );
+      }
+    }
     const targets = await buildPushTargets(
       devices,
       notification.title,
       notification.body,
-      data
+      data,
+      allowTranslation
     );
 
     if (!targets.length) {

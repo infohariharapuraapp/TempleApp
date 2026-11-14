@@ -1,4 +1,6 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import i18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
+
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -86,7 +88,7 @@ function formatDate(value?: string | null) {
   const time = timestamp(value);
   if (!time) return '';
 
-  return new Date(time).toLocaleDateString('en-IN', {
+  return new Date(time).toLocaleDateString(getSpiritualLocale(), {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -160,7 +162,7 @@ function VideoCard({
 
               {latest && (
                 <View style={styles.latestTag}>
-                  <AutoTranslatedText style={styles.latestTagText}>LATEST</AutoTranslatedText>
+                  <Text style={styles.latestTagText}>{tr("LATEST")}</Text>
                 </View>
               )}
             </ImageBackground>
@@ -198,7 +200,7 @@ function VideoCard({
               size={19}
               color={C.maroon}
             />
-            <AutoTranslatedText style={styles.watchText}>Watch</AutoTranslatedText>
+            <Text style={styles.watchText}>{tr("Watch")}</Text>
           </View>
         </View>
       </View>
@@ -224,7 +226,7 @@ function GuruCard({ item }: { item: GuruVani }) {
         </View>
 
         <View style={styles.guruTopText}>
-          <AutoTranslatedText style={styles.guruLabel}>GURU VANI</AutoTranslatedText>
+          <Text style={styles.guruLabel}>{tr("GURU VANI")}</Text>
           <Text style={styles.guruDate}>
             {formatDate(item.published_at)}
           </Text>
@@ -250,7 +252,7 @@ function GuruCard({ item }: { item: GuruVani }) {
       )}
 
       <View style={styles.guruFooter}>
-        <AutoTranslatedText style={styles.readTeaching}>Read Teaching</AutoTranslatedText>
+        <Text style={styles.readTeaching}>{tr("Read Teaching")}</Text>
         <Ionicons
           name="arrow-forward"
           size={17}
@@ -271,7 +273,7 @@ function QuoteCard({ item }: { item: Quote }) {
       await Share.share({
         message:
           `"${quote}"\n\n` +
-          `— ${item.author || 'Temple Teachings'}\n\n` +
+          `— ${item.author || tr('Temple Teachings')}\n\n` +
           'Divyakshetra Hariharapura',
       });
     } catch (error) {
@@ -294,7 +296,7 @@ function QuoteCard({ item }: { item: Quote }) {
       <Text style={styles.quoteText}>“{quote}”</Text>
 
       <Text style={styles.quoteAuthor}>
-        — {item.author || 'Temple Teachings'}
+        — {item.author || tr('Temple Teachings')}
       </Text>
 
       <View style={styles.quoteFooter}>
@@ -312,7 +314,7 @@ function QuoteCard({ item }: { item: Quote }) {
         <TouchableOpacity
           onPress={shareQuote}
           style={styles.shareButton}
-          accessibilityLabel="Share quote"
+          accessibilityLabel={tr("Share quote")}
         >
           <Ionicons
             name="share-social-outline"
@@ -325,7 +327,46 @@ function QuoteCard({ item }: { item: Quote }) {
   );
 }
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  const translated = i18n.t(
+    'spiritualContent.' + key,
+    { defaultValue: text }
+  );
+  if (text.startsWith('←')) {
+    return '← ' + translated.replace(/^←\s*/, '');
+  }
+  if (text.startsWith('▶')) {
+    return '▶ ' + translated.replace(/^▶\s*/, '');
+  }
+  return translated;
+}
+function getSpiritualLocale(): string {
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
 export default function PravachanasScreen() {
+  const { i18n: selectedI18n } = useTranslation();
+  const language =
+    selectedI18n.resolvedLanguage ||
+    selectedI18n.language ||
+    'en';
+
   const [tab, setTab] = useState<Tab>('All');
   const [videos, setVideos] = useState<Pravachana[]>([]);
   const [guruVani, setGuruVani] = useState<GuruVani[]>([]);
@@ -418,7 +459,7 @@ export default function PravachanasScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -486,9 +527,7 @@ export default function PravachanasScreen() {
           />
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.headerTitle}>
-          Pravachana & Quotes
-        </AutoTranslatedText>
+        <Text style={styles.headerTitle}>{tr("Pravachana & Quotes")}</Text>
 
         <View style={styles.headerRight}>
           <Text style={styles.headerOm}>ॐ</Text>
@@ -503,7 +542,7 @@ export default function PravachanasScreen() {
         >
           {tabs.map((name) => (
             <TouchableOpacity
-              key={name}
+              key={tr(name)}
               activeOpacity={0.8}
               onPress={() => setTab(name)}
               style={[
@@ -517,7 +556,7 @@ export default function PravachanasScreen() {
                   tab === name && styles.activeTabText,
                 ]}
               >
-                {name}
+                {tr(name)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -530,9 +569,7 @@ export default function PravachanasScreen() {
             size="large"
             color={C.maroon}
           />
-          <AutoTranslatedText style={styles.loadingText}>
-            Loading divine teachings...
-          </AutoTranslatedText>
+          <Text style={styles.loadingText}>{tr("Loading divine teachings...")}</Text>
         </View>
       ) : (
         <ScrollView
@@ -549,9 +586,9 @@ export default function PravachanasScreen() {
         >
           {!!error && (
             <View style={styles.notice}>
-              <Text style={styles.noticeText}>{error}</Text>
+              <Text style={styles.noticeText}>{tr(error)}</Text>
               <TouchableOpacity onPress={() => loadData()}>
-                <AutoTranslatedText style={styles.retryText}>Retry</AutoTranslatedText>
+                <Text style={styles.retryText}>{tr("Retry")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -563,13 +600,8 @@ export default function PravachanasScreen() {
                 size={42}
                 color={C.gold}
               />
-              <AutoTranslatedText style={styles.emptyTitle}>
-                No content available yet
-              </AutoTranslatedText>
-              <AutoTranslatedText style={styles.emptyText}>
-                New spiritual teachings will appear here
-                when published.
-              </AutoTranslatedText>
+              <Text style={styles.emptyTitle}>{tr("No content available yet")}</Text>
+              <Text style={styles.emptyText}>{tr("New spiritual teachings will appear here when published.")}</Text>
             </View>
           ) : tab === 'All' ? (
             feed.map((entry) => {

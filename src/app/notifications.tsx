@@ -1,5 +1,12 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
-import React, { useCallback, useState } from 'react';
+
+import { useTranslation } from 'react-i18next';
+
+import translationI18n from '@/localization/i18n';
+
+
+
+
+import React, { useCallback, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,7 +34,56 @@ type NotificationItem = {
   is_read: boolean;
 };
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  return translationI18n.t(
+    'templeUpdates.' + key,
+    { defaultValue: text }
+  );
+}
+function getUpdatesLocale(): string {
+  const language = (
+    translationI18n.resolvedLanguage ||
+    translationI18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
+function translatedCount(
+  key: string,
+  count: number
+): string {
+  return translationI18n.t(
+    'templeUpdates.' + key +
+    (count === 1 ? '_one' : '_other'),
+    { count }
+  );
+}
+
+
+
+
 export default function NotificationsScreen() {
+  // NOTIFICATION_LANGUAGE_V1
+  const { i18n } = useTranslation();
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).toLowerCase().split('-')[0];
+  const requestVersion = useRef(0);
+
   const [notifications, setNotifications] = useState<
     NotificationItem[]
   >([]);
@@ -38,6 +94,7 @@ export default function NotificationsScreen() {
   const loadNotifications = async (
     showLoading = true
   ) => {
+    const version = ++requestVersion.current;
     try {
       if (showLoading) {
         setLoading(true);
@@ -51,13 +108,14 @@ export default function NotificationsScreen() {
       }
 
       const response = await apiRequest(
-        '/notifications',
+        '/notifications?lang=' + encodeURIComponent(language),
         {
           method: 'GET',
           token,
         }
       );
 
+      if (version !== requestVersion.current) return;
       if (response.success) {
         setNotifications(response.data || []);
         return;
@@ -68,26 +126,32 @@ export default function NotificationsScreen() {
           'Unable to load notifications'
       );
     } catch (error: any) {
+      if (version !== requestVersion.current) return;
       console.error(
         'Load notifications error:',
         error
       );
 
       Alert.alert(
-        'Unable to Load Notifications',
-        error?.message ||
-          'Please try again.'
+        tr("Unable to Load Notifications"),
+        (error?.message && tr(error.message)) ||
+          tr("Please try again.")
       );
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (version === requestVersion.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
-    }, [])
+      return () => {
+        requestVersion.current += 1;
+      };
+    }, [language])
   );
 
   const handleRefresh = () => {
@@ -202,8 +266,8 @@ switch (notificationType) {
       );
 
       Alert.alert(
-        'Announcement Unavailable',
-        'This notification does not contain an announcement ID.'
+        tr("Announcement Unavailable"),
+        tr("This notification does not contain an announcement ID.")
       );
     }
     break;
@@ -224,8 +288,8 @@ switch (notificationType) {
     );
 
     Alert.alert(
-      'Unable to Open Notification',
-      error?.message || 'Please try again.'
+      tr("Unable to Open Notification"),
+      (error?.message && tr(error.message)) || tr("Please try again.")
     );
   }
 };
@@ -271,9 +335,9 @@ switch (notificationType) {
       );
 
       Alert.alert(
-        'Unable to Update',
-        error?.message ||
-          'Please try again.'
+        tr("Unable to Update"),
+        (error?.message && tr(error.message)) ||
+          tr("Please try again.")
       );
     }
   };
@@ -289,7 +353,9 @@ switch (notificationType) {
 
     const date = new Date(value);
 
-    return date.toLocaleString();
+    return Number.isNaN(date.getTime())
+      ? ''
+      : date.toLocaleString(getUpdatesLocale());
   };
 
   if (loading) {
@@ -301,9 +367,7 @@ switch (notificationType) {
             color="#B66A2C"
           />
 
-          <AutoTranslatedText style={styles.loadingText}>
-            Loading temple notifications...
-          </AutoTranslatedText>
+          <Text style={styles.loadingText}>{tr("Loading temple notifications...")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -324,22 +388,16 @@ switch (notificationType) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AutoTranslatedText style={styles.label}>
-              TEMPLE UPDATES
-            </AutoTranslatedText>
+            <Text style={styles.label}>{tr("TEMPLE UPDATES")}</Text>
 
-            <AutoTranslatedText style={styles.title}>
-              Notifications
-            </AutoTranslatedText>
+            <Text style={styles.title}>{tr("Notifications")}</Text>
 
-            <AutoTranslatedText style={styles.subtitle}>
-              Stay updated with temple announcements,
-              events and important information.
-            </AutoTranslatedText>
+            <Text style={styles.subtitle}>{tr("Stay updated with temple announcements, events and important information.")}</Text>
           </View>
 
           <TouchableOpacity
             style={styles.closeButton}
+ accessibilityLabel={tr("Go back")}
             onPress={() => router.back()}
           >
             <Text style={styles.closeText}>
@@ -353,18 +411,14 @@ switch (notificationType) {
           <View>
             <Text style={styles.summaryTitle}>
               {unreadCount > 0
-                ? `${unreadCount} unread ${
-                    unreadCount === 1
-                      ? 'notification'
-                      : 'notifications'
-                  }`
-                : 'You are all caught up'}
+        ? translatedCount('unread_count', unreadCount)
+        : tr('You are all caught up')}
             </Text>
 
             <Text style={styles.summaryText}>
               {unreadCount > 0
-                ? 'Open notifications to mark them as read.'
-                : 'No unread temple updates.'}
+                ? tr(tr('Open notifications to mark them as read.'))
+                : tr(tr('No unread temple updates.'))}
             </Text>
           </View>
 
@@ -373,9 +427,7 @@ switch (notificationType) {
               onPress={handleMarkAllRead}
               style={styles.markAllButton}
             >
-              <AutoTranslatedText style={styles.markAllText}>
-                Mark all read
-              </AutoTranslatedText>
+              <Text style={styles.markAllText}>{tr("Mark all read")}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -387,14 +439,9 @@ switch (notificationType) {
               🔔
             </Text>
 
-            <AutoTranslatedText style={styles.emptyTitle}>
-              No Notifications Yet
-            </AutoTranslatedText>
+            <Text style={styles.emptyTitle}>{tr("No Notifications Yet")}</Text>
 
-            <AutoTranslatedText style={styles.emptyText}>
-              Temple announcements and updates
-              will appear here.
-            </AutoTranslatedText>
+            <Text style={styles.emptyText}>{tr("Temple announcements and updates will appear here.")}</Text>
           </View>
         ) : (
           notifications.map((item) => (
@@ -465,8 +512,8 @@ switch (notificationType) {
                   ]}
                 >
                   {item.is_read
-                    ? 'Viewed'
-                    : 'New'}
+                    ? tr('Viewed')
+                    : tr('New')}
                 </Text>
               </View>
             </TouchableOpacity>

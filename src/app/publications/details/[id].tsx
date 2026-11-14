@@ -1,7 +1,8 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -56,7 +57,7 @@ type ApiResponse<T> = {
 // HELPERS
 // ========================================
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, language: string) {
   if (!value) return null;
 
   const date = new Date(value);
@@ -65,7 +66,7 @@ function formatDate(value: string | null) {
     return null;
   }
 
-  return date.toLocaleDateString('en-IN', {
+  return date.toLocaleDateString(language + '-IN', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -89,6 +90,26 @@ function isValidDocumentUrl(value: string) {
 // ========================================
 
 export default function PublicationDetailsScreen() {
+  // PUBLICATIONS_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language =
+    (i18n.resolvedLanguage ||
+      i18n.language ||
+      'en').split('-')[0];
+  const requestIdRef = useRef(0);
+  const localizeError = (value: string) => {
+    const key = value.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const translationKey = 'publicationsLocal.' + key;
+    return i18n.exists(translationKey)
+      ? String(t(translationKey))
+      : String(t(
+          'publicationsLocal.something_went_wrong_please_try_again'
+        ));
+  };
+
   const { id, category_id } = useLocalSearchParams<{
     id: string;
     category_id?: string;
@@ -109,7 +130,8 @@ export default function PublicationDetailsScreen() {
 
   const loadPublication = useCallback(
     async (showLoading = true) => {
-      try {
+      const currentRequest = ++requestIdRef.current;
+    try {
         if (showLoading) {
           setLoading(true);
         }
@@ -138,9 +160,12 @@ export default function PublicationDetailsScreen() {
         const response = await apiRequest<
           ApiResponse<Publication[]>
         >(
-          `/publications?category_id=${categoryId}`
+          `/publications?category_id=${categoryId}&lang=${encodeURIComponent(language)}`
         );
 
+        if (currentRequest !== requestIdRef.current) {
+          return;
+        }
         if (!response.success) {
           throw new Error(
             response.message ||
@@ -160,6 +185,10 @@ export default function PublicationDetailsScreen() {
 
         setPublication(selected);
       } catch (err) {
+        if (currentRequest !== requestIdRef.current) {
+          return;
+        }
+
         console.error('Publication details error:', err);
 
         setError(
@@ -168,16 +197,21 @@ export default function PublicationDetailsScreen() {
             : 'Unable to load publication details'
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (currentRequest === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [id, category_id]
+    [id, category_id, language]
   );
 
   useFocusEffect(
     useCallback(() => {
       void loadPublication();
+      return () => {
+        requestIdRef.current++;
+      };
     }, [loadPublication])
   );
 
@@ -249,9 +283,7 @@ export default function PublicationDetailsScreen() {
           style={styles.backRow}
           onPress={() => router.back()}
         >
-          <AutoTranslatedText style={styles.backText}>
-            ‹ Back to Publications
-          </AutoTranslatedText>
+          <Text style={styles.backText}>{t('publicationsLocal.back_to_publications')}</Text>
         </TouchableOpacity>
 
         {loading && (
@@ -261,34 +293,28 @@ export default function PublicationDetailsScreen() {
               color="#B66A2C"
             />
 
-            <AutoTranslatedText style={styles.message}>
-              Loading publication details...
-            </AutoTranslatedText>
+            <Text style={styles.message}>{t('publicationsLocal.loading_publication_details')}</Text>
           </View>
         )}
 
         {!loading && !!error && (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>
-              {error}
+              {localizeError(error)}
             </Text>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={() => void loadPublication()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{t('publicationsLocal.try_again')}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {!loading && !error && publication && (
           <>
-            <AutoTranslatedText style={styles.smallTitle}>
-              TEMPLE PUBLICATIONS
-            </AutoTranslatedText>
+            <Text style={styles.smallTitle}>{t('publicationsLocal.temple_publications')}</Text>
 
             <Text style={styles.category}>
               {publication.category_name}
@@ -318,9 +344,7 @@ export default function PublicationDetailsScreen() {
 
             {!!publication.author && (
               <View style={styles.metadataRow}>
-                <AutoTranslatedText style={styles.metadataLabel}>
-                  Author
-                </AutoTranslatedText>
+                <Text style={styles.metadataLabel}>{t('publicationsLocal.author')}</Text>
 
                 <Text style={styles.metadataValue}>
                   {publication.author}
@@ -328,31 +352,23 @@ export default function PublicationDetailsScreen() {
               </View>
             )}
 
-            {!!formatDate(
-              publication.publication_date
-            ) && (
+            {!!formatDate(publication.publication_date, language) && (
               <View style={styles.metadataRow}>
-                <AutoTranslatedText style={styles.metadataLabel}>
-                  Published
-                </AutoTranslatedText>
+                <Text style={styles.metadataLabel}>{t('publicationsLocal.published')}</Text>
 
                 <Text style={styles.metadataValue}>
-                  {formatDate(
-                    publication.publication_date
-                  )}
+                  {formatDate(publication.publication_date, language)}
                 </Text>
               </View>
             )}
 
             <View style={styles.divider} />
 
-            <AutoTranslatedText style={styles.sectionTitle}>
-              About This Publication
-            </AutoTranslatedText>
+            <Text style={styles.sectionTitle}>{t('publicationsLocal.about_this_publication')}</Text>
 
             <Text style={styles.description}>
               {publication.description?.trim() ||
-                'No description is available for this publication.'}
+                t('publicationsLocal.no_description_is_available_for_this_publication')}
             </Text>
 
             {!!publication.document_url && (
@@ -368,24 +384,21 @@ export default function PublicationDetailsScreen() {
               >
                 <Text style={styles.documentButtonText}>
                   {openingDocument
-                    ? 'Opening Document...'
-                    : '📄 Read / Open Document'}
+                    ? t('publicationsLocal.opening_document')
+                    : t('publicationsLocal.read_open_document')}
                 </Text>
               </TouchableOpacity>
             )}
 
             {!!documentError && (
               <Text style={styles.errorText}>
-                {documentError}
+                {localizeError(documentError)}
               </Text>
             )}
 
             {!publication.document_url && (
               <View style={styles.noticeCard}>
-                <AutoTranslatedText style={styles.noticeText}>
-                  A digital document is not currently
-                  available for this publication.
-                </AutoTranslatedText>
+                <Text style={styles.noticeText}>{t('publicationsLocal.a_digital_document_is_not_currently_available_for_this_publication')}</Text>
               </View>
             )}
 
@@ -395,15 +408,9 @@ export default function PublicationDetailsScreen() {
               </Text>
 
               <View style={styles.infoContent}>
-                <AutoTranslatedText style={styles.infoTitle}>
-                  Spiritual Knowledge
-                </AutoTranslatedText>
+                <Text style={styles.infoTitle}>{t('publicationsLocal.spiritual_knowledge')}</Text>
 
-                <AutoTranslatedText style={styles.infoText}>
-                  Explore devotional literature and
-                  temple publications shared for
-                  spiritual learning.
-                </AutoTranslatedText>
+                <Text style={styles.infoText}>{t('publicationsLocal.explore_devotional_literature_and_temple_publications_shared_for_spiritual_learning')}</Text>
               </View>
             </View>
           </>

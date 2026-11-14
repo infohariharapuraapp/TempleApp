@@ -95,11 +95,15 @@ function getCoverImage(event: TempleEvent): string | null {
 
   return firstImage?.image_url || null;
 }
+function validEventTime(value: unknown): string {
+  if (typeof value !== 'string') return '';
 
-function validEventTime(value?: string | null): string {
-  if (!value) return '';
+  const time = value.trim().slice(0, 5);
 
-  const time = value.slice(0, 5);
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return '';
+  }
+
   return time === '00:00' ? '' : time;
 }
 
@@ -115,7 +119,7 @@ export default function EventsScreen() {
   const [error, setError] = useState('');
 
   const currentLanguage = (
-    i18n.resolvedLanguage || i18n.language
+    i18n.resolvedLanguage || i18n.language || 'en'
   ).split('-')[0];
 
   const locale = LOCALES[currentLanguage] || 'en-IN';
@@ -127,9 +131,9 @@ export default function EventsScreen() {
 
       try {
         const [categoryResponse, eventResponse] = await Promise.all([
-          apiRequest<ApiResponse<Category[]>>('/event-categories'),
+          apiRequest<ApiResponse<Category[]>>(`/event-categories?lang=${encodeURIComponent(currentLanguage)}`),
           apiRequest<ApiResponse<TempleEvent[]>>(
-            `/events?type=${period}`
+            `/events?type=${period}&lang=${encodeURIComponent(currentLanguage)}`
           ),
         ]);
 
@@ -145,8 +149,29 @@ export default function EventsScreen() {
           ? eventResponse.data
           : [];
 
-        setCategories(activeCategories);
-        setEvents(loadedEvents);
+       console.log(
+  'EVENT LANGUAGE:', currentLanguage
+);
+
+console.log(
+  'EVENT DATE DEBUG:',
+  JSON.stringify(
+    loadedEvents.map(event => ({
+      id: event.id,
+      event_date: event.event_date,
+      event_date_type: typeof event.event_date,
+      event_end_date: event.event_end_date,
+      event_end_date_type: typeof event.event_end_date,
+      start_time: event.start_time,
+      end_time: event.end_time,
+    })),
+    null,
+    2
+  )
+);
+
+setCategories(activeCategories);
+setEvents(loadedEvents);
 
         setCategoryId((current) =>
           current !== null &&
@@ -162,7 +187,7 @@ export default function EventsScreen() {
         setRefreshing(false);
       }
     },
-    [period, t]
+   [period, t, currentLanguage]
   );
 
   useFocusEffect(
@@ -171,13 +196,48 @@ export default function EventsScreen() {
     }, [loadData])
   );
 
-  function formatDate(value?: string | null): string {
-    if (!value) return '—';
+   function normalizeEventDate(value: unknown): string {
+    if (!value) return '';
 
-    const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return '';
+
+      return value.toISOString().slice(0, 10);
+    }
+
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const text = value.trim();
+
+    const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+
+    if (match) {
+      const date = new Date(`${match[0]}T12:00:00`);
+
+      if (
+        !Number.isNaN(date.getTime()) &&
+        date.getFullYear() === Number(match[0].slice(0, 4)) &&
+        date.getMonth() + 1 === Number(match[0].slice(5, 7)) &&
+        date.getDate() === Number(match[0].slice(8, 10))
+      ) {
+        return match[0];
+      }
+    }
+
+    return '';
+  }
+
+  function formatDate(value: unknown): string {
+    const normalized = normalizeEventDate(value);
+
+    if (!normalized) return '—';
+
+    const date = new Date(`${normalized}T12:00:00`);
 
     if (Number.isNaN(date.getTime())) {
-      return value.slice(0, 10);
+      return '—';
     }
 
     return date.toLocaleDateString(locale, {
@@ -188,19 +248,19 @@ export default function EventsScreen() {
   }
 
   function formatDateRange(event: TempleEvent): string {
-    const start = formatDate(event.event_date);
-    const end = event.event_end_date;
+    const start = normalizeEventDate(event.event_date);
+    const end = normalizeEventDate(event.event_end_date);
 
-    if (
-      !end ||
-      end.slice(0, 10) === event.event_date?.slice(0, 10)
-    ) {
-      return start;
+    if (!start && !end) return '—';
+
+    if (!start) return formatDate(end);
+
+    if (!end || start === end) {
+      return formatDate(start);
     }
 
-    return `${start} – ${formatDate(end)}`;
+    return `${formatDate(start)} – ${formatDate(end)}`;
   }
-
   const visibleEvents =
     categoryId === null
       ? events
@@ -413,8 +473,8 @@ export default function EventsScreen() {
     validEventTime(event.end_time)
       ? `${validEventTime(event.start_time)} – ${validEventTime(event.end_time)}`
       : validEventTime(event.start_time)
-        ? `Starts at ${validEventTime(event.start_time)}`
-        : `Ends at ${validEventTime(event.end_time)}`}
+        ? t('events.startsAt', { time: validEventTime(event.start_time) })
+        : t('events.endsAt', { time: validEventTime(event.end_time) })}
   </Text>
 ) : null}
 

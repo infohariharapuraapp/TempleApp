@@ -1,7 +1,8 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -56,6 +57,26 @@ type ApiResponse<T> = {
 // ========================================
 
 export default function PublicationCategoryScreen() {
+  // PUBLICATIONS_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const language =
+    (i18n.resolvedLanguage ||
+      i18n.language ||
+      'en').split('-')[0];
+  const requestIdRef = useRef(0);
+  const localizeError = (value: string) => {
+    const key = value.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const translationKey = 'publicationsLocal.' + key;
+    return i18n.exists(translationKey)
+      ? String(t(translationKey))
+      : String(t(
+          'publicationsLocal.something_went_wrong_please_try_again'
+        ));
+  };
+
   const { id, name } = useLocalSearchParams<{
     id: string;
     name?: string;
@@ -69,9 +90,10 @@ export default function PublicationCategoryScreen() {
   const [error, setError] = useState('');
 
   const categoryName =
-    typeof name === 'string'
+    publications[0]?.category_name ||
+    (typeof name === 'string'
       ? name
-      : 'Publications';
+      : t('publicationsLocal.publications'));
 
   // ========================================
   // LOAD PUBLICATIONS
@@ -79,7 +101,8 @@ export default function PublicationCategoryScreen() {
 
   const loadPublications = useCallback(
     async (showLoading = true) => {
-      try {
+      const currentRequest = ++requestIdRef.current;
+    try {
         if (showLoading) {
           setLoading(true);
         }
@@ -98,9 +121,12 @@ export default function PublicationCategoryScreen() {
         const response = await apiRequest<
           ApiResponse<Publication[]>
         >(
-          `/publications?category_id=${categoryId}`
+          `/publications?category_id=${categoryId}&lang=${encodeURIComponent(language)}`
         );
 
+        if (currentRequest !== requestIdRef.current) {
+          return;
+        }
         if (!response.success) {
           throw new Error(
             response.message ||
@@ -110,6 +136,10 @@ export default function PublicationCategoryScreen() {
 
         setPublications(response.data || []);
       } catch (err) {
+        if (currentRequest !== requestIdRef.current) {
+          return;
+        }
+
         console.error(
           'Load category publications:',
           err
@@ -121,16 +151,21 @@ export default function PublicationCategoryScreen() {
             : 'Unable to load publications'
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (currentRequest === requestIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [id]
+    [id, language]
   );
 
   useFocusEffect(
     useCallback(() => {
       void loadPublications();
+      return () => {
+        requestIdRef.current++;
+      };
     }, [loadPublications])
   );
 
@@ -154,7 +189,7 @@ export default function PublicationCategoryScreen() {
       return null;
     }
 
-    return date.toLocaleDateString('en-IN', {
+    return date.toLocaleDateString(language + '-IN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -196,23 +231,16 @@ export default function PublicationCategoryScreen() {
           style={styles.backRow}
           onPress={() => router.back()}
         >
-          <AutoTranslatedText style={styles.backText}>
-            ‹ Back to Publications
-          </AutoTranslatedText>
+          <Text style={styles.backText}>{t('publicationsLocal.back_to_publications')}</Text>
         </TouchableOpacity>
 
-        <AutoTranslatedText style={styles.smallTitle}>
-          TEMPLE RESOURCES
-        </AutoTranslatedText>
+        <Text style={styles.smallTitle}>{t('publicationsLocal.temple_resources')}</Text>
 
         <Text style={styles.title}>
           {categoryName}
         </Text>
 
-        <AutoTranslatedText style={styles.subtitle}>
-          Explore spiritual publications and
-          devotional reading material.
-        </AutoTranslatedText>
+        <Text style={styles.subtitle}>{t('publicationsLocal.explore_spiritual_publications_and_devotional_reading_material')}</Text>
 
         <View style={styles.banner}>
           <Text style={styles.bannerIcon}>
@@ -224,16 +252,13 @@ export default function PublicationCategoryScreen() {
               {categoryName}
             </Text>
 
-            <AutoTranslatedText style={styles.bannerText}>
-              Discover resources shared by
-              the temple administration.
-            </AutoTranslatedText>
+            <Text style={styles.bannerText}>{t('publicationsLocal.discover_resources_shared_by_the_temple_administration')}</Text>
           </View>
         </View>
 
         {!loading && !error && (
           <Text style={styles.sectionTitle}>
-            Available Publications ({publications.length})
+            {t('publicationsLocal.available_publications_count', { count: publications.length })}
           </Text>
         )}
 
@@ -244,25 +269,21 @@ export default function PublicationCategoryScreen() {
               color="#B66A2C"
             />
 
-            <AutoTranslatedText style={styles.message}>
-              Loading publications...
-            </AutoTranslatedText>
+            <Text style={styles.message}>{t('publicationsLocal.loading_publications')}</Text>
           </View>
         )}
 
         {!loading && !!error && (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>
-              {error}
+              {localizeError(error)}
             </Text>
 
             <TouchableOpacity
               style={styles.retryButton}
               onPress={() => void loadPublications()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{t('publicationsLocal.try_again')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -275,14 +296,9 @@ export default function PublicationCategoryScreen() {
                 📖
               </Text>
 
-              <AutoTranslatedText style={styles.emptyTitle}>
-                No Publications Yet
-              </AutoTranslatedText>
+              <Text style={styles.emptyTitle}>{t('publicationsLocal.no_publications_yet')}</Text>
 
-              <AutoTranslatedText style={styles.message}>
-                There are currently no publications
-                available in this category.
-              </AutoTranslatedText>
+              <Text style={styles.message}>{t('publicationsLocal.there_are_currently_no_publications_available_in_this_category')}</Text>
             </View>
           )}
 
@@ -321,7 +337,7 @@ export default function PublicationCategoryScreen() {
 
                   {!!item.author && (
                     <Text style={styles.authorText}>
-                      By {item.author}
+                      {t('publicationsLocal.by_author', { author: item.author })}
                     </Text>
                   )}
 
@@ -344,9 +360,7 @@ export default function PublicationCategoryScreen() {
                     </Text>
                   )}
 
-                  <AutoTranslatedText style={styles.viewText}>
-                    View Details ›
-                  </AutoTranslatedText>
+                  <Text style={styles.viewText}>{t('publicationsLocal.view_details')}</Text>
                 </View>
               </TouchableOpacity>
             ))}

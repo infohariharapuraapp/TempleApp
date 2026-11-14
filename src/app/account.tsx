@@ -1,4 +1,4 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import { useTranslation } from 'react-i18next';
 
 import React, { useCallback, useState } from 'react';
 import { notifyAuthChanged } from '@/services/authSession';
@@ -40,6 +40,123 @@ type User = {
 // ========================================
 
 export default function AccountScreen() {
+  // ACCOUNT_LANGUAGE_V1
+  const { t, i18n } = useTranslation();
+  const localizeAccountError = (
+    message: unknown,
+    fallback: string
+  ): string => {
+    if (typeof message !== 'string') {
+      return fallback;
+    }
+    const knownMessages: Record<string, string> = {
+      "TEMPLE ACCOUNT": "accountLocal.temple_account",
+      "My Account": "accountLocal.my_account",
+      "My Profile": "accountLocal.my_profile",
+      "Your personal information and temple services": "accountLocal.your_personal_information_and_temple_services",
+      "Devotee": "accountLocal.devotee",
+      "Temple Devotee": "accountLocal.temple_devotee",
+      "Edit": "accountLocal.edit",
+      "Profile Details": "accountLocal.profile_details",
+      "Loading...": "accountLocal.loading",
+      "Loading your details...": "accountLocal.loading_your_details",
+      "Loading your profile...": "accountLocal.loading_your_profile",
+      "Full Name": "accountLocal.full_name",
+      "Email Address": "accountLocal.email_address",
+      "Phone Number": "accountLocal.phone_number",
+      "Mobile Number": "accountLocal.mobile_number",
+      "Not available": "accountLocal.not_available",
+      "Account": "accountLocal.account",
+      "Edit Profile": "accountLocal.edit_profile",
+      "Update your personal information": "accountLocal.update_your_personal_information",
+      "My Bookings": "accountLocal.my_bookings",
+      "View your room and seva bookings": "accountLocal.view_your_room_and_seva_bookings",
+      "Your Spiritual Journey": "accountLocal.your_spiritual_journey",
+      "Stay connected with the temple through your bookings, prayers and devotional activities.": "accountLocal.stay_connected_with_the_temple_through_your_bookings_prayers_and_devotional_activities",
+      "Logout": "accountLocal.logout",
+      "Delete My Account": "accountLocal.delete_my_account",
+      "Back to Home": "accountLocal.back_to_home",
+      "Account Error": "accountLocal.account_error",
+      "Unable to load account": "accountLocal.unable_to_load_account",
+      "Unable to load your account details.": "accountLocal.unable_to_load_your_account_details",
+      "Are you sure you want to logout?": "accountLocal.are_you_sure_you_want_to_logout",
+      "Cancel": "accountLocal.cancel",
+      "Logout Failed": "accountLocal.logout_failed",
+      "Unable to logout. Please try again.": "accountLocal.unable_to_logout_please_try_again",
+      "Failed to load profile": "accountLocal.failed_to_load_profile",
+      "Profile Error": "accountLocal.profile_error",
+      "Unable to load profile": "accountLocal.unable_to_load_profile",
+      "My Temple Activities": "accountLocal.my_temple_activities",
+      "View your temple bookings": "accountLocal.view_your_temple_bookings",
+      "My Donations": "accountLocal.my_donations",
+      "View your donation history": "accountLocal.view_your_donation_history",
+      "Deities": "accountLocal.deities",
+      "Explore temple deities": "accountLocal.explore_temple_deities",
+      "Temple Events": "accountLocal.temple_events",
+      "View upcoming events": "accountLocal.view_upcoming_events",
+      "Temple Information": "accountLocal.temple_information",
+      "About Temple": "accountLocal.about_temple",
+      "Learn about our temple": "accountLocal.learn_about_our_temple",
+      "Temple Location": "accountLocal.temple_location",
+      "Find the temple and directions": "accountLocal.find_the_temple_and_directions",
+      "Settings": "accountLocal.settings",
+      "Notifications": "accountLocal.notifications",
+      "Manage notification preferences": "accountLocal.manage_notification_preferences",
+      "App Settings": "accountLocal.app_settings",
+      "Manage your app preferences": "accountLocal.manage_your_app_preferences",
+      "About App": "accountLocal.about_app",
+      "Temple App information": "accountLocal.temple_app_information",
+      "May the divine blessings be with you always.": "accountLocal.may_the_divine_blessings_be_with_you_always",
+      "Error": "accountLocal.error",
+      "Invalid Name": "accountLocal.invalid_name",
+      "Enter a name between 2 and 100 characters.": "accountLocal.enter_a_name_between_2_and_100_characters",
+      "Invalid Phone": "accountLocal.invalid_phone",
+      "Enter a valid 10-digit Indian mobile number.": "accountLocal.enter_a_valid_10_digit_indian_mobile_number",
+      "Unable to update profile": "accountLocal.unable_to_update_profile",
+      "Success": "accountLocal.success",
+      "Your profile has been updated successfully.": "accountLocal.your_profile_has_been_updated_successfully",
+      "OK": "accountLocal.ok",
+      "Update Failed": "accountLocal.update_failed",
+      "Please try again.": "accountLocal.please_try_again",
+      "‹ Back": "accountLocal.back",
+      "Update your devotee account information.": "accountLocal.update_your_devotee_account_information",
+      "Enter your full name": "accountLocal.enter_your_full_name",
+      "Your registered email cannot be changed.": "accountLocal.your_registered_email_cannot_be_changed",
+      "Mobile number changes will require OTP verification.": "accountLocal.mobile_number_changes_will_require_otp_verification",
+      "Save Changes": "accountLocal.save_changes",
+      "Session Expired": "accountLocal.session_expired",
+      "Please log in again.": "accountLocal.please_log_in_again",
+      "Unable to delete account.": "accountLocal.unable_to_delete_account",
+      "Account Deleted": "accountLocal.account_deleted",
+      "Your temple app account has been deleted.": "accountLocal.your_temple_app_account_has_been_deleted",
+      "Deletion Failed": "accountLocal.deletion_failed",
+      "Password Required": "accountLocal.password_required",
+      "Enter your account password to continue.": "accountLocal.enter_your_account_password_to_continue",
+      "Permanently Delete Account?": "accountLocal.permanently_delete_account",
+      "This action cannot be undone. Your temple app login and profile will be deleted. Separate website bookings are managed through the temple website.": "accountLocal.this_action_cannot_be_undone_your_temple_app_login_and_profile_will_be_deleted_separate_website_bookings_are_managed_through_the_temple_website",
+      "Delete Permanently": "accountLocal.delete_permanently",
+      "ACCOUNT SETTINGS": "accountLocal.account_settings",
+      "Permanent Account Deletion": "accountLocal.permanent_account_deletion",
+      "Deleting your account is permanent and cannot be undone.": "accountLocal.deleting_your_account_is_permanent_and_cannot_be_undone",
+      "Your temple app profile and login credentials will be removed. Some community contributions may remain without your name.": "accountLocal.your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name",
+      "Room and seva bookings made through the separate temple website are managed by that website.": "accountLocal.room_and_seva_bookings_made_through_the_separate_temple_website_are_managed_by_that_website",
+      "Confirm your password": "accountLocal.confirm_your_password",
+      "Enter your password": "accountLocal.enter_your_password",
+      "Delete My Account Permanently": "accountLocal.delete_my_account_permanently",
+      "Cancel — Keep My Account": "accountLocal.cancel_keep_my_account"
+    };
+    const clean = message.trim();
+    const key = Object.prototype.hasOwnProperty.call(
+      knownMessages,
+      clean
+    )
+      ? knownMessages[clean]
+      : null;
+    return key
+      ? String(i18n.t(key))
+      : fallback;
+  };
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,9 +191,8 @@ export default function AccountScreen() {
     } catch (error: any) {
       console.error('Failed to load account:', error);
 
-      Alert.alert(
-        'Account Error',
-        error?.message || 'Unable to load your account details.'
+      Alert.alert(t('accountLocal.account_error'),
+        localizeAccountError(error?.message, t('accountLocal.unable_to_load_your_account_details'))
       );
     } finally {
       setLoading(false);
@@ -87,7 +203,7 @@ export default function AccountScreen() {
   useFocusEffect(
     useCallback(() => {
       loadUser();
-    }, [])
+    }, [t])
   );
 
   // ========================================
@@ -95,16 +211,15 @@ export default function AccountScreen() {
   // ========================================
 
   const handleLogout = () => {
-  Alert.alert(
-    'Logout',
-    'Are you sure you want to logout?',
+  Alert.alert(t('accountLocal.logout'),
+    t('accountLocal.are_you_sure_you_want_to_logout'),
     [
       {
-        text: 'Cancel',
+        text: t('accountLocal.cancel'),
         style: 'cancel',
       },
       {
-        text: 'Logout',
+        text: t('accountLocal.logout'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -119,9 +234,8 @@ export default function AccountScreen() {
           } catch (error) {
             console.error('Logout error:', error);
 
-            Alert.alert(
-              'Logout Failed',
-              'Unable to logout. Please try again.'
+            Alert.alert(t('accountLocal.logout_failed'),
+              t('accountLocal.unable_to_logout_please_try_again')
             );
           }
         },
@@ -129,7 +243,7 @@ export default function AccountScreen() {
     ]
   );
 };
-  const displayName = user?.full_name || 'Devotee';
+  const displayName = user?.full_name || t('accountLocal.devotee');
   const firstLetter = displayName.charAt(0).toUpperCase();
 
   // ========================================
@@ -146,17 +260,11 @@ export default function AccountScreen() {
 
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AutoTranslatedText style={styles.label}>
-              TEMPLE ACCOUNT
-            </AutoTranslatedText>
+            <Text style={styles.label}>{t('accountLocal.temple_account')}</Text>
 
-            <AutoTranslatedText style={styles.title}>
-              My Account
-            </AutoTranslatedText>
+            <Text style={styles.title}>{t('accountLocal.my_account')}</Text>
 
-            <AutoTranslatedText style={styles.subtitle}>
-              Your personal information and temple services
-            </AutoTranslatedText>
+            <Text style={styles.subtitle}>{t('accountLocal.your_personal_information_and_temple_services')}</Text>
           </View>
 
           <View style={styles.headerIcon}>
@@ -177,12 +285,10 @@ export default function AccountScreen() {
 
           <View style={styles.profileInfo}>
             <Text style={styles.name}>
-              {loading ? 'Loading...' : displayName}
+              {loading ? t('accountLocal.loading') : displayName}
             </Text>
 
-            <AutoTranslatedText style={styles.profileSubtitle}>
-              Temple Devotee
-            </AutoTranslatedText>
+            <Text style={styles.profileSubtitle}>{t('accountLocal.temple_devotee')}</Text>
           </View>
 
           <TouchableOpacity
@@ -190,17 +296,13 @@ export default function AccountScreen() {
             onPress={() => router.push('/edit-profile')}
             activeOpacity={0.7}
           >
-            <AutoTranslatedText style={styles.editButtonText}>
-              Edit
-            </AutoTranslatedText>
+            <Text style={styles.editButtonText}>{t('accountLocal.edit')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* PROFILE DETAILS */}
 
-        <AutoTranslatedText style={styles.sectionTitle}>
-          Profile Details
-        </AutoTranslatedText>
+        <Text style={styles.sectionTitle}>{t('accountLocal.profile_details')}</Text>
 
         <View style={styles.detailsCard}>
           {loading ? (
@@ -210,32 +312,30 @@ export default function AccountScreen() {
                 color="#6B1720"
               />
 
-              <AutoTranslatedText style={styles.loadingText}>
-                Loading your details...
-              </AutoTranslatedText>
+              <Text style={styles.loadingText}>{t('accountLocal.loading_your_details')}</Text>
             </View>
           ) : (
             <>
               <DetailRow
                 icon="👤"
-                label="Full Name"
-                value={user?.full_name || 'Not available'}
+                label={t('accountLocal.full_name')}
+                value={user?.full_name || t('accountLocal.not_available')}
               />
 
               <View style={styles.divider} />
 
               <DetailRow
                 icon="✉️"
-                label="Email Address"
-                value={user?.email || 'Not available'}
+                label={t('accountLocal.email_address')}
+                value={user?.email || t('accountLocal.not_available')}
               />
 
               <View style={styles.divider} />
 
               <DetailRow
                 icon="📱"
-                label="Phone Number"
-                value={user?.phone || 'Not available'}
+                label={t('accountLocal.phone_number')}
+                value={user?.phone || t('accountLocal.not_available')}
               />
             </>
           )}
@@ -243,15 +343,13 @@ export default function AccountScreen() {
 
         {/* ACCOUNT OPTIONS */}
 
-        <AutoTranslatedText style={styles.sectionTitle}>
-          Account
-        </AutoTranslatedText>
+        <Text style={styles.sectionTitle}>{t('accountLocal.account')}</Text>
 
         <View style={styles.card}>
           <AccountItem
             icon="👤"
-            title="Edit Profile"
-            description="Update your personal information"
+            title={t('accountLocal.edit_profile')}
+            description={t('accountLocal.update_your_personal_information')}
             onPress={() => router.push('/edit-profile')}
           />
 
@@ -259,8 +357,8 @@ export default function AccountScreen() {
 
           <AccountItem
             icon="🎫"
-            title="My Bookings"
-            description="View your room and seva bookings"
+            title={t('accountLocal.my_bookings')}
+            description={t('accountLocal.view_your_room_and_seva_bookings')}
             onPress={() => router.push('/website-bookings')}
             last
           />
@@ -274,15 +372,9 @@ export default function AccountScreen() {
           </Text>
 
           <View style={styles.infoContent}>
-            <AutoTranslatedText style={styles.infoTitle}>
-              Your Spiritual Journey
-            </AutoTranslatedText>
+            <Text style={styles.infoTitle}>{t('accountLocal.your_spiritual_journey')}</Text>
 
-            <AutoTranslatedText style={styles.infoText}>
-              Stay connected with the temple through
-              your bookings, prayers and devotional
-              activities.
-            </AutoTranslatedText>
+            <Text style={styles.infoText}>{t('accountLocal.stay_connected_with_the_temple_through_your_bookings_prayers_and_devotional_activities')}</Text>
           </View>
         </View>
 
@@ -297,9 +389,7 @@ export default function AccountScreen() {
             ↪
           </Text>
 
-          <AutoTranslatedText style={styles.logoutButtonText}>
-            Logout
-          </AutoTranslatedText>
+          <Text style={styles.logoutButtonText}>{t('accountLocal.logout')}</Text>
         </TouchableOpacity>
 
 
@@ -310,9 +400,7 @@ export default function AccountScreen() {
   onPress={() => router.push('/delete-account' as any)}
   activeOpacity={0.8}
 >
-  <AutoTranslatedText style={styles.deleteAccountButtonText}>
-    Delete My Account
-  </AutoTranslatedText>
+  <Text style={styles.deleteAccountButtonText}>{t('accountLocal.delete_my_account')}</Text>
 </TouchableOpacity>
 
 
@@ -325,9 +413,7 @@ export default function AccountScreen() {
           onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.8}
         >
-          <AutoTranslatedText style={styles.homeButtonText}>
-            Back to Home
-          </AutoTranslatedText>
+          <Text style={styles.homeButtonText}>{t('accountLocal.back_to_home')}</Text>
         </TouchableOpacity>
 
       </ScrollView>

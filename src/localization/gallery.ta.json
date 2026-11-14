@@ -19,6 +19,9 @@
     "sharing": "பகிரப்படுகிறது...",
     "download": "பதிவிறக்கம்",
     "saving": "சேமிக்கப்படுகிறது...",
-    "shareImage": "கோயில் புகைப்படத்தைப் பகிரவும்"
+    "shareImage": "கோயில் புகைப்படத்தைப் பகிரவும்",
+    "photoCount_one": "{{count}} புகைப்படம்",
+    "photoCount_other": "{{count}} புகைப்படங்கள்",
+    "photoCount_plural": "{{count}} புகைப்படங்கள்"
   }
 }

@@ -1,4 +1,6 @@
-import AutoTranslatedText from '@/components/AutoTranslatedText';
+import i18n from '@/localization/i18n';
+import { useTranslation } from 'react-i18next';
+
 
 import React, {
   useCallback,
@@ -71,7 +73,46 @@ const COLORS = {
 // GURU VANI DETAILS SCREEN
 // ========================================
 
+
+function tr(text: string): string {
+  const key = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+  const translated = i18n.t(
+    'spiritualContent.' + key,
+    { defaultValue: text }
+  );
+  if (text.startsWith('←')) {
+    return '← ' + translated.replace(/^←\s*/, '');
+  }
+  if (text.startsWith('▶')) {
+    return '▶ ' + translated.replace(/^▶\s*/, '');
+  }
+  return translated;
+}
+function getSpiritualLocale(): string {
+  const language = (
+    i18n.resolvedLanguage ||
+    i18n.language ||
+    'en'
+  ).split('-')[0];
+  const locales: Record<string, string> = {
+    en: 'en-IN',
+    te: 'te-IN',
+    kn: 'kn-IN',
+    hi: 'hi-IN',
+    ta: 'ta-IN'
+  };
+  return locales[language] || 'en-IN';
+}
 export default function GuruVaniDetailsScreen() {
+  const { i18n: selectedI18n } = useTranslation();
+  const language =
+    selectedI18n.resolvedLanguage ||
+    selectedI18n.language ||
+    'en';
+
   const { id } = useLocalSearchParams<{
     id: string;
   }>();
@@ -121,7 +162,7 @@ export default function GuruVaniDetailsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,9 +182,7 @@ export default function GuruVaniDetailsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <AutoTranslatedText style={styles.backText}>
-            ← Back to Guru Vani
-          </AutoTranslatedText>
+          <Text style={styles.backText}>{tr("← Back to Guru Vani")}</Text>
         </Pressable>
 
         {/* HEADER */}
@@ -168,17 +207,11 @@ export default function GuruVaniDetailsScreen() {
             ॐ
           </Text>
 
-          <AutoTranslatedText style={styles.heroEyebrow}>
-            SACRED TEACHINGS
-          </AutoTranslatedText>
+          <Text style={styles.heroEyebrow}>{tr("SACRED TEACHINGS")}</Text>
 
-          <AutoTranslatedText style={styles.heroTitle}>
-            Guru Vani
-          </AutoTranslatedText>
+          <Text style={styles.heroTitle}>{tr("Guru Vani")}</Text>
 
-          <AutoTranslatedText style={styles.heroSubtitle}>
-            Timeless wisdom for the spiritual journey
-          </AutoTranslatedText>
+          <Text style={styles.heroSubtitle}>{tr("Timeless wisdom for the spiritual journey")}</Text>
         </LinearGradient>
 
         {/* LOADING */}
@@ -190,9 +223,7 @@ export default function GuruVaniDetailsScreen() {
               color={COLORS.maroon}
             />
 
-            <AutoTranslatedText style={styles.stateText}>
-              Loading teaching...
-            </AutoTranslatedText>
+            <Text style={styles.stateText}>{tr("Loading teaching...")}</Text>
           </View>
         ) : error || !item ? (
           <View style={styles.stateCard}>
@@ -201,16 +232,14 @@ export default function GuruVaniDetailsScreen() {
             </Text>
 
             <Text style={styles.stateText}>
-              {error || 'Teaching not found.'}
+              {tr(error || 'Teaching not found.')}
             </Text>
 
             <Pressable
               style={styles.retryButton}
               onPress={() => void loadDetails()}
             >
-              <AutoTranslatedText style={styles.retryText}>
-                Try Again
-              </AutoTranslatedText>
+              <Text style={styles.retryText}>{tr("Try Again")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -219,14 +248,12 @@ export default function GuruVaniDetailsScreen() {
 
             <View style={styles.mainCard}>
               <View style={styles.cardHeader}>
-                <AutoTranslatedText style={styles.cardEyebrow}>
-                  GURU VANI
-                </AutoTranslatedText>
+                <Text style={styles.cardEyebrow}>{tr("GURU VANI")}</Text>
 
                 <Text style={styles.date}>
                   {new Date(
                     item.published_at
-                  ).toLocaleDateString()}
+                  ).toLocaleDateString(getSpiritualLocale())}
                 </Text>
               </View>
 
@@ -251,13 +278,9 @@ export default function GuruVaniDetailsScreen() {
 
             {item.transliteration?.trim() ? (
               <View style={styles.infoCard}>
-                <AutoTranslatedText style={styles.infoEyebrow}>
-                  PRONUNCIATION
-                </AutoTranslatedText>
+                <Text style={styles.infoEyebrow}>{tr("PRONUNCIATION")}</Text>
 
-                <AutoTranslatedText style={styles.infoTitle}>
-                  Transliteration
-                </AutoTranslatedText>
+                <Text style={styles.infoTitle}>{tr("Transliteration")}</Text>
 
                 <Text style={styles.infoText}>
                   {item.transliteration}
@@ -269,13 +292,9 @@ export default function GuruVaniDetailsScreen() {
 
             {item.meaning?.trim() ? (
               <View style={styles.infoCard}>
-                <AutoTranslatedText style={styles.infoEyebrow}>
-                  SPIRITUAL UNDERSTANDING
-                </AutoTranslatedText>
+                <Text style={styles.infoEyebrow}>{tr("SPIRITUAL UNDERSTANDING")}</Text>
 
-                <AutoTranslatedText style={styles.infoTitle}>
-                  Meaning
-                </AutoTranslatedText>
+                <Text style={styles.infoTitle}>{tr("Meaning")}</Text>
 
                 <Text style={styles.infoText}>
                   {item.meaning}
@@ -290,10 +309,7 @@ export default function GuruVaniDetailsScreen() {
                 ✦
               </Text>
 
-              <AutoTranslatedText style={styles.footerText}>
-                May these sacred teachings guide
-                your spiritual journey.
-              </AutoTranslatedText>
+              <Text style={styles.footerText}>{tr("May these sacred teachings guide your spiritual journey.")}</Text>
             </View>
           </>
         )}

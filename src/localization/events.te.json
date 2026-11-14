@@ -20,6 +20,8 @@
     "eventUnavailable": "ఈ కార్యక్రమం ప్రస్తుతం అందుబాటులో లేదు.",
     "detailsLoading": "కార్యక్రమ వివరాలు లోడ్ అవుతున్నాయి...",
     "detailsDate": "కార్యక్రమ తేదీ",
-    "detailsDescriptionFallback": "మరిన్ని వివరాలు త్వరలో అందుబాటులో ఉంటాయి."
+    "detailsDescriptionFallback": "మరిన్ని వివరాలు త్వరలో అందుబాటులో ఉంటాయి.",
+    "startsAt": "{{time}} గంటలకు ప్రారంభం",
+    "endsAt": "{{time}} గంటలకు ముగింపు"
   }
 }

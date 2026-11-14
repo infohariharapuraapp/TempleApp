@@ -20,6 +20,8 @@
     "sharing": "शेयर हो रहा है...",
     "download": "डाउनलोड",
     "saving": "सेव हो रहा है...",
-    "shareImage": "मंदिर की तस्वीर शेयर करें"
+    "shareImage": "मंदिर की तस्वीर शेयर करें",
+    "photoCount_one": "{{count}} तस्वीर",
+    "photoCount_other": "{{count}} तस्वीरें"
   }
 }
