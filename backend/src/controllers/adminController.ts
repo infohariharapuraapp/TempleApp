@@ -2,6 +2,11 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { pool } from '../db';
 import {
+  parseEventVideos,
+  saveEventVideos,
+  getEventVideos,
+} from '../utils/eventVideos';
+import {
   createNotification,
   sendNotificationRecord,
 } from '../services/notificationService';
@@ -380,6 +385,8 @@ function parseEventInput(body: Record<string, unknown>) {
     images = body.images;
     if (new Set(images).size !== images.length) throw new Error('Duplicate event images are not allowed');
   }
+  const videos = parseEventVideos(body.videos);
+
   return {
     title: title.trim(),
     description: (body.description as string | undefined)?.trim() || null,
@@ -389,6 +396,7 @@ function parseEventInput(body: Record<string, unknown>) {
     endTime,
     location: (body.location as string | undefined)?.trim() || null,
     images,
+    videos,
     legacyImageUrl: (body.image_url as string | undefined)?.trim() || null,
   };
 }
@@ -406,7 +414,23 @@ const eventSelect = `
     COALESCE((
       SELECT json_agg(ei.image_url ORDER BY ei.display_order, ei.id)
       FROM event_images ei WHERE ei.event_id = e.id
-    ), '[]'::json) AS images
+    ), '[]'::json) AS images,
+
+    COALESCE((
+      SELECT json_agg(
+        json_build_object(
+          'id', ev.id,
+          'title', ev.title,
+          'youtube_url', ev.youtube_url,
+          'youtube_video_id', ev.youtube_video_id,
+          'display_order', ev.display_order
+        )
+        ORDER BY ev.display_order, ev.id
+      )
+      FROM event_videos ev
+      WHERE ev.event_id = e.id
+    ), '[]'::json) AS videos
+
   FROM events e
   LEFT JOIN event_categories c ON c.id = e.category_id`;
 
@@ -458,7 +482,21 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
         [event.id, url, index]
       );
     }
+    if (input.videos !== undefined) {
+      await saveEventVideos(
+        client,
+        event.id,
+        input.videos
+      );
+    }
+
+    event.videos = await getEventVideos(
+      client,
+      event.id
+    );
+
     await client.query('COMMIT');
+
     event.images = input.images ?? [];
   } catch (error) {
     await client.query('ROLLBACK');
@@ -537,6 +575,19 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
         );
       }
     }
+    if (input.videos !== undefined) {
+      await saveEventVideos(
+        client,
+        id,
+        input.videos
+      );
+    }
+
+    event.videos = await getEventVideos(
+      client,
+      id
+    );
+
     const images = await client.query(
       'SELECT image_url FROM event_images WHERE event_id=$1 ORDER BY display_order, id', [id]
     );

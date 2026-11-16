@@ -1,4 +1,3 @@
-
 import { Request, Response } from 'express';
 import { pool } from '../db';
 
@@ -57,8 +56,9 @@ export const getEvents = async (
 
     const values: unknown[] = [];
 
-    // Multi-day events remain upcoming until the
-    // final day of the event has passed.
+    // Multi-day events remain upcoming until
+    // the final day has passed.
+
     if (type === 'past') {
       conditions.push(
         `COALESCE(e.event_end_date, e.event_date) < ${todayExpression}`
@@ -71,6 +71,7 @@ export const getEvents = async (
 
     if (categoryId !== null) {
       values.push(categoryId);
+
       conditions.push(
         `e.category_id = $${values.length}`
       );
@@ -119,7 +120,25 @@ export const getEvents = async (
              )
              ELSE '[]'::json
            END
-         ) AS images
+         ) AS images,
+
+         COALESCE(
+           (
+             SELECT json_agg(
+               json_build_object(
+                 'id', ev.id,
+                 'title', ev.title,
+                 'youtube_url', ev.youtube_url,
+                 'youtube_video_id', ev.youtube_video_id,
+                 'display_order', ev.display_order
+               )
+               ORDER BY ev.display_order, ev.id
+             )
+             FROM event_videos ev
+             WHERE ev.event_id = e.id
+           ),
+           '[]'::json
+         ) AS videos
 
        FROM events e
        INNER JOIN event_categories c

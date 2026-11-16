@@ -3,6 +3,20 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { apiRequest } from '../lib/api';
 
+type EventVideo = {
+  id?: number;
+  title?: string | null;
+  youtube_url: string;
+  youtube_video_id?: string;
+  display_order?: number;
+};
+
+type EventVideoDraft = {
+  key: string;
+  title: string;
+  youtube_url: string;
+};
+
 type EventItem = {
   id: number;
   title: string;
@@ -11,6 +25,7 @@ type EventItem = {
   event_date?: string | null;
   event_end_date?: string | null;
   images?: Array<string | { image_url: string }>;
+  videos?: EventVideo[];
   start_time?: string | null;
   end_time?: string | null;
   location?: string | null;
@@ -72,6 +87,68 @@ const IMAGE_EXTENSIONS = [
 
 const IMAGE_ACCEPT = IMAGE_EXTENSIONS.join(',');
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+const MAX_EVENT_VIDEOS = 10;
+
+let nextVideoKey = 0;
+
+function createVideoKey() {
+  nextVideoKey += 1;
+  return 'video-' + nextVideoKey;
+}
+
+function extractEventYouTubeId(
+  value: string
+): string | null {
+  try {
+    const url = new URL(value.trim());
+
+    if (
+      !['https:', 'http:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.port
+    ) {
+      return null;
+    }
+
+    const host = url.hostname.toLowerCase();
+
+    const parts = url.pathname
+      .split('/')
+      .filter(Boolean);
+
+    let id: string | null = null;
+
+    if (host === 'youtu.be') {
+      id = parts[0] || null;
+    } else if (
+      [
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'music.youtube.com',
+        'youtube-nocookie.com',
+        'www.youtube-nocookie.com',
+      ].includes(host)
+    ) {
+      if (url.pathname === '/watch') {
+        id = url.searchParams.get('v');
+      } else if (
+        ['embed', 'shorts', 'live', 'v']
+          .includes(parts[0])
+      ) {
+        id = parts[1] || null;
+      }
+    }
+
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id)
+      ? id
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 const filterControlStyle: React.CSSProperties = {
   width: '100%',
@@ -979,6 +1056,20 @@ export default function Events() {
                     <td>
                       <strong>{event.title}</strong>
 
+                      {Boolean(event.videos?.length) && (
+                        <small
+                          style={{
+                            display: 'block',
+                            color: '#6B1720',
+                            marginTop: 5,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {event.videos?.length}
+                          {' YouTube video(s)'}
+                        </small>
+                      )}
+
                       {event.description && (
                         <small
                           style={{
@@ -1161,6 +1252,24 @@ function EventForm({
   const [pendingFiles, setPendingFiles] =
     useState<File[]>([]);
 
+  const [videos, setVideos] =
+    useState<EventVideoDraft[]>(() =>
+      [...(event?.videos ?? [])]
+        .sort(
+          (a, b) =>
+            (a.display_order ?? 0) -
+            (b.display_order ?? 0)
+        )
+        .map(video => ({
+          key: createVideoKey(),
+          title: video.title || '',
+          youtube_url: video.youtube_url || '',
+        }))
+    );
+
+  const [videosChanged, setVideosChanged] =
+    useState(false);
+
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -1229,6 +1338,82 @@ function EventForm({
     });
   }
 
+  function addVideo() {
+    if (videos.length >= MAX_EVENT_VIDEOS) {
+      setFormError('Maximum 10 videos per event');
+      return;
+    }
+
+    const key = createVideoKey();
+
+    setVideos(previous => [
+      ...previous,
+      {
+        key,
+        title: '',
+        youtube_url: '',
+      },
+    ]);
+
+    setVideosChanged(true);
+    setFormError('');
+  }
+
+  function updateVideo(
+    key: string,
+    field: 'title' | 'youtube_url',
+    value: string
+  ) {
+    setVideos(previous =>
+      previous.map(video =>
+        video.key === key
+          ? { ...video, [field]: value }
+          : video
+      )
+    );
+
+    setVideosChanged(true);
+    setFormError('');
+  }
+
+  function removeVideo(key: string) {
+    setVideos(previous =>
+      previous.filter(video => video.key !== key)
+    );
+
+    setVideosChanged(true);
+    setFormError('');
+  }
+
+  function moveVideo(
+    index: number,
+    direction: number
+  ) {
+    setVideos(previous => {
+      const target = index + direction;
+
+      if (
+        index < 0 ||
+        index >= previous.length ||
+        target < 0 ||
+        target >= previous.length
+      ) {
+        return previous;
+      }
+
+      const next = [...previous];
+
+      [next[index], next[target]] = [
+        next[target],
+        next[index],
+      ];
+
+      return next;
+    });
+
+    setVideosChanged(true);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
@@ -1283,6 +1468,64 @@ function EventForm({
       return;
     }
 
+    if (videos.length > MAX_EVENT_VIDEOS) {
+      setFormError('Maximum 10 videos per event');
+      return;
+    }
+
+    const seenVideoIds = new Set<string>();
+
+    const allVideos: {
+      title: string | null;
+      youtube_url: string;
+    }[] = [];
+
+    for (const [index, video] of videos.entries()) {
+      const url = video.youtube_url.trim();
+      const title = video.title.trim();
+
+      if (url.length > 2048) {
+        setFormError(
+          'YouTube URL is too long for video ' +
+          (index + 1)
+        );
+        return;
+      }
+
+      const videoId = extractEventYouTubeId(url);
+
+      if (!videoId) {
+        setFormError(
+          'Enter a valid YouTube URL for video ' +
+          (index + 1)
+        );
+        return;
+      }
+
+      if (title.length > 255) {
+        setFormError(
+          'Video title cannot exceed 255 characters'
+        );
+        return;
+      }
+
+      if (seenVideoIds.has(videoId)) {
+        setFormError(
+          'Duplicate YouTube videos are not allowed'
+        );
+        return;
+      }
+
+      seenVideoIds.add(videoId);
+
+      allVideos.push({
+        title: title || null,
+        youtube_url:
+          'https://www.youtube.com/watch?v=' +
+          videoId,
+      });
+    }
+
     try {
       setSaving(true);
       setFormError('');
@@ -1323,6 +1566,9 @@ function EventForm({
         description: description.trim() || null,
         image_url: allImages[0] || null,
         images: allImages,
+        ...(!event || videosChanged
+          ? { videos: allVideos }
+          : {}),
         event_date: eventDate,
         event_end_date: eventEndDate || null,
         start_time:
@@ -1649,6 +1895,385 @@ function EventForm({
             ))}
           </div>
         </div>
+
+
+        {/* EVENT VIDEOS */}
+
+        <section
+          style={{
+            marginTop: 24,
+            padding: 18,
+            border: '1px solid #E8DCCB',
+            borderRadius: 12,
+            backgroundColor: '#FFFDF8',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  margin: 0,
+                  color: '#6B1720',
+                  fontSize: 18,
+                }}
+              >
+                Event Videos
+              </h3>
+
+              <p
+                style={{
+                  color: '#81776D',
+                  fontSize: 13,
+                  marginTop: 6,
+                }}
+              >
+                Add YouTube videos related to this event.
+                Devotees can watch them inside the app.
+              </p>
+            </div>
+
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#6B1720',
+              }}
+            >
+              {videos.length}/{MAX_EVENT_VIDEOS}
+              {' videos'}
+            </span>
+          </div>
+
+          {videos.length === 0 && (
+            <div
+              style={{
+                padding: '24px 12px',
+                textAlign: 'center',
+                border: '1px dashed #D8C7AD',
+                borderRadius: 10,
+                color: '#81776D',
+                marginTop: 12,
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              <strong>No videos added</strong>
+
+              <p style={{ fontSize: 13 }}>
+                Videos are optional. You can add them
+                now or after publishing the event.
+              </p>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'grid',
+              gap: 14,
+              marginTop: 14,
+            }}
+          >
+            {videos.map((video, index) => {
+              const videoId =
+                extractEventYouTubeId(
+                  video.youtube_url
+                );
+
+              return (
+                <div
+                  key={video.key}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #E8DCCB',
+                    borderRadius: 10,
+                    padding: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <strong
+                      style={{ color: '#6B1720' }}
+                    >
+                      Video {index + 1}
+                    </strong>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        title="Move video up"
+                        disabled={
+                          saving || index === 0
+                        }
+                        onClick={() =>
+                          moveVideo(index, -1)
+                        }
+                      >
+                        Up
+                      </button>
+
+                      <button
+                        type="button"
+                        title="Move video down"
+                        disabled={
+                          saving ||
+                          index === videos.length - 1
+                        }
+                        onClick={() =>
+                          moveVideo(index, 1)
+                        }
+                      >
+                        Down
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          removeVideo(video.key)
+                        }
+                        style={{
+                          color: '#B42318',
+                          border: '1px solid #F2C5C0',
+                          backgroundColor: '#FFF5F4',
+                          borderRadius: 6,
+                          padding: '7px 12px',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+                      gap: 16,
+                      alignItems: 'start',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: 12,
+                      }}
+                    >
+                      <label>
+                        Video Title (Optional)
+
+                        <input
+                          value={video.title}
+                          maxLength={255}
+                          disabled={saving}
+                          placeholder="e.g. Special Mahapooja"
+                          onChange={e =>
+                            updateVideo(
+                              video.key,
+                              'title',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </label>
+
+                      <label>
+                        YouTube URL *
+
+                        <input
+                          type="url"
+                          value={video.youtube_url}
+                          maxLength={2048}
+                          disabled={saving}
+                          required
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          onChange={e =>
+                            updateVideo(
+                              video.key,
+                              'youtube_url',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </label>
+
+                      {video.youtube_url.trim() &&
+                        !videoId && (
+                          <small
+                            style={{
+                              color: '#B42318',
+                            }}
+                          >
+                            Enter a valid YouTube URL
+                          </small>
+                        )}
+
+                      {videoId && (
+                        <small
+                          style={{
+                            color: '#247A42',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Valid YouTube URL format
+                        </small>
+                      )}
+                    </div>
+
+                    <div>
+                      {videoId ? (
+                        <>
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: '100%',
+                              maxWidth: 320,
+                              aspectRatio: '16 / 9',
+                              backgroundColor: '#222222',
+                              borderRadius: 9,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <img
+                              key={videoId}
+                              src={
+                                'https://i.ytimg.com/vi/' +
+                                videoId +
+                                '/hqdefault.jpg'
+                              }
+                              alt={
+                                video.title ||
+                                'YouTube video thumbnail'
+                              }
+                              loading="lazy"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform:
+                                  'translate(-50%, -50%)',
+                                backgroundColor: '#E62117',
+                                color: '#FFFFFF',
+                                padding: '8px 20px',
+                                borderRadius: 9,
+                                fontSize: 20,
+                              }}
+                            >
+                              {'\u25B6'}
+                            </span>
+                          </div>
+
+                          <a
+                            href={
+                              'https://www.youtube.com/watch?v=' +
+                              videoId
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-block',
+                              color: '#6B1720',
+                              marginTop: 8,
+                              fontSize: 13,
+                            }}
+                          >
+                            Preview on YouTube
+                          </a>
+                        </>
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            maxWidth: 320,
+                            aspectRatio: '16 / 9',
+                            backgroundColor: '#F5F0E8',
+                            borderRadius: 9,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            color: '#81776D',
+                            fontSize: 13,
+                          }}
+                        >
+                          Thumbnail Preview
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            disabled={
+              saving ||
+              videos.length >= MAX_EVENT_VIDEOS
+            }
+            onClick={addVideo}
+            style={{
+              width: '100%',
+              padding: 12,
+              marginTop: 16,
+              border: '1px dashed #C69A3A',
+              borderRadius: 9,
+              backgroundColor: '#FFF8EC',
+              color: '#6B1720',
+              fontWeight: 600,
+              cursor:
+                saving ||
+                videos.length >= MAX_EVENT_VIDEOS
+                  ? 'not-allowed'
+                  : 'pointer',
+            }}
+          >
+            + Add YouTube Video
+          </button>
+
+          <p
+            style={{
+              marginBottom: 0,
+              color: '#81776D',
+              fontSize: 12,
+              marginTop: 10,
+            }}
+          >
+            Supports regular YouTube links, Shorts,
+            live streams and shortened links.
+            Playback depends on YouTube embedding
+            permissions.
+          </p>
+        </section>
 
         <p
           style={{

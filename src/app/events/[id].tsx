@@ -19,6 +19,8 @@ import {
 } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { apiRequest } from '@/services/api';
+import EventVideos from '@/components/EventVideos';
+import type { EventVideo } from '@/components/EventVideos';
 
 type Category = {
   id: number;
@@ -42,6 +44,7 @@ type TempleEvent = {
   description?: string | null;
   image_url?: string | null;
   images?: EventImage[];
+  videos?: EventVideo[];
   event_date?: string | null;
   event_end_date?: string | null;
   start_time?: string | null;
@@ -101,6 +104,7 @@ export default function EventDetailsScreen() {
   const [error, setError] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [screenFocused, setScreenFocused] = useState(false);
 
   const galleryRef = useRef<ScrollView>(null);
   const viewerRef = useRef<ScrollView>(null);
@@ -253,7 +257,12 @@ export default function EventDetailsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setScreenFocused(true);
       void loadEvent();
+
+      return () => {
+        setScreenFocused(false);
+      };
     }, [loadEvent])
   );
 
@@ -506,6 +515,13 @@ export default function EventDetailsScreen() {
                 {event.description?.trim() ||
                   t('events.detailsDescriptionFallback')}
               </Text>
+
+              {/* EMBEDDED EVENT VIDEOS */}
+              {screenFocused && (
+                <EventVideos
+                  videos={event.videos}
+                />
+              )}
             </View>
           </View>
         )}
