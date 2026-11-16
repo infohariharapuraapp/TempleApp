@@ -65,3 +65,14 @@ src.zip
 *.aab
 
 *.tsx.bak
+# Temporary development scripts and backups
+*.bak
+/fix-*.cjs
+/translate-*.cjs
+/update-*.cjs
+/verify-translations.cjs
+/repair-nearby-script.cjs
+/translation_*_review.txt
+/translation_existing_code.txt
+/backend/fix-*.cjs
+/admin/dist-final/
