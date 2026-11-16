@@ -89,38 +89,38 @@ type Guru = {
 
 
 const QUICK_ACTIONS = [
-  { icon: 'Ã°Å¸â„¢Â', titleKey: 'home.quickDarshan', route: '/darshan' },
-  { icon: 'Ã°Å¸â€œâ€¦', titleKey: 'home.quickEvents', route: '/events' },
-  { icon: 'Ã°Å¸â€™Â°', titleKey: 'home.quickDonations', route: '/donations' },
-  { icon: 'Ã°Å¸â€“Â¼Ã¯Â¸Â', titleKey: 'home.gallery', route: '/gallery' },
+  { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
+  { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
+  { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
+  { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
   {
-    icon: 'Ã°Å¸Âªâ€',
+    icon: '🪔',
     titleKey: 'home.quickSeva',
     route: '/seva-registration',
     comingSoon: true,
   },
   {
-    icon: 'Ã°Å¸â€ºâ€¢',
+    icon: '🛕',
     titleKey: 'home.poojaServices',
     route: '/pooja-services',
   },
   {
-    icon: 'Ã¢Ëœâ‚¬Ã¯Â¸Â',
+    icon: '☀️',
     titleKey: 'home.dailyPanchangam',
     route: '/panchangam',
   },
   {
-    icon: 'Ã°Å¸â€œÂ¿',
+    icon: '📿',
     titleKey: 'home.pravachanas',
     route: '/pravachanas',
   },
   {
-    icon: 'Ã°Å¸â€œâ€¦',
+    icon: '📅',
     titleKey: 'home.mahaswamijiProgrammes',
     route: '/mahaswamiji-programmes',
   },
   {
-    icon: 'Ã°Å¸â€œÂ¢',
+    icon: '📢',
     titleKey: 'home.divyakshetraUpdates',
     route: '/announcements',
   },
@@ -680,7 +680,7 @@ export default function HomeScreen() {
               onPressIn={() => animatePress(notificationScale, 0.9)}
               onPressOut={() => animatePress(notificationScale, 1)}
             >
-              <Text style={styles.notificationIcon}>Ã°Å¸â€â€</Text>
+              <Text style={styles.notificationIcon}>🔔</Text>
 
               {unreadNotificationCount > 0 && (
                 <View style={styles.notificationBadge}>
@@ -721,7 +721,7 @@ export default function HomeScreen() {
 
             <View style={styles.bannerDecorTop}>
               <View style={styles.decorLine} />
-              <Text style={styles.decorDiamond}>Ã¢â€”â€ </Text>
+              <Text style={styles.decorDiamond}>◆</Text>
               <View style={styles.decorLine} />
             </View>
 
@@ -738,7 +738,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                Ã Â¥Â
+                ॐ
               </Animated.Text>
 
               <Text style={styles.bannerEyebrow}>
@@ -758,12 +758,12 @@ export default function HomeScreen() {
                 onPress={() => router.push('/darshan')}
               >
                 <Text style={styles.bannerButtonText}>{t('home.exploreTemple')}</Text>
-                <Text style={styles.bannerButtonArrow}>Ã¢â€ â€™</Text>
+                <Text style={styles.bannerButtonArrow}>→</Text>
               </AnimatedTouchable>
             </View>
 
             <View style={styles.bannerBottomBadge}>
-              <Text style={styles.bannerBottomBadgeText}>Ã Â¤Â¹Ã Â¤Â°Ã Â¤Â¿Ã Â¤Æ’ Ã Â¥Â</Text>
+              <Text style={styles.bannerBottomBadgeText}>हरिः ॐ</Text>
             </View>
           </Animated.View>
 
@@ -805,7 +805,7 @@ const fallbackTitle =
           comingSoon
             ? `${t(item.titleKey, {
                 defaultValue: fallbackTitle,
-              })} (${({ en: 'Coming Soon in December', te: 'Ã Â°Â¡Ã Â°Â¿Ã Â°Â¸Ã Â±â€ Ã Â°â€šÃ Â°Â¬Ã Â°Â°Ã Â±ÂÃ¢â‚¬Å’Ã Â°Â²Ã Â±â€¹ Ã Â°Â¤Ã Â±ÂÃ Â°ÂµÃ Â°Â°Ã Â°Â²Ã Â±â€¹', kn: 'Ã Â²Â¡Ã Â²Â¿Ã Â²Â¸Ã Â³â€ Ã Â²â€šÃ Â²Â¬Ã Â²Â°Ã Â³ÂÃ¢â‚¬Å’Ã Â²Â¨Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â²Â¿ Ã Â²Â¶Ã Â³â‚¬Ã Â²ËœÃ Â³ÂÃ Â²Â°Ã Â²Â¦Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â³â€¡', hi: 'Ã Â¤Â¦Ã Â¤Â¿Ã Â¤Â¸Ã Â¤â€šÃ Â¤Â¬Ã Â¤Â° Ã Â¤Â®Ã Â¥â€¡Ã Â¤â€š Ã Â¤Å“Ã Â¤Â²Ã Â¥ÂÃ Â¤Â¦ Ã Â¤â€  Ã Â¤Â°Ã Â¤Â¹Ã Â¤Â¾ Ã Â¤Â¹Ã Â¥Ë†', ta: 'Ã Â®Å¸Ã Â®Â¿Ã Â®Å¡Ã Â®Â®Ã Â¯ÂÃ Â®ÂªÃ Â®Â°Ã Â®Â¿Ã Â®Â²Ã Â¯Â Ã Â®ÂµÃ Â®Â¿Ã Â®Â°Ã Â¯Ë†Ã Â®ÂµÃ Â®Â¿Ã Â®Â²Ã Â¯Â' } as Record<string, string>)[currentLanguage] || 'Coming Soon in December'})`
+              })} (${({ en: 'Coming Soon in December', te: 'డిసెంబర్‌లో త్వరలో', kn: 'ಡಿಸೆಂಬರ್‌ನಲ್ಲಿ ಶೀಘ್ರದಲ್ಲೇ', hi: 'दिसंबर में जल्द आ रहा है', ta: 'டிசம்பரில் விரைவில்' } as Record<string, string>)[currentLanguage] || 'Coming Soon in December'})`
             : t(item.titleKey, {
                 defaultValue: fallbackTitle,
               })
@@ -829,7 +829,7 @@ const fallbackTitle =
   onPress={() => router.push('/dharma' as any)}
 >
   <View style={styles.dharmaIconCircle}>
-    <Text style={styles.dharmaIcon}>Ã Â¥Â</Text>
+    <Text style={styles.dharmaIcon}>ॐ</Text>
   </View>
 
   <View style={styles.dharmaContent}>
@@ -851,7 +851,7 @@ const fallbackTitle =
       </Text>
 
       <Text style={styles.dharmaActionArrow}>
-        Ã¢â€ â€™
+        →
       </Text>
     </View>
   </View>
@@ -890,7 +890,7 @@ const fallbackTitle =
               </Text>
 
               <Text style={styles.viewAllArrow}>
-                Ã¢â€ â€™
+                →
               </Text>
             </TouchableOpacity>
           </View>
@@ -1001,7 +1001,7 @@ const fallbackTitle =
               <Text
                 style={styles.darshanEmptyIcon}
               >
-                {darshanLoadError ? 'Ã¢â€ Â»' : 'Ã¢â€“Â¶'}
+                {darshanLoadError ? '↻' : '▶'}
               </Text>
 
               <Text
@@ -1027,7 +1027,7 @@ const fallbackTitle =
                       fontWeight: '700',
                     }}
                   >
-                    {t('home.viewAll')} Ã¢â€ â€™
+                    {t('home.viewAll')} →
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1094,7 +1094,7 @@ const fallbackTitle =
                         <Text
                           style={styles.videoPlayIcon}
                         >
-                          Ã¢â€“Â¶
+                          ▶
                         </Text>
                       </View>
 
@@ -1204,7 +1204,7 @@ const fallbackTitle =
 
               <View style={styles.readMore}>
                 <Text style={styles.readMoreText}>{t('home.readFullStory')}</Text>
-                <Text style={styles.readMoreArrow}>Ã¢â€ â€™</Text>
+                <Text style={styles.readMoreArrow}>→</Text>
               </View>
             </View>
           </AnimatedTouchable>
@@ -1224,7 +1224,7 @@ const fallbackTitle =
               style={styles.viewAllButton}
             >
               <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-              <Text style={styles.viewAllArrow}>Ã¢â€ â€™</Text>
+              <Text style={styles.viewAllArrow}>→</Text>
             </TouchableOpacity>
           </View>
 
@@ -1277,12 +1277,12 @@ const fallbackTitle =
 
               <View style={styles.roomBookingButton}>
                 <Text style={styles.roomBookingButtonText}>{t('home.bookRoom')}</Text>
-                <Text style={styles.roomBookingButtonArrow}>Ã¢â€ â€™</Text>
+                <Text style={styles.roomBookingButtonArrow}>→</Text>
               </View>
             </View>
 
             <View style={styles.roomIconOrb}>
-              <Text style={styles.roomBookingIcon}>Ã°Å¸ÂÂ¨</Text>
+              <Text style={styles.roomBookingIcon}>🏨</Text>
             </View>
           </AnimatedTouchable>
 
@@ -1299,7 +1299,7 @@ const fallbackTitle =
               style={styles.viewAllButton}
             >
               <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-              <Text style={styles.viewAllArrow}>Ã¢â€ â€™</Text>
+              <Text style={styles.viewAllArrow}>→</Text>
             </TouchableOpacity>
           </View>
 
@@ -1329,7 +1329,7 @@ const fallbackTitle =
             ))
           ) : (
             <View style={styles.emptyEventCard}>
-              <Text style={styles.emptyEventIcon}>Ã°Å¸Âªâ€</Text>
+              <Text style={styles.emptyEventIcon}>🪔</Text>
               <Text style={styles.emptyEventTitle}>{t('home.noEvents')}</Text>
               <Text style={styles.emptyEventText}>
                 {t('home.noEventsDescription')}
@@ -1387,7 +1387,7 @@ const fallbackTitle =
 
               <View style={styles.aboutUsReadMore}>
                 <Text style={styles.aboutUsReadMoreText}>{t('home.readMore')}</Text>
-                <Text style={styles.aboutUsReadMoreArrow}>Ã¢â€ â€™</Text>
+                <Text style={styles.aboutUsReadMoreArrow}>→</Text>
               </View>
             </View>
           </AnimatedTouchable>
@@ -1397,7 +1397,7 @@ const fallbackTitle =
 <View style={styles.serviceCard}>
   {/* POOJA SERVICES */}
   <ServiceRow
-    icon="Ã°Å¸â„¢Â"
+    icon="🙏"
     title={t('home.poojaServices')}
     subtitle={t('home.poojaServicesSubtitle')}
     onPress={() => router.push('/pooja-services' as any)}
@@ -1405,7 +1405,7 @@ const fallbackTitle =
 
   {/* TEMPLE LOCATION */}
   <ServiceRow
-    icon="Ã°Å¸â€œÂ"
+    icon="📍"
     title={t('home.templeLocation')}
     subtitle={t('home.planJourney')}
     onPress={() => router.push('/temple-location')}
@@ -1413,7 +1413,7 @@ const fallbackTitle =
 
   {/* NEARBY PLACES */}
   <ServiceRow
-    icon="Ã°Å¸â€”ÂºÃ¯Â¸Â"
+    icon="🗺️"
     title={t('home.nearbyPlaces', {
       defaultValue: 'Nearby Places',
     })}
@@ -1425,7 +1425,7 @@ const fallbackTitle =
 
   {/* CONTACT TEMPLE */}
   <ServiceRow
-    icon="Ã¢ËœÅ½Ã¯Â¸Â"
+    icon="☎️"
     title={t('home.contactTemple')}
     subtitle={t('home.reachTeam')}
     onPress={() => router.push('/contact')}
@@ -1435,9 +1435,9 @@ const fallbackTitle =
 
           <View style={styles.footerBlessing}>
             <View style={styles.footerLine} />
-            <Text style={styles.footerOm}>Ã Â¥Â</Text>
+            <Text style={styles.footerOm}>ॐ</Text>
             <Text style={styles.footerText}>{t('home.footer')}</Text>
-            <Text style={styles.footerSubtext}>Ã Â¤Â¹Ã Â¤Â°Ã Â¤Â¿Ã Â¤Æ’ Ã Â¥Â Ã Â¤Â¤Ã Â¤Â¤Ã Â¥Â Ã Â¤Â¸Ã Â¤Â¤Ã Â¥Â</Text>
+            <Text style={styles.footerSubtext}>हरिः ॐ तत् सत्</Text>
             <View style={styles.footerLine} />
           </View>
         </Animated.View>
@@ -1631,7 +1631,7 @@ function AnimatedQuickAction({
           <Text style={styles.actionIcon}>{icon}</Text>
         </View>
         <Text style={styles.actionTitle}>{title}</Text>
-        <Text style={styles.actionArrow}>Ã¢â‚¬Âº</Text>
+        <Text style={styles.actionArrow}>›</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1691,18 +1691,18 @@ function AnimatedGuruCard({
         </View>
 
         <View style={styles.guruBody}>
-          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : guru.title === 'BHAGAVATPÃ„â‚¬DA' ? t('home.bhagavatpada') : guru.title || ''}</Text>
+          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : guru.title === 'BHAGAVATPĀDA' ? t('home.bhagavatpada') : guru.title || ''}</Text>
           <Text style={styles.guruName} numberOfLines={3}>{guru.name}</Text>
           <Text style={styles.guruVerse} numberOfLines={3}>
             {guru.verse}
           </Text>
           <Text style={styles.guruTranslation} numberOfLines={3}>
-            Ã¢â‚¬Å“{guru.translation || ''}Ã¢â‚¬Â
+            “{guru.translation || ''}”
           </Text>
 
           <View style={styles.guruReadRow}>
             <Text style={styles.guruRead}>{t('home.viewGuru')}</Text>
-            <Text style={styles.guruReadArrow}>Ã¢â€ â€™</Text>
+            <Text style={styles.guruReadArrow}>→</Text>
           </View>
         </View>
       </AnimatedTouchable>
@@ -1769,7 +1769,7 @@ function AnimatedEventCard({
         </View>
 
         <View style={styles.eventArrowCircle}>
-          <Text style={styles.arrowSmall}>Ã¢â‚¬Âº</Text>
+          <Text style={styles.arrowSmall}>›</Text>
         </View>
       </AnimatedTouchable>
     </Animated.View>
@@ -1827,7 +1827,7 @@ function ServiceRow({
         </View>
 
         <View style={styles.serviceArrowCircle}>
-          <Text style={styles.arrowSmall}>Ã¢â‚¬Âº</Text>
+          <Text style={styles.arrowSmall}>›</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>

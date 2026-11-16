@@ -268,6 +268,9 @@ export default function EventVideos({
                       }
                       source={{
                         uri: embedUrl,
+                        headers: {
+                          Referer: 'https://hariharapura-temple-admin.onrender.com/',
+                        },
                       }}
                       style={styles.webView}
                       javaScriptEnabled
