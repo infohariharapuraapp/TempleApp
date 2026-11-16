@@ -1,4 +1,19 @@
-import { API_BASE_URL, apiRequest } from '@/services/api';
+import { apiRequest } from '@/services/api';
+
+// HOME_DARSHAN_CATEGORIES_V1
+import {
+  fetchDarshanVideoData,
+  buildDarshanVideoFilters,
+  filterDarshanVideos,
+  getDarshanVideoThumbnail,
+  getYoutubeThumbnail,
+  getDarshanVideoLabels,
+} from '@/services/darshanVideos';
+
+import type {
+  DarshanVideo,
+  DarshanVideoCategory,
+} from '@/services/darshanVideos';
 import {
   setAudioModeAsync,
   useAudioPlayer,
@@ -74,53 +89,45 @@ type Guru = {
 
 
 const QUICK_ACTIONS = [
-  { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
-  { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
-  { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
-  { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
+  { icon: 'Ã°Å¸â„¢Â', titleKey: 'home.quickDarshan', route: '/darshan' },
+  { icon: 'Ã°Å¸â€œâ€¦', titleKey: 'home.quickEvents', route: '/events' },
+  { icon: 'Ã°Å¸â€™Â°', titleKey: 'home.quickDonations', route: '/donations' },
+  { icon: 'Ã°Å¸â€“Â¼Ã¯Â¸Â', titleKey: 'home.gallery', route: '/gallery' },
   {
-    icon: '🪔',
+    icon: 'Ã°Å¸Âªâ€',
     titleKey: 'home.quickSeva',
     route: '/seva-registration',
     comingSoon: true,
   },
   {
-    icon: '🛕',
+    icon: 'Ã°Å¸â€ºâ€¢',
     titleKey: 'home.poojaServices',
     route: '/pooja-services',
   },
   {
-    icon: '☀️',
+    icon: 'Ã¢Ëœâ‚¬Ã¯Â¸Â',
     titleKey: 'home.dailyPanchangam',
     route: '/panchangam',
   },
   {
-    icon: '📿',
+    icon: 'Ã°Å¸â€œÂ¿',
     titleKey: 'home.pravachanas',
     route: '/pravachanas',
   },
   {
-    icon: '📅',
+    icon: 'Ã°Å¸â€œâ€¦',
     titleKey: 'home.mahaswamijiProgrammes',
     route: '/mahaswamiji-programmes',
   },
   {
-    icon: '📢',
+    icon: 'Ã°Å¸â€œÂ¢',
     titleKey: 'home.divyakshetraUpdates',
     route: '/announcements',
   },
 ];
 
 
-type DarshanVideo = {
-  id: number;
-  title: string;
-  description?: string | null;
-  label: 'live' | 'watch';
-  url: string;
-  thumbnail_url?: string | null;
-  is_active: boolean;
-};
+
 
 // Welcome audio session tracking
 let hasPlayedWelcomeAudio = false;
@@ -138,7 +145,22 @@ export default function HomeScreen() {
   const [gurus, setGurus] = useState<Guru[]>([]);
   const [gurusLoading, setGurusLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
-  const [darshanVideos, setDarshanVideos] = useState<DarshanVideo[]>([]);
+  const [darshanVideos, setDarshanVideos] =
+    useState<DarshanVideo[]>([]);
+
+  const [darshanCategories, setDarshanCategories] =
+    useState<DarshanVideoCategory[]>([]);
+
+  const [selectedDarshanCategory, setSelectedDarshanCategory] =
+    useState('all');
+
+  const [darshanLoading, setDarshanLoading] =
+    useState(true);
+
+  const [darshanLoadError, setDarshanLoadError] =
+    useState(false);
+
+  const darshanScrollRef = useRef<ScrollView>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // Keep the player stable; fetch and load the admin audio only once.
@@ -454,21 +476,57 @@ export default function HomeScreen() {
 
       const loadDarshanVideos = async () => {
         try {
-          const response = await apiRequest<{
-            success: boolean;
-            data: DarshanVideo[];
-          }>(`/darshan-videos?lang=${lang}`);
+          if (shouldShowLoading) {
+            setDarshanLoading(true);
+            setDarshanVideos([]);
+            setDarshanCategories([]);
+          }
+
+          setDarshanLoadError(false);
+
+          const result =
+            await fetchDarshanVideoData(
+              currentLanguage
+            );
+
           if (!isCurrent()) return;
-          setDarshanVideos(response.success && Array.isArray(response.data)
-            ? response.data
-            : []);
+
+          setDarshanVideos(result.videos);
+          setDarshanCategories(result.categories);
+
+          const availableFilters =
+            buildDarshanVideoFilters(
+              result.videos,
+              result.categories,
+              currentLanguage
+            );
+
+          setSelectedDarshanCategory(
+            current =>
+              availableFilters.some(
+                filter => filter.id === current
+              )
+                ? current
+                : 'all'
+          );
+
         } catch (error) {
           if (isCurrent()) {
-            console.error('Home Darshan Videos error:', error);
-           // Keep the previously loaded videos if refresh fails.
+            console.error(
+              'Home Darshan Videos error:',
+              error
+            );
+
+            setDarshanLoadError(true);
+          }
+        } finally {
+          if (isCurrent()) {
+            setDarshanLoading(false);
           }
         }
       };
+
+
 
       void loadGurus();
       void loadEvents();
@@ -480,6 +538,33 @@ export default function HomeScreen() {
       };
     }, [currentLanguage])
   );
+
+  const darshanLabels =
+    getDarshanVideoLabels(currentLanguage);
+
+  const darshanFilters =
+    buildDarshanVideoFilters(
+      darshanVideos,
+      darshanCategories,
+      currentLanguage
+    );
+
+  const filteredDarshanVideos =
+    filterDarshanVideos(
+      darshanVideos,
+      selectedDarshanCategory
+    );
+
+  const selectDarshanCategory = (
+    categoryId: string
+  ) => {
+    setSelectedDarshanCategory(categoryId);
+
+    darshanScrollRef.current?.scrollTo({
+      x: 0,
+      animated: false,
+    });
+  };
 
   const loadUnreadNotificationCount = async () => {
     try {
@@ -595,7 +680,7 @@ export default function HomeScreen() {
               onPressIn={() => animatePress(notificationScale, 0.9)}
               onPressOut={() => animatePress(notificationScale, 1)}
             >
-              <Text style={styles.notificationIcon}>🔔</Text>
+              <Text style={styles.notificationIcon}>Ã°Å¸â€â€</Text>
 
               {unreadNotificationCount > 0 && (
                 <View style={styles.notificationBadge}>
@@ -636,7 +721,7 @@ export default function HomeScreen() {
 
             <View style={styles.bannerDecorTop}>
               <View style={styles.decorLine} />
-              <Text style={styles.decorDiamond}>◆</Text>
+              <Text style={styles.decorDiamond}>Ã¢â€”â€ </Text>
               <View style={styles.decorLine} />
             </View>
 
@@ -653,7 +738,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                ॐ
+                Ã Â¥Â
               </Animated.Text>
 
               <Text style={styles.bannerEyebrow}>
@@ -673,18 +758,18 @@ export default function HomeScreen() {
                 onPress={() => router.push('/darshan')}
               >
                 <Text style={styles.bannerButtonText}>{t('home.exploreTemple')}</Text>
-                <Text style={styles.bannerButtonArrow}>→</Text>
+                <Text style={styles.bannerButtonArrow}>Ã¢â€ â€™</Text>
               </AnimatedTouchable>
             </View>
 
             <View style={styles.bannerBottomBadge}>
-              <Text style={styles.bannerBottomBadgeText}>हरिः ॐ</Text>
+              <Text style={styles.bannerBottomBadgeText}>Ã Â¤Â¹Ã Â¤Â°Ã Â¤Â¿Ã Â¤Æ’ Ã Â¥Â</Text>
             </View>
           </Animated.View>
 
 
 
-        
+
 {/* Quick Access */}
 <SectionHeading
   title={t('home.quickAccess')}
@@ -696,7 +781,7 @@ export default function HomeScreen() {
     const comingSoon =
       'comingSoon' in item && item.comingSoon;
 
-   
+
 const fallbackTitle =
   item.titleKey === 'home.divyakshetraUpdates'
     ? 'Divyakshetra Updates'
@@ -710,7 +795,7 @@ const fallbackTitle =
             ? 'Pooja Services'
             : item.titleKey;
 
-          
+
 
     return (
       <AnimatedQuickAction
@@ -720,7 +805,7 @@ const fallbackTitle =
           comingSoon
             ? `${t(item.titleKey, {
                 defaultValue: fallbackTitle,
-              })} (${({ en: 'Coming Soon in December', te: 'డిసెంబర్‌లో త్వరలో', kn: 'ಡಿಸೆಂಬರ್‌ನಲ್ಲಿ ಶೀಘ್ರದಲ್ಲೇ', hi: 'दिसंबर में जल्द आ रहा है', ta: 'டிசம்பரில் விரைவில்' } as Record<string, string>)[currentLanguage] || 'Coming Soon in December'})`
+              })} (${({ en: 'Coming Soon in December', te: 'Ã Â°Â¡Ã Â°Â¿Ã Â°Â¸Ã Â±â€ Ã Â°â€šÃ Â°Â¬Ã Â°Â°Ã Â±ÂÃ¢â‚¬Å’Ã Â°Â²Ã Â±â€¹ Ã Â°Â¤Ã Â±ÂÃ Â°ÂµÃ Â°Â°Ã Â°Â²Ã Â±â€¹', kn: 'Ã Â²Â¡Ã Â²Â¿Ã Â²Â¸Ã Â³â€ Ã Â²â€šÃ Â²Â¬Ã Â²Â°Ã Â³ÂÃ¢â‚¬Å’Ã Â²Â¨Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â²Â¿ Ã Â²Â¶Ã Â³â‚¬Ã Â²ËœÃ Â³ÂÃ Â²Â°Ã Â²Â¦Ã Â²Â²Ã Â³ÂÃ Â²Â²Ã Â³â€¡', hi: 'Ã Â¤Â¦Ã Â¤Â¿Ã Â¤Â¸Ã Â¤â€šÃ Â¤Â¬Ã Â¤Â° Ã Â¤Â®Ã Â¥â€¡Ã Â¤â€š Ã Â¤Å“Ã Â¤Â²Ã Â¥ÂÃ Â¤Â¦ Ã Â¤â€  Ã Â¤Â°Ã Â¤Â¹Ã Â¤Â¾ Ã Â¤Â¹Ã Â¥Ë†', ta: 'Ã Â®Å¸Ã Â®Â¿Ã Â®Å¡Ã Â®Â®Ã Â¯ÂÃ Â®ÂªÃ Â®Â°Ã Â®Â¿Ã Â®Â²Ã Â¯Â Ã Â®ÂµÃ Â®Â¿Ã Â®Â°Ã Â¯Ë†Ã Â®ÂµÃ Â®Â¿Ã Â®Â²Ã Â¯Â' } as Record<string, string>)[currentLanguage] || 'Coming Soon in December'})`
             : t(item.titleKey, {
                 defaultValue: fallbackTitle,
               })
@@ -744,7 +829,7 @@ const fallbackTitle =
   onPress={() => router.push('/dharma' as any)}
 >
   <View style={styles.dharmaIconCircle}>
-    <Text style={styles.dharmaIcon}>ॐ</Text>
+    <Text style={styles.dharmaIcon}>Ã Â¥Â</Text>
   </View>
 
   <View style={styles.dharmaContent}>
@@ -766,89 +851,327 @@ const fallbackTitle =
       </Text>
 
       <Text style={styles.dharmaActionArrow}>
-        →
+        Ã¢â€ â€™
       </Text>
     </View>
   </View>
 </TouchableOpacity>
           {/* Watch & Experience */}
+
           <View style={styles.videoSectionHeader}>
-            <View>
-              <Text style={styles.videoEyebrow}>{t('home.watchExperience')}</Text>
-              <Text style={styles.videoSectionTitle}>{t('home.darshanVideos')}</Text>
-              <Text style={styles.videoSectionSubtitle}>{t('home.videoSubtitle')}</Text>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.videoEyebrow}>
+                {t('home.watchExperience')}
+              </Text>
+
+              <Text style={styles.videoSectionTitle}>
+                {t('home.darshanVideos')}
+              </Text>
+
+              <Text style={styles.videoSectionSubtitle}>
+                {t('home.videoSubtitle')}
+              </Text>
             </View>
+
             <TouchableOpacity
-              onPress={() => router.push('/darshan-videos')}
+              onPress={() =>
+                router.push({
+                  pathname: '/darshan-videos',
+                  params: {
+                    category: selectedDarshanCategory,
+                  },
+                })
+              }
               activeOpacity={0.7}
               style={styles.videoViewAll}
             >
-              <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-              <Text style={styles.viewAllArrow}>→</Text>
+              <Text style={styles.viewAll}>
+                {t('home.viewAll')}
+              </Text>
+
+              <Text style={styles.viewAllArrow}>
+                Ã¢â€ â€™
+              </Text>
             </TouchableOpacity>
           </View>
+
+          {/* DARSHAN CATEGORY FILTERS */}
 
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.videoList}
+            contentContainerStyle={
+              styles.darshanCategoryList
+            }
           >
-            {darshanVideos.map((video, index) => {
-              const openVideo = () => {
-                if (video.url) {
-                  Linking.openURL(video.url);
-                }
-              };
-
-              const thumbnail = video.thumbnail_url
-                ? video.thumbnail_url.startsWith('http')
-                  ? video.thumbnail_url
-                  : `${API_BASE_URL.replace(/\/api\/?$/, '')}${video.thumbnail_url.startsWith('/') ? '' : '/'
-                  }${video.thumbnail_url}`
-                : '';
+            {darshanFilters.map(filter => {
+              const active =
+                selectedDarshanCategory ===
+                filter.id;
 
               return (
                 <TouchableOpacity
-                  key={video.id}
-                  activeOpacity={video.url ? 0.82 : 1}
-                  onPress={openVideo}
-                  style={[styles.videoCard, index === darshanVideos.length - 1 && styles.videoCardLast]}
+                  key={filter.id}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: active,
+                  }}
+                  onPress={() =>
+                    selectDarshanCategory(
+                      filter.id
+                    )
+                  }
+                  style={[
+                    styles.darshanCategoryChip,
+
+                    active &&
+                      styles.darshanCategoryActive,
+                  ]}
                 >
-                  <View style={styles.videoThumbnailWrap}>
-                    <Image
-                      source={{ uri: thumbnail }}
-                      style={styles.videoThumbnail}
-                      resizeMode="cover"
+                  {filter.id === 'live' && (
+                    <View
+                      style={[
+                        styles.darshanFilterLiveDot,
+
+                        active && {
+                          backgroundColor:
+                            COLORS.white,
+                        },
+                      ]}
                     />
-                    <View style={styles.videoThumbnailShade} />
+                  )}
 
-                    <View style={styles.videoPlayButton}>
-                      <Text style={styles.videoPlayIcon}>▶</Text>
-                    </View>
+                  <Text
+                    style={[
+                      styles.darshanCategoryText,
 
-                    {video.label === 'live' ? (
-                      <View style={styles.videoLiveBadge}>
-                        <View style={styles.videoLiveDot} />
-                        <Text style={styles.videoLiveText}>{t('home.live')}</Text>
-                      </View>
-                    ) : null}
-
-                  </View>
-
-                  <View style={styles.videoCardBody}>
-                    <Text style={styles.videoCardLabel}>
-                      {video.label === 'live' ? t('home.live') : t('home.watch')}
-                    </Text>
-                    <Text style={styles.videoCardTitle} numberOfLines={1}>{video.title}</Text>
-                    <Text style={styles.videoCardDescription} numberOfLines={2}>
-                      {video.description}
-                    </Text>
-                    <Text style={styles.videoWatchNow}>{t('home.watchNow')}</Text>
-                  </View>
+                      active &&
+                        styles.darshanCategoryTextActive,
+                    ]}
+                  >
+                    {filter.name}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
+
+          {/* DARSHAN VIDEO COUNT */}
+
+          {!darshanLoading &&
+            filteredDarshanVideos.length > 0 && (
+              <View
+                style={styles.darshanResultsRow}
+              >
+                <Text
+                  style={styles.darshanResultsTitle}
+                >
+                  {selectedDarshanCategory === 'all'
+                    ? darshanLabels.allVideos
+                    : darshanFilters.find(
+                        filter =>
+                          filter.id ===
+                          selectedDarshanCategory
+                      )?.name ||
+                      darshanLabels.allVideos}
+                </Text>
+
+                <Text
+                  style={styles.darshanResultsCount}
+                >
+                  {filteredDarshanVideos.length}{' '}
+                  {darshanLabels.videos}
+                </Text>
+              </View>
+            )}
+
+          {/* VIDEO CAROUSEL */}
+
+          {darshanLoading ? (
+            <View style={styles.darshanEmptyCard}>
+              <Text
+                style={styles.darshanEmptyText}
+              >
+                {t('darshanVideos.loading')}
+              </Text>
+            </View>
+          ) : filteredDarshanVideos.length === 0 ? (
+            <View style={styles.darshanEmptyCard}>
+              <Text
+                style={styles.darshanEmptyIcon}
+              >
+                {darshanLoadError ? 'Ã¢â€ Â»' : 'Ã¢â€“Â¶'}
+              </Text>
+
+              <Text
+                style={styles.darshanEmptyText}
+              >
+                {darshanLoadError
+                  ? darshanLabels.error
+                  : selectedDarshanCategory === 'all'
+                    ? t('darshanVideos.emptyText')
+                    : darshanLabels.noCategoryVideos}
+              </Text>
+
+              {darshanLoadError && (
+                <TouchableOpacity
+                  style={{ padding: 12 }}
+                  onPress={() =>
+                    router.push('/darshan-videos')
+                  }
+                >
+                  <Text
+                    style={{
+                      color: COLORS.brown,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {t('home.viewAll')} Ã¢â€ â€™
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <ScrollView
+              ref={darshanScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={
+                styles.videoList
+              }
+            >
+              {filteredDarshanVideos.map(
+                (video, index) => (
+                  <TouchableOpacity
+                    key={video.id}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel={video.title}
+                    onPress={async () => {
+                      try {
+                        if (
+                          /^https?:[/][/]/i.test(
+                            video.url
+                          )
+                        ) {
+                          await Linking.openURL(
+                            video.url
+                          );
+                        }
+                      } catch (error) {
+                        console.warn(
+                          'Unable to open video:',
+                          error
+                        );
+                      }
+                    }}
+                    style={[
+                      styles.videoCard,
+
+                      index ===
+                        filteredDarshanVideos.length - 1 &&
+                        styles.videoCardLast,
+                    ]}
+                  >
+
+                    {/* VIDEO THUMBNAIL */}
+
+                    <View
+                      style={styles.videoThumbnailWrap}
+                    >
+                      <HomeDarshanThumbnail
+                        video={video}
+                      />
+
+                      <View
+                        style={styles.videoThumbnailShade}
+                      />
+
+                      <View
+                        style={styles.videoPlayButton}
+                      >
+                        <Text
+                          style={styles.videoPlayIcon}
+                        >
+                          Ã¢â€“Â¶
+                        </Text>
+                      </View>
+
+                      {video.label === 'live' && (
+                        <View
+                          style={styles.videoLiveBadge}
+                        >
+                          <View
+                            style={styles.videoLiveDot}
+                          />
+
+                          <Text
+                            style={styles.videoLiveText}
+                          >
+                            {t('home.live')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* VIDEO DETAILS */}
+
+                    <View
+                      style={styles.videoCardBody}
+                    >
+                      <Text
+                        style={styles.videoCardLabel}
+                      >
+                        {video.label === 'live'
+                          ? t('home.live')
+                          : t('home.watch')}
+                      </Text>
+
+                      {!!video.category_name && (
+                        <View
+                          style={
+                            styles.darshanVideoCategoryBadge
+                          }
+                        >
+                          <Text
+                            numberOfLines={1}
+                            style={
+                              styles.darshanVideoCategoryText
+                            }
+                          >
+                            {video.category_name}
+                          </Text>
+                        </View>
+                      )}
+
+                      <Text
+                        style={styles.videoCardTitle}
+                        numberOfLines={2}
+                      >
+                        {video.title}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.videoCardDescription
+                        }
+                        numberOfLines={2}
+                      >
+                        {video.description || ''}
+                      </Text>
+
+                      <Text
+                        style={styles.videoWatchNow}
+                      >
+                        {t('home.watchNow')}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )
+              )}
+            </ScrollView>
+          )}
 
           {/* About Sreemath */}
           <SectionHeading
@@ -881,7 +1204,7 @@ const fallbackTitle =
 
               <View style={styles.readMore}>
                 <Text style={styles.readMoreText}>{t('home.readFullStory')}</Text>
-                <Text style={styles.readMoreArrow}>→</Text>
+                <Text style={styles.readMoreArrow}>Ã¢â€ â€™</Text>
               </View>
             </View>
           </AnimatedTouchable>
@@ -901,7 +1224,7 @@ const fallbackTitle =
               style={styles.viewAllButton}
             >
               <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-              <Text style={styles.viewAllArrow}>→</Text>
+              <Text style={styles.viewAllArrow}>Ã¢â€ â€™</Text>
             </TouchableOpacity>
           </View>
 
@@ -954,12 +1277,12 @@ const fallbackTitle =
 
               <View style={styles.roomBookingButton}>
                 <Text style={styles.roomBookingButtonText}>{t('home.bookRoom')}</Text>
-                <Text style={styles.roomBookingButtonArrow}>→</Text>
+                <Text style={styles.roomBookingButtonArrow}>Ã¢â€ â€™</Text>
               </View>
             </View>
 
             <View style={styles.roomIconOrb}>
-              <Text style={styles.roomBookingIcon}>🏨</Text>
+              <Text style={styles.roomBookingIcon}>Ã°Å¸ÂÂ¨</Text>
             </View>
           </AnimatedTouchable>
 
@@ -976,7 +1299,7 @@ const fallbackTitle =
               style={styles.viewAllButton}
             >
               <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-              <Text style={styles.viewAllArrow}>→</Text>
+              <Text style={styles.viewAllArrow}>Ã¢â€ â€™</Text>
             </TouchableOpacity>
           </View>
 
@@ -1006,7 +1329,7 @@ const fallbackTitle =
             ))
           ) : (
             <View style={styles.emptyEventCard}>
-              <Text style={styles.emptyEventIcon}>🪔</Text>
+              <Text style={styles.emptyEventIcon}>Ã°Å¸Âªâ€</Text>
               <Text style={styles.emptyEventTitle}>{t('home.noEvents')}</Text>
               <Text style={styles.emptyEventText}>
                 {t('home.noEventsDescription')}
@@ -1064,17 +1387,17 @@ const fallbackTitle =
 
               <View style={styles.aboutUsReadMore}>
                 <Text style={styles.aboutUsReadMoreText}>{t('home.readMore')}</Text>
-                <Text style={styles.aboutUsReadMoreArrow}>→</Text>
+                <Text style={styles.aboutUsReadMoreArrow}>Ã¢â€ â€™</Text>
               </View>
             </View>
           </AnimatedTouchable>
 
           {/* Temple Services */}
-        
+
 <View style={styles.serviceCard}>
   {/* POOJA SERVICES */}
   <ServiceRow
-    icon="🙏"
+    icon="Ã°Å¸â„¢Â"
     title={t('home.poojaServices')}
     subtitle={t('home.poojaServicesSubtitle')}
     onPress={() => router.push('/pooja-services' as any)}
@@ -1082,7 +1405,7 @@ const fallbackTitle =
 
   {/* TEMPLE LOCATION */}
   <ServiceRow
-    icon="📍"
+    icon="Ã°Å¸â€œÂ"
     title={t('home.templeLocation')}
     subtitle={t('home.planJourney')}
     onPress={() => router.push('/temple-location')}
@@ -1090,7 +1413,7 @@ const fallbackTitle =
 
   {/* NEARBY PLACES */}
   <ServiceRow
-    icon="🗺️"
+    icon="Ã°Å¸â€”ÂºÃ¯Â¸Â"
     title={t('home.nearbyPlaces', {
       defaultValue: 'Nearby Places',
     })}
@@ -1102,7 +1425,7 @@ const fallbackTitle =
 
   {/* CONTACT TEMPLE */}
   <ServiceRow
-    icon="☎️"
+    icon="Ã¢ËœÅ½Ã¯Â¸Â"
     title={t('home.contactTemple')}
     subtitle={t('home.reachTeam')}
     onPress={() => router.push('/contact')}
@@ -1112,14 +1435,61 @@ const fallbackTitle =
 
           <View style={styles.footerBlessing}>
             <View style={styles.footerLine} />
-            <Text style={styles.footerOm}>ॐ</Text>
+            <Text style={styles.footerOm}>Ã Â¥Â</Text>
             <Text style={styles.footerText}>{t('home.footer')}</Text>
-            <Text style={styles.footerSubtext}>हरिः ॐ तत् सत्</Text>
+            <Text style={styles.footerSubtext}>Ã Â¤Â¹Ã Â¤Â°Ã Â¤Â¿Ã Â¤Æ’ Ã Â¥Â Ã Â¤Â¤Ã Â¤Â¤Ã Â¥Â Ã Â¤Â¸Ã Â¤Â¤Ã Â¥Â</Text>
             <View style={styles.footerLine} />
           </View>
         </Animated.View>
       </Animated.ScrollView>
     </SafeAreaView>
+  );
+}
+
+function HomeDarshanThumbnail({
+  video,
+}: {
+  video: DarshanVideo;
+}) {
+  const primary =
+    getDarshanVideoThumbnail(video);
+
+  const fallback =
+    getYoutubeThumbnail(video.url);
+
+  const [uri, setUri] = useState(primary);
+
+  useEffect(() => {
+    setUri(primary);
+  }, [primary, video.id]);
+
+  if (!uri) {
+    return (
+      <View
+        style={styles.darshanThumbnailFallback}
+      >
+        <Text
+          style={styles.darshanThumbnailFallbackText}
+        >
+          YouTube
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.videoThumbnail}
+      resizeMode="cover"
+      onError={() => {
+        if (fallback && uri !== fallback) {
+          setUri(fallback);
+        } else {
+          setUri('');
+        }
+      }}
+    />
   );
 }
 
@@ -1261,7 +1631,7 @@ function AnimatedQuickAction({
           <Text style={styles.actionIcon}>{icon}</Text>
         </View>
         <Text style={styles.actionTitle}>{title}</Text>
-        <Text style={styles.actionArrow}>›</Text>
+        <Text style={styles.actionArrow}>Ã¢â‚¬Âº</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1321,18 +1691,18 @@ function AnimatedGuruCard({
         </View>
 
         <View style={styles.guruBody}>
-          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : guru.title === 'BHAGAVATPĀDA' ? t('home.bhagavatpada') : guru.title || ''}</Text>
+          <Text style={styles.guruTitle}>{guru.title === 'GURU' ? t('home.guru') : guru.title === 'MAHASWAMIJI' ? t('home.mahaswamiji') : guru.title === 'BHAGAVATPÃ„â‚¬DA' ? t('home.bhagavatpada') : guru.title || ''}</Text>
           <Text style={styles.guruName} numberOfLines={3}>{guru.name}</Text>
           <Text style={styles.guruVerse} numberOfLines={3}>
             {guru.verse}
           </Text>
           <Text style={styles.guruTranslation} numberOfLines={3}>
-            “{guru.translation || ''}”
+            Ã¢â‚¬Å“{guru.translation || ''}Ã¢â‚¬Â
           </Text>
 
           <View style={styles.guruReadRow}>
             <Text style={styles.guruRead}>{t('home.viewGuru')}</Text>
-            <Text style={styles.guruReadArrow}>→</Text>
+            <Text style={styles.guruReadArrow}>Ã¢â€ â€™</Text>
           </View>
         </View>
       </AnimatedTouchable>
@@ -1399,7 +1769,7 @@ function AnimatedEventCard({
         </View>
 
         <View style={styles.eventArrowCircle}>
-          <Text style={styles.arrowSmall}>›</Text>
+          <Text style={styles.arrowSmall}>Ã¢â‚¬Âº</Text>
         </View>
       </AnimatedTouchable>
     </Animated.View>
@@ -1457,13 +1827,142 @@ function ServiceRow({
         </View>
 
         <View style={styles.serviceArrowCircle}>
-          <Text style={styles.arrowSmall}>›</Text>
+          <Text style={styles.arrowSmall}>Ã¢â‚¬Âº</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 const styles = StyleSheet.create({
+
+  // HOME DARSHAN CATEGORY STYLES
+
+  darshanCategoryList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 5,
+    paddingBottom: 16,
+  },
+
+  darshanCategoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: COLORS.cream,
+    borderWidth: 1,
+    borderColor: '#E6D1B3',
+    borderRadius: 24,
+  },
+
+  darshanCategoryActive: {
+    backgroundColor: COLORS.darkBrown,
+    borderColor: COLORS.darkBrown,
+  },
+
+  darshanCategoryText: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.brown,
+  },
+
+  darshanCategoryTextActive: {
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+
+  darshanFilterLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#C64732',
+  },
+
+  darshanResultsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  darshanResultsTitle: {
+    flex: 1,
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.brown,
+  },
+
+  darshanResultsCount: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: COLORS.muted,
+  },
+
+  darshanVideoCategoryBadge: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: COLORS.cream,
+    borderRadius: 7,
+    marginTop: 5,
+    marginBottom: 7,
+  },
+
+  darshanVideoCategoryText: {
+    fontFamily: FONTS.medium,
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.brown,
+  },
+
+  darshanEmptyCard: {
+    backgroundColor: COLORS.soft,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 18,
+    padding: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+    marginBottom: 24,
+  },
+
+  darshanEmptyIcon: {
+    fontSize: 26,
+    color: COLORS.gold,
+    marginBottom: 12,
+  },
+
+  darshanEmptyText: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.muted,
+    textAlign: 'center',
+  },
+
+  darshanThumbnailFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: COLORS.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  darshanThumbnailFallbackText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.brown,
+    marginTop: 65,
+  },
+
   container: {
     flex: 1,
     backgroundColor: '#FFF7E8',
@@ -2333,7 +2832,7 @@ const styles = StyleSheet.create({
     marginBottom: 23,
   },
 
-  
+
 guruCard: {
   width: 244,
   height: 440,
@@ -2386,7 +2885,7 @@ guruCard: {
     color: COLORS.darkBrown,
   },
 
-  
+
 guruBody: {
   padding: 15,
   height: 280,
@@ -2435,7 +2934,7 @@ guruBody: {
     minHeight: 51,
   },
 
- 
+
 guruReadRow: {
   flexDirection: 'row',
   alignItems: 'center',
