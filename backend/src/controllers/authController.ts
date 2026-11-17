@@ -4,7 +4,11 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { sendPasswordResetOTP } from '../services/emailService';
+import {
+  sendPasswordResetOTP,
+  sendRegistrationConfirmation,
+} from '../services/emailService';
+
 import { randomInt } from 'node:crypto';
 
 // =========================
@@ -133,12 +137,34 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       ]
     );
 
-    return res.status(201).json({
-      success: true,
-      message:
-        'Registration successful. Please login.',
-      data: result.rows[0],
-    });
+   // ========================================
+// SEND REGISTRATION CONFIRMATION EMAIL
+// ========================================
+
+if (cleanEmail) {
+  void sendRegistrationConfirmation(
+    cleanEmail,
+    cleanName
+  ).catch((emailError) => {
+
+    console.error(
+      'Registration confirmation email error:',
+      emailError
+    );
+
+  });
+}
+
+// ========================================
+// RETURN REGISTRATION SUCCESS RESPONSE
+// ========================================
+
+return res.status(201).json({
+  success: true,
+  message:
+    'Registration successful. Please login.',
+  data: result.rows[0],
+});
 
   } catch (error: any) {
     console.error('Registration error:', error);

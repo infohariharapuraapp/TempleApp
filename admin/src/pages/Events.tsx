@@ -7,7 +7,7 @@ type EventVideo = {
   id?: number;
   title?: string | null;
   youtube_url: string;
-  youtube_video_id?: string;
+  youtube_video_id?: string;  
   display_order?: number;
 };
 
