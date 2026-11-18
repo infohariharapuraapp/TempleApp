@@ -1,6 +1,6 @@
-﻿{
+{
   "expo": {
-     "name": "Divyakshetra Hariharapura",
+    "name": "Divyakshetra Hariharapura",
     "slug": "TempleApp",
     "owner": "hariharapuratempleapps-team",
     "version": "1.0.0",
@@ -24,11 +24,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-"package": "com.sreemathhariharapura.templeapp",
-"blockedPermissions": [
-  "android.permission.READ_MEDIA_IMAGES",
-  "android.permission.READ_MEDIA_VIDEO"
-]
+      "package": "com.sreemathhariharapura.templeapp",
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
     },
     "web": {
       "output": "static",
@@ -37,13 +37,23 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/withAndroidOptimization",
+      [
         "expo-splash-screen",
-         {
-    "backgroundColor": "#FFFDF8",
-    "image": "./assets/images/splash-icon.png",
-    "imageWidth": 220,
-    "resizeMode": "contain"
-  }
+        {
+          "backgroundColor": "#FFFDF8",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
       ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
@@ -74,4 +84,3 @@
     }
   }
 }
-
