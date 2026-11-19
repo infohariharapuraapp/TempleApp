@@ -93,12 +93,17 @@ const QUICK_ACTIONS = [
   { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
   { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
-  {
-    icon: '🪔',
-    titleKey: 'home.quickSeva',
-    route: '/seva-registration',
-    comingSoon: true,
-  },
+ {
+  icon: '🪔',
+  titleKey: 'home.volunteerSeva',
+  route: '/volunteer',
+  comingSoon: false,
+},
+{
+  icon: '📋',
+  titleKey: 'home.mySevas',
+  route: '/my-sevas',
+},
   {
     icon: '🛕',
     titleKey: 'home.poojaServices',
@@ -783,17 +788,21 @@ export default function HomeScreen() {
 
 
 const fallbackTitle =
-  item.titleKey === 'home.divyakshetraUpdates'
-    ? 'Divyakshetra Updates'
-    : item.titleKey === 'home.mahaswamijiProgrammes'
-      ? 'Mahaswamiji Programmes'
-      : item.titleKey === 'home.dailyPanchangam'
-        ? 'Daily Panchangam'
-        : item.titleKey === 'home.pravachanas'
-          ? 'Pravachana & Quotes'
-          : item.titleKey === 'home.poojaServices'
-            ? 'Pooja Services'
-            : item.titleKey;
+  item.titleKey === 'home.volunteerSeva'
+    ? 'Volunteer Seva'
+    : item.titleKey === 'home.mySevas'
+      ? 'My Sevas'
+      : item.titleKey === 'home.divyakshetraUpdates'
+        ? 'Divyakshetra Updates'
+        : item.titleKey === 'home.mahaswamijiProgrammes'
+          ? 'Mahaswamiji Programmes'
+          : item.titleKey === 'home.dailyPanchangam'
+            ? 'Daily Panchangam'
+            : item.titleKey === 'home.pravachanas'
+              ? 'Pravachana & Quotes'
+              : item.titleKey === 'home.poojaServices'
+                ? 'Pooja Services'
+                : item.titleKey;
 
 
 

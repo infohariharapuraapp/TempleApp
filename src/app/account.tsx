@@ -1,7 +1,14 @@
 import { useTranslation } from 'react-i18next';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { notifyAuthChanged } from '@/services/authSession';
+
+
+import {
+  unregisterCurrentPushDevice,
+  resumePushRegistration,
+  registerForPushNotificationsAsync,
+} from '@/services/notifications';
 
 import {
   ActivityIndicator,
@@ -159,6 +166,9 @@ export default function AccountScreen() {
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutInProgress = useRef(false);
+  const logoutConfirmationOpen = useRef(false);
 
   // ========================================
   // LOAD LOGGED-IN USER
@@ -211,38 +221,107 @@ export default function AccountScreen() {
   // ========================================
 
   const handleLogout = () => {
-  Alert.alert(t('accountLocal.logout'),
-    t('accountLocal.are_you_sure_you_want_to_logout'),
-    [
-      {
-        text: t('accountLocal.cancel'),
-        style: 'cancel',
-      },
-      {
-        text: t('accountLocal.logout'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            // Remove saved JWT
-            await removeToken();
-
-            // Update authentication state
-            notifyAuthChanged(false);
-
-            // Navigate to Login
-            router.replace('/login');
-          } catch (error) {
-            console.error('Logout error:', error);
-
-            Alert.alert(t('accountLocal.logout_failed'),
-              t('accountLocal.unable_to_logout_please_try_again')
-            );
-          }
+    if (
+      logoutInProgress.current ||
+      logoutConfirmationOpen.current
+    ) {
+      return;
+    }
+    logoutConfirmationOpen.current = true;
+    Alert.alert(
+      t('accountLocal.logout'),
+      t('accountLocal.are_you_sure_you_want_to_logout'),
+      [
+        {
+          text: t('accountLocal.cancel'),
+          style: 'cancel',
+          onPress: () => {
+            logoutConfirmationOpen.current = false;
+          },
         },
-      },
-    ]
-  );
-};
+        {
+          text: t('accountLocal.logout'),
+          style: 'destructive',
+          onPress: async () => {
+            logoutConfirmationOpen.current = false;
+            if (logoutInProgress.current) {
+              return;
+            }
+            logoutInProgress.current = true;
+            setLoggingOut(true);
+            let originalToken: string | null = null;
+            try {
+              // Capture the current authentication session.
+              originalToken = await getToken();
+              if (originalToken) {
+                const deviceUnregistered =
+                  await unregisterCurrentPushDevice();
+                if (!deviceUnregistered) {
+                  console.warn(
+                    'Push device unregistration could not be confirmed.'
+                  );
+                }
+                // Never remove a replacement session.
+                const currentToken = await getToken();
+                if (currentToken !== originalToken) {
+                  throw new Error(
+                    'Authentication session changed during logout.'
+                  );
+                }
+                await removeToken();
+              }
+              // Clear local authenticated user details.
+              setUser(null);
+              notifyAuthChanged(false);
+              router.replace('/login');
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Recover notification registration only
+              // if the original session is still active.
+              try {
+                const remainingToken = await getToken();
+                if (
+                  originalToken &&
+                  remainingToken === originalToken
+                ) {
+                  resumePushRegistration();
+                  void registerForPushNotificationsAsync()
+                    .catch((pushError) => {
+                      console.warn(
+                        'Push registration recovery failed:',
+                        pushError
+                      );
+                    });
+                } else if (!remainingToken) {
+                  setUser(null);
+                  notifyAuthChanged(false);
+                  router.replace('/login');
+                  return;
+                }
+              } catch (recoveryError) {
+                console.warn(
+                  'Logout session recovery failed:',
+                  recoveryError
+                );
+              }
+              Alert.alert(
+                t('accountLocal.logout_failed'),
+                t(
+                  'accountLocal.unable_to_logout_please_try_again'
+                )
+              );
+            } finally {
+              logoutInProgress.current = false;
+              setLoggingOut(false);
+            }
+          },
+        },
+      ],
+      {
+        cancelable: false,
+      }
+    );
+  };
   const displayName = user?.full_name || t('accountLocal.devotee');
   const firstLetter = displayName.charAt(0).toUpperCase();
 
@@ -293,7 +372,8 @@ export default function AccountScreen() {
 
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => router.push('/edit-profile')}
+            disabled={loggingOut}
+            onPress={() => { if (!logoutInProgress.current) router.push('/edit-profile'); }}
             activeOpacity={0.7}
           >
             <Text style={styles.editButtonText}>{t('accountLocal.edit')}</Text>
@@ -350,7 +430,7 @@ export default function AccountScreen() {
             icon="👤"
             title={t('accountLocal.edit_profile')}
             description={t('accountLocal.update_your_personal_information')}
-            onPress={() => router.push('/edit-profile')}
+            onPress={() => { if (!logoutInProgress.current) router.push('/edit-profile'); }}
           />
 
           {/* KEEP EXISTING MY BOOKINGS WEBVIEW */}
@@ -359,7 +439,7 @@ export default function AccountScreen() {
             icon="🎫"
             title={t('accountLocal.my_bookings')}
             description={t('accountLocal.view_your_room_and_seva_bookings')}
-            onPress={() => router.push('/website-bookings')}
+            onPress={() => { if (!logoutInProgress.current) router.push('/website-bookings'); }}
             last
           />
         </View>
@@ -381,22 +461,43 @@ export default function AccountScreen() {
         {/* LOGOUT */}
 
         <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.logoutIcon}>
-            ↪
-          </Text>
+  style={[
+    styles.logoutButton,
+    loggingOut && styles.disabledButton,
+  ]}
+  onPress={handleLogout}
+  disabled={loggingOut}
+  activeOpacity={0.8}
+  accessibilityState={{
+    disabled: loggingOut,
+    busy: loggingOut,
+  }}
+>
+  {loggingOut ? (
+    <ActivityIndicator
+      size="small"
+      color="#6B1720"
+      style={{ marginRight: 8 }}
+    />
+  ) : (
+    <Text style={styles.logoutIcon}>
+      ↪
+    </Text>
+  )}
 
-          <Text style={styles.logoutButtonText}>{t('accountLocal.logout')}</Text>
-        </TouchableOpacity>
+  <Text style={styles.logoutButtonText}>
+    {loggingOut
+      ? t('accountLocal.loading')
+      : t('accountLocal.logout')}
+  </Text>
+</TouchableOpacity>
 
 
 {/* DELETE ACCOUNT */}
 
 <TouchableOpacity
   style={styles.deleteAccountButton}
+  disabled={loggingOut}
   onPress={() => router.push('/delete-account' as any)}
   activeOpacity={0.8}
 >
@@ -410,6 +511,7 @@ export default function AccountScreen() {
 
         <TouchableOpacity
           style={styles.homeButton}
+          disabled={loggingOut}
           onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.8}
         >
@@ -789,6 +891,9 @@ const styles = StyleSheet.create({
     color: '#8E8175',
   },
 
+  disabledButton: {
+    opacity: 0.65,
+  },
   logoutButton: {
     height: 48,
     borderRadius: 15,

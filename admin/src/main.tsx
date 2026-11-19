@@ -1,49 +1,81 @@
-  import React, { useEffect, useState } from 'react';
+import React, {
+  useEffect,
+  useState,
+  lazy,
+  Suspense,
+} from 'react';
+import { createRoot } from 'react-dom/client';
 
-  import { createRoot } from 'react-dom/client';
+import {
+  apiRequest,
+  clearAdminSession,
+} from './lib/api';
 
-  import Gallery from './pages/Gallery';
+import './styles.css';
 
+// ========================================
+// LAZY LOADED ADMIN MODULES
+// ========================================
 
-  import { apiRequest, clearAdminSession } from './lib/api';
-  import TempleContact from './pages/TempleContact';
+const Gallery = lazy(() => import('./pages/Gallery'));
 
-  import Publications from './pages/Publications';
+const TempleContact = lazy(() => import('./pages/TempleContact'));
 
-  import Pravachanas from './pages/Pravachanas';
+const Publications = lazy(() => import('./pages/Publications'));
 
-  import Quotes from './pages/Quotes';
+const Pravachanas = lazy(() => import('./pages/Pravachanas'));
 
+const Quotes = lazy(() => import('./pages/Quotes'));
 
+const Activities = lazy(() => import('./pages/Activities'));
 
-  import Activities from './pages/Activities';
+const Darshan = lazy(() => import('./pages/Darshan'));
 
+const Events = lazy(() => import('./pages/Events'));
 
-  import Darshan from './pages/Darshan';
+const MahaswamijiProgrammes = lazy(
+  () => import('./pages/MahaswamijiProgrammes')
+);
 
-  import Events from './pages/Events';
+const VolunteerSeva = lazy(
+  () => import('./pages/VolunteerSeva')
+);
 
-  import MahaswamijiProgrammes from './pages/MahaswamijiProgrammes';
+const Users = lazy(() => import('./pages/Users'));
 
+const DarshanVideos = lazy(
+  () => import('./pages/DarshanVideos')
+);
 
-  import Users from './pages/Users';
+const Announcements = lazy(
+  () => import('./pages/Announcements')
+);
 
-  import DarshanVideos from './pages/DarshanVideos';
+const DharmaSandeham = lazy(
+  () => import('./pages/DharmaSandeham')
+);
 
-  import Announcements from './pages/Announcements';
+const GuruParampara = lazy(
+  () => import('./pages/GuruParampara')
+);
 
-  import DharmaSandeham from './pages/DharmaSandeham';
+const NearbyPlaces = lazy(
+  () => import('./pages/NearbyPlaces')
+);
 
-  import GuruParampara from './pages/GuruParampara';
+const GuruVani = lazy(() => import('./pages/GuruVani'));
 
-  import NearbyPlaces from './pages/NearbyPlaces';
+const WelcomeSlokams = lazy(
+  () => import('./pages/WelcomeSlokams')
+);
 
-  import GuruVani from './pages/GuruVani';
-  import WelcomeSlokams from './pages/WelcomeSlokams';
+const PoojaServices = lazy(
+  () => import('./pages/PoojaServices')
+);
 
-  import PoojaServices from './pages/PoojaServices';
-
-  import WelcomeScreen from './pages/WelcomeScreen';
+const WelcomeScreen = lazy(
+  () => import('./pages/WelcomeScreen')
+);
 
   import './styles.css';
 
@@ -144,6 +176,8 @@
 
 
     ['events', 'Events'],
+
+    ['volunteer-seva', 'Volunteer Seva Management'],
 
     ['gallery', 'Gallery'],
 
@@ -862,7 +896,7 @@
     );
   }
 
-  
+
   function Page({
 
     title,
@@ -914,33 +948,186 @@
     );
 
   }
+// ========================================
+// ADMIN MODULE LOADING
+// ========================================
 
+function ModuleLoading() {
+  return (
+    <main className="content">
+      <div
+        className="panel"
+        role="status"
+        aria-live="polite"
+        style={{
+          minHeight: 240,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            border: '4px solid #E8DED2',
+            borderTopColor: '#6B1720',
+            borderRightColor: '#C69A3A',
+            borderRadius: '50%',
+            animation: 'adminModuleSpin 0.8s linear infinite',
+          }}
+        />
+
+        <style>{`
+          @keyframes adminModuleSpin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+
+        <h3>Loading Module...</h3>
+
+        <p>Please wait while the page loads.</p>
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+        >
+          Reload if loading takes too long
+        </button>
+      </div>
+    </main>
+  );
+}
+
+// ========================================
+// ADMIN MODULE ERROR BOUNDARY
+// ========================================
+
+class ModuleErrorBoundary extends React.Component<
+  {
+    children: React.ReactNode;
+  },
+  {
+    hasError: boolean;
+  }
+> {
+  state = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError() {
+    return {
+      hasError: true,
+    };
+  }
+
+  componentDidCatch(
+    error: Error,
+    info: React.ErrorInfo
+  ) {
+    console.error(
+      'Admin module error:',
+      error,
+      info.componentStack
+    );
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="content">
+          <div
+            className="panel"
+            role="alert"
+            style={{
+              minHeight: 220,
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <h2>Unable to Load Module</h2>
+
+            <p>
+              The module could not be loaded.
+              This may be caused by a network
+              interruption or a recent application
+              update.
+            </p>
+
+            <p>
+              You can select another module from
+              the sidebar or reload the dashboard.
+            </p>
+
+            <button
+              className="primary"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Reload Dashboard
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 
   function App() {
 
-    const [user, setUser] =
+   const [user, setUser] =
+  useState<User | null>(() => {
+    try {
+      const raw = localStorage.getItem(
+        'temple_admin_user'
+      );
 
-      useState<User | null>(() => {
+      const token = localStorage.getItem(
+        'temple_admin_token'
+      );
 
-        const raw =
+      if (!raw || !token) {
+        clearAdminSession();
+        return null;
+      }
 
-          localStorage.getItem(
+      const cachedUser = JSON.parse(raw);
 
-            'temple_admin_user'
+      if (
+        !cachedUser ||
+        !Number.isSafeInteger(cachedUser.id) ||
+        cachedUser.id <= 0 ||
+        cachedUser.role !== 'admin' ||
+        typeof cachedUser.full_name !== 'string' ||
+        typeof cachedUser.email !== 'string'
+      ) {
+        clearAdminSession();
+        return null;
+      }
 
-          );
+      return cachedUser as User;
 
+    } catch (error) {
+      console.error(
+        'Unable to restore admin session:',
+        error
+      );
 
+      try {
+        clearAdminSession();
+      } catch {
+        // Storage may be unavailable.
+      }
 
-        return raw
-
-          ? JSON.parse(raw)
-
-          : null;
-
-      });
-
+      return null;
+    }
+  });
 
 
     const [page, setPage] =
@@ -1097,23 +1284,19 @@
 
           </div>
 
-        </aside>
 
+       </aside>
 
+<ModuleErrorBoundary key={page}>
+  <Suspense fallback={<ModuleLoading />}>
 
-        {page === 'dashboard' && (
+    {page === 'dashboard' && (
+      <Dashboard />
+    )}
 
-          <Dashboard />
-
-        )}
-
-
-
-        {page === 'deities' && (
-
-          <Deities />
-
-        )}
+    {page === 'deities' && (
+      <Deities />
+    )}
 
         {page === 'guru-parampara' && (
           <GuruParampara />
@@ -1123,7 +1306,7 @@
         )}
 
         {page === 'quotes' && <Quotes />}
-        
+
         {page === 'pravachanas' && (
   <Pravachanas />
 )}
@@ -1190,6 +1373,10 @@
 
         )}
 
+        {page === 'volunteer-seva' && (
+  <VolunteerSeva />
+)}
+
         {page === 'dharma-sandeham' && (
 
           <DharmaSandeham />
@@ -1215,11 +1402,14 @@
       TEMPLE CONTACT SETTINGS
   ======================================== */}
 
-        {page === 'temple-contact' && (
-          <TempleContact />
-        )}
+      {page === 'temple-contact' && (
+  <TempleContact />
+)}
 
-      </div>
+  </Suspense>
+</ModuleErrorBoundary>
+
+</div>
 
     );
 

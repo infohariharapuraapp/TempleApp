@@ -1,121 +1,591 @@
+import React, {
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+
 import { useTranslation } from 'react-i18next';
 
-import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  getMyVolunteerRegistrations,
+  getVolunteerError,
+  formatVolunteerDate,
+  formatVolunteerDateTime,
+} from '@/services/volunteerApi';
 
-const PURPLE = '#6A35A0';
-const BG = '#FFF4F8';
-const TEXT = '#102B3A';
-const MUTED = '#71808B';
+import type {
+  MyVolunteerRegistration,
+} from '@/services/volunteerApi';
 
-const MOCK_MY_SEVAS = [
-  {
-    id: 'SR-1001',
-    type: 'Individual Seva',
-    name: 'Ravi Kumar',
-    date: '10 Sep 2026',
-    time: '08:00 AM',
-    assignedSeva: '',
-    status: 'Pending Admin Assignment',
-  },
-  {
-    id: 'SR-1002',
-    type: 'Group Seva',
-    name: 'Sri Lakshmi Group',
-    members: 10,
-    date: '12 Sep 2026',
-    time: '06:00 PM',
-    assignedSeva: 'Annadanam Seva',
-    status: 'Seva Assigned',
-  },
-];
+import { ApiError } from '@/services/api';
+
+import {
+  VOLUNTEER_COLORS as C,
+  VolunteerScreen,
+  VolunteerCover,
+  VolunteerStatusBadge,
+  VolunteerLoading,
+  VolunteerError,
+  VolunteerEmpty,
+  VolunteerButton,
+  VolunteerInfo,
+} from '@/components/volunteer/VolunteerUI';
+
+type Filter =
+  | 'all'
+  | 'active'
+  | 'completed'
+  | 'closed';
 
 export default function MySevasScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const [items, setItems] =
+    useState<MyVolunteerRegistration[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  const [loginRequired, setLoginRequired] =
+    useState(false);
+
+  const [filter, setFilter] =
+    useState<Filter>('all');
+
+  const version = useRef(0);
+
+  const load = useCallback(
+    async (refresh = false) => {
+      const requestVersion = ++version.current;
+
+      setError('');
+      setLoginRequired(false);
+
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+        setItems([]);
+      }
+
+      try {
+        const data =
+          await getMyVolunteerRegistrations();
+
+        if (requestVersion !== version.current) {
+          return;
+        }
+
+        setItems(data);
+      } catch (err) {
+        if (requestVersion !== version.current) {
+          return;
+        }
+
+        setItems([]);
+
+        setLoginRequired(
+          err instanceof ApiError &&
+          err.status === 401
+        );
+
+        setError(getVolunteerError(err));
+      } finally {
+        if (requestVersion === version.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    },
+    []
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+
+      return () => {
+        version.current++;
+      };
+    }, [load, i18n.language])
+  );
+
+  const activeStatuses = [
+    'pending',
+    'approved',
+    'assigned',
+    'in_progress',
+  ];
+
+  const activeCount = items.filter(
+    item => activeStatuses.includes(item.status)
+  ).length;
+
+  const completedCount = items.filter(
+    item => item.status === 'completed'
+  ).length;
+
+  const filtered = items.filter(item => {
+    if (filter === 'active') {
+      return activeStatuses.includes(item.status);
+    }
+
+    if (filter === 'completed') {
+      return item.status === 'completed';
+    }
+
+    if (filter === 'closed') {
+      return (
+        item.status === 'rejected' ||
+        item.status === 'cancelled'
+      );
+    }
+
+    return true;
+  });
+
+  const filters: {
+    value: Filter;
+    label: string;
+  }[] = [
+    {
+      value: 'all',
+      label: t('volunteer.all', 'All'),
+    },
+    {
+      value: 'active',
+      label: t('volunteer.active', 'Active'),
+    },
+    {
+      value: 'completed',
+      label: t('volunteer.completed', 'Completed'),
+    },
+    {
+      value: 'closed',
+      label: t('volunteer.closed', 'Closed'),
+    },
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>{t('bookingScreens.sevaRegistrations')}</Text>
-      </View>
+    <VolunteerScreen
+      title={t('bookingScreens.mySevas', 'My Sevas')}
+    >
+      {loading ? (
+        <VolunteerLoading />
+      ) : error ? (
+        <View style={styles.content}>
+          <VolunteerError
+            message={error}
+            onRetry={() => void load()}
+          />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>{t('bookingScreens.mySevas')}</Text>
-        <Text style={styles.subtitle}>{t('bookingScreens.sevaSubtitle')}</Text>
+          {loginRequired && (
+            <VolunteerButton
+              title={t('common.login', 'Login')}
+              onPress={() => router.push('/login')}
+            />
+          )}
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              colors={[C.maroon]}
+              tintColor={C.maroon}
+            />
+          }
+        >
+          <View style={styles.hero}>
+            <Text style={styles.heroLabel}>
+              {t(
+                'volunteer.myServiceJourney',
+                'MY SERVICE JOURNEY'
+              )}
+            </Text>
 
-        {MOCK_MY_SEVAS.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.top}>
-              <View>
-                <Text style={styles.id}>{item.id}</Text>
-                <Text style={styles.type}>{t(item.type === 'Individual Seva' ? 'bookingScreens.individualSeva' : 'bookingScreens.groupSeva')}</Text>
-              </View>
-              <View style={styles.status}><Text style={styles.statusText}>{t(item.status === 'Seva Assigned' ? 'bookingScreens.sevaAssigned' : 'bookingScreens.pendingAssignment')}</Text></View>
+            <Text style={styles.heroTitle}>
+              {t(
+                'volunteer.sevaRegistrations',
+                'My Volunteer Sevas'
+              )}
+            </Text>
+
+            <Text style={styles.heroDescription}>
+              {t(
+                'volunteer.mySevasDescription',
+                'Track your registrations and service progress.'
+              )}
+            </Text>
+
+            <View style={styles.stats}>
+              <Stat
+                label={t('volunteer.total', 'Total')}
+                value={items.length}
+              />
+
+              <Stat
+                label={t('volunteer.active', 'Active')}
+                value={activeCount}
+              />
+
+              <Stat
+                label={t(
+                  'volunteer.completed',
+                  'Completed'
+                )}
+                value={completedCount}
+              />
             </View>
-
-            <Text style={styles.name}>{item.name}</Text>
-
-            <View style={styles.infoBox}>
-              <Info label={t('bookingScreens.date')} value={item.date} />
-              <Info label={t('bookingScreens.time')} value={item.time} />
-              {item.members ? <Info label={t('bookingScreens.members')} value={String(item.members)} /> : <Info label={t('bookingScreens.type')} value={t('bookingScreens.individual')} />}
-            </View>
-
-            <TouchableOpacity style={styles.details}>
-              <Text style={styles.detailsText}>{t('bookingScreens.registrationDetails')}</Text>
-              <Text style={styles.arrow}>→</Text>
-            </TouchableOpacity>
           </View>
-        ))}
 
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/seva-registration')}>
-          <Text style={styles.buttonText}>{t('bookingScreens.registerNewSeva')}</Text>
-        </TouchableOpacity>
+          <View style={styles.filters}>
+            {filters.map(option => (
+              <View
+                key={option.value}
+                style={styles.filter}
+              >
+                <VolunteerButton
+                  title={option.label}
+                  secondary={filter !== option.value}
+                  onPress={() => setFilter(option.value)}
+                />
+              </View>
+            ))}
+          </View>
 
-        <Text style={styles.note}>{t('bookingScreens.mockNote')}</Text>
-      </ScrollView>
-    </SafeAreaView>
+          {filtered.length === 0 ? (
+            <VolunteerEmpty
+              title={t(
+                'volunteer.noRegistrations',
+                'No Registrations'
+              )}
+              message={t(
+                'volunteer.noRegistrationsDescription',
+                'There are no volunteer registrations in this category.'
+              )}
+            />
+          ) : (
+            filtered.map(item => (
+              <View
+                key={item.id}
+                style={styles.card}
+              >
+                <VolunteerCover uri={item.image_url} />
+
+                <View style={styles.cardBody}>
+                  <VolunteerStatusBadge
+                    status={item.status}
+                  />
+
+                  <Text style={styles.title}>
+                    {item.opportunity_title}
+                  </Text>
+
+                  <Text
+                    selectable
+                    style={styles.code}
+                  >
+                    {item.registration_code}
+                  </Text>
+
+                  <Text style={styles.type}>
+                    {item.registration_type === 'group'
+                      ? t(
+                          'bookingScreens.groupSeva',
+                          'Group Seva'
+                        )
+                      : t(
+                          'bookingScreens.individualSeva',
+                          'Individual Seva'
+                        )}
+                  </Text>
+
+                  {!!item.group_name && (
+                    <Text style={styles.description}>
+                      {item.group_name}
+                    </Text>
+                  )}
+
+                  <View style={styles.info}>
+                    <VolunteerInfo
+                      label={t(
+                        'volunteer.serviceStart',
+                        'Service Start'
+                      )}
+                      value={formatVolunteerDate(
+                        item.service_start_date
+                      )}
+                    />
+
+                    <VolunteerInfo
+                      label={t(
+                        'volunteer.serviceEnd',
+                        'Service End'
+                      )}
+                      value={formatVolunteerDate(
+                        item.service_end_date
+                      )}
+                    />
+
+                    <VolunteerInfo
+                      label={t(
+                        'volunteer.totalMembers',
+                        'Total Volunteers'
+                      )}
+                      value={item.total_members}
+                    />
+
+                    <VolunteerInfo
+                      label={t(
+                        'volunteer.assignedDuties',
+                        'Assigned Duties'
+                      )}
+                      value={item.total_assignments}
+                    />
+
+                    <VolunteerInfo
+                      label={t(
+                        'volunteer.registeredOn',
+                        'Registered On'
+                      )}
+                      value={formatVolunteerDateTime(
+                        item.created_at
+                      )}
+                    />
+                  </View>
+
+                  {item.status === 'rejected' &&
+                    !!item.rejection_reason && (
+                      <View style={styles.rejection}>
+                        <Text style={styles.rejectionTitle}>
+                          {t(
+                            'volunteer.rejectionReason',
+                            'Rejection Reason'
+                          )}
+                        </Text>
+
+                        <Text style={styles.description}>
+                          {item.rejection_reason}
+                        </Text>
+                      </View>
+                    )}
+
+                  <VolunteerButton
+                    title={t(
+                      'bookingScreens.registrationDetails',
+                      'View Registration Details'
+                    )}
+                    disabled={refreshing}
+                    onPress={() =>
+                      router.push({
+                        pathname:
+                          '/volunteer/registration-details',
+                        params: {
+                          registrationId: String(item.id),
+                        },
+                      })
+                    }
+                  />
+                </View>
+              </View>
+            ))
+          )}
+
+          <View style={styles.bottom}>
+            <VolunteerButton
+              title={t(
+                'bookingScreens.registerNewSeva',
+                'Explore Volunteer Sevas'
+              )}
+              onPress={() =>
+                router.push('/seva-registration')
+              }
+            />
+          </View>
+        </ScrollView>
+      )}
+    </VolunteerScreen>
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
   return (
-    <View style={styles.infoItem}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <View style={styles.stat}>
+      <Text style={styles.statNumber}>
+        {value}
+      </Text>
+
+      <Text style={styles.statLabel}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
-  header: { height: 78, backgroundColor: PURPLE, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
-  back: { color: '#FFF', fontSize: 42, lineHeight: 42, marginRight: 4 },
-  title: { color: '#FFF', fontSize: 21, fontWeight: '600' },
-  content: { padding: 20, paddingBottom: 50 },
-  heading: { color: TEXT, fontSize: 26, fontWeight: '800', marginTop: 8 },
-  subtitle: { color: MUTED, fontSize: 13, lineHeight: 19, marginTop: 5, marginBottom: 18 },
-  card: { backgroundColor: '#FFF', borderRadius: 22, padding: 16, marginBottom: 13, borderWidth: 1, borderColor: '#E8DDE8' },
-  top: { flexDirection: 'row', justifyContent: 'space-between' },
-  id: { color: PURPLE, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  type: { color: TEXT, fontSize: 17, fontWeight: '800', marginTop: 3 },
-  status: { backgroundColor: '#E5F3E9', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6 },
-  statusText: { color: '#2F7D4A', fontSize: 9, fontWeight: '800' },
-  name: { color: TEXT, fontSize: 15, fontWeight: '700', marginTop: 13, marginBottom: 10 },
-  infoBox: { flexDirection: 'row', backgroundColor: '#F2E2F7', borderRadius: 14, paddingVertical: 11 },
-  infoItem: { flex: 1, alignItems: 'center' },
-  infoLabel: { color: MUTED, fontSize: 7, fontWeight: '800' },
-  infoValue: { color: TEXT, fontSize: 10, fontWeight: '800', marginTop: 4, textAlign: 'center' },
-  assignmentBox: { backgroundColor: '#FFF7FB', borderWidth: 1, borderColor: '#E5D4E8', borderRadius: 14, padding: 12, marginTop: 11 },
-  assignmentLabel: { color: MUTED, fontSize: 8, fontWeight: '800' },
-  assignmentValue: { color: TEXT, fontSize: 13, fontWeight: '800', marginTop: 4 },
-  details: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingTop: 12 },
-  detailsText: { color: PURPLE, fontSize: 11, fontWeight: '800' },
-  arrow: { color: PURPLE, fontSize: 17, marginLeft: 5 },
-  button: { backgroundColor: PURPLE, height: 54, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
-  note: { textAlign: 'center', color: '#A48BAE', fontSize: 8, letterSpacing: 0.8, marginTop: 13 },
+  content: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  hero: {
+    backgroundColor: C.maroon,
+    borderRadius: 22,
+    padding: 22,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: C.gold,
+  },
+
+  heroLabel: {
+    color: '#EAD19A',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+
+  heroTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 25,
+    marginTop: 10,
+  },
+
+  heroDescription: {
+    color: '#F7EBD7',
+    fontSize: 13,
+    lineHeight: 21,
+    marginTop: 7,
+  },
+
+  stats: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 20,
+  },
+
+  stat: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+  },
+
+  statNumber: {
+    color: '#FFFFFF',
+    fontSize: 25,
+    fontWeight: '800',
+  },
+
+  statLabel: {
+    color: '#F7EBD7',
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+
+  filter: {
+    width: '48%',
+  },
+
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 16,
+  },
+
+  cardBody: {
+    padding: 18,
+  },
+
+  title: {
+    color: C.maroon,
+    fontSize: 21,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+
+  code: {
+    color: C.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 7,
+  },
+
+  type: {
+    color: C.maroon,
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+
+  description: {
+    color: C.text,
+    fontSize: 13,
+    lineHeight: 21,
+    marginTop: 6,
+  },
+
+  info: {
+    backgroundColor: C.background,
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 15,
+  },
+
+  rejection: {
+    backgroundColor: C.lightRed,
+    padding: 13,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+
+  rejectionTitle: {
+    color: C.red,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  bottom: {
+    marginTop: 12,
+  },
 });

@@ -1,0 +1,129 @@
+import { Router } from 'express';
+
+import {
+  authenticateToken,
+} from '../middleware/authMiddleware';
+
+import {
+  getAvailableOpportunities,
+  getOpportunityById,
+} from '../controllers/volunteerOpportunityController';
+
+import {
+  getAvailableShifts,
+} from '../controllers/volunteerShiftController';
+
+import {
+  createVolunteerRegistration,
+  getMyVolunteerRegistrations,
+} from '../controllers/volunteerRegistrationController';
+
+import {
+  getMyVolunteerIdCards,
+} from '../controllers/volunteerIdCardController';
+
+import {
+  getMyVolunteerAccommodation,
+} from '../controllers/volunteerAccommodationController';
+
+import {
+  getMyVolunteerCertificates,
+  downloadMyVolunteerCertificate,
+} from '../controllers/volunteerCertificateController';
+
+import {
+  getMySevaDetails,
+} from '../controllers/volunteerMySevasController';
+
+const router = Router();
+
+// ========================================
+// PUBLIC VOLUNTEER OPPORTUNITIES
+// ========================================
+
+router.get(
+  '/opportunities',
+  getAvailableOpportunities
+);
+
+router.get(
+  '/opportunities/:id',
+  getOpportunityById
+);
+
+router.get(
+  '/opportunities/:opportunityId/shifts',
+  getAvailableShifts
+);
+
+// ========================================
+// VOLUNTEER REGISTRATION
+// ========================================
+
+router.post(
+  '/registrations',
+  authenticateToken,
+  createVolunteerRegistration
+);
+
+// ========================================
+// MY SEVA REGISTRATIONS
+// ========================================
+
+router.get(
+  '/my-registrations',
+  authenticateToken,
+  getMyVolunteerRegistrations
+);
+
+// ========================================
+// COMPLETE MY SEVA DETAILS
+// ========================================
+
+router.get(
+  '/my-registrations/:registrationId',
+  authenticateToken,
+  getMySevaDetails
+);
+
+// ========================================
+// MY DIGITAL ID CARDS
+// ========================================
+
+router.get(
+  '/my-id-cards',
+  authenticateToken,
+  getMyVolunteerIdCards
+);
+
+// ========================================
+// MY ACCOMMODATION
+// ========================================
+
+router.get(
+  '/my-accommodation',
+  authenticateToken,
+  getMyVolunteerAccommodation
+);
+
+// ========================================
+// MY CERTIFICATES
+// ========================================
+
+router.get(
+  '/my-certificates',
+  authenticateToken,
+  getMyVolunteerCertificates
+);
+
+// ========================================
+// SECURE CERTIFICATE DOWNLOAD
+// ========================================
+
+router.get(
+  '/certificates/:certificateId/download',
+  authenticateToken,
+  downloadMyVolunteerCertificate
+);
+
+export default router;

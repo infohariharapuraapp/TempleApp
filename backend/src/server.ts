@@ -39,6 +39,12 @@ import quotesRoutes from './routes/quotesRoutes';
 import adminQuotesRoutes from './routes/adminQuotesRoutes';
 
 
+import {
+  startVolunteerScheduler,
+} from './services/volunteerSchedulerService';
+
+
+
 import mahaswamijiProgrammeRoutes from './routes/mahaswamijiProgrammeRoutes';
 import adminMahaswamijiProgrammeRoutes from './routes/adminMahaswamijiProgrammeRoutes';
 
@@ -61,6 +67,9 @@ import dharmaRoutes from './routes/dharmaRoutes';
 import adminDharmaRoutes from './routes/adminDharmaRoutes';
 import guruVaniRoutes from './routes/guruVaniRoutes';
 
+
+import volunteerRoutes from './routes/volunteerRoutes';
+import adminVolunteerRoutes from './routes/adminVolunteerRoutes';
 
 
 
@@ -139,6 +148,23 @@ app.use('/api/pravachanas', pravachanaRoutes);
 // Protected - Admin Management
 app.use('/api/admin/pravachanas', adminPravachanaRoutes);
 
+// ========================================
+// VOLUNTEER SEVA MANAGEMENT
+// ========================================
+
+// Public - Devotee App
+
+app.use(
+  '/api/volunteer',
+  volunteerRoutes
+);
+
+// Protected - Admin Dashboard
+
+app.use(
+  '/api/admin/volunteer',
+  adminVolunteerRoutes
+);
 
 
 // ========================================
@@ -424,6 +450,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Temple App Backend running on port ${PORT}`);
+
+  startVolunteerScheduler();
 });
 // ========================================
 // SCHEDULED NOTIFICATION PROCESSOR

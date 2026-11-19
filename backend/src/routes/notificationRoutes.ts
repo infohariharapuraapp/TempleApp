@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   registerDevice,
+  unregisterDevice,
   sendTestNotification,
   getMyNotifications,
   getUnreadCount,
@@ -26,6 +27,16 @@ router.post(
 );
 
 // ========================================
+// UNREGISTER CURRENT PUSH DEVICE
+// ========================================
+
+router.post(
+  '/unregister-device',
+  authenticateToken,
+  unregisterDevice
+);
+
+// ========================================
 // SEND TEST PUSH NOTIFICATION
 // ========================================
 
@@ -40,6 +51,7 @@ router.post(
 // ========================================
 
 // Get logged-in user's notifications
+
 router.get(
   '/',
   authenticateToken,
@@ -47,6 +59,7 @@ router.get(
 );
 
 // Get unread notification count
+
 router.get(
   '/unread-count',
   authenticateToken,
@@ -54,6 +67,7 @@ router.get(
 );
 
 // Mark all notifications as read
+
 router.patch(
   '/read-all',
   authenticateToken,
@@ -61,9 +75,11 @@ router.patch(
 );
 
 // Mark one notification as read
+
 router.patch(
   '/:id/read',
   authenticateToken,
   markNotificationAsRead
 );
-export default router;  
+
+export default router;

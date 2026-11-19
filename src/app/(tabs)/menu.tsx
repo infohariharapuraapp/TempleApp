@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 import {
@@ -23,16 +22,14 @@ export default function MenuScreen() {
   const { t } = useTranslation();
 
   return (
-   <SafeAreaView
-  style={styles.container}
-  edges={['top', 'left', 'right']}
->
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* HEADER */}
-
         <Text style={styles.title}>
           {t('tabs.menu')}
         </Text>
@@ -43,8 +40,6 @@ export default function MenuScreen() {
             'Temple services and information'
           )}
         </Text>
-
-        {/* MENU ITEMS */}
 
         <View style={styles.card}>
           <MenuItem
@@ -72,33 +67,62 @@ export default function MenuScreen() {
             onPress={() => router.push('/publications')}
           />
 
-          {/* PRAVACHANA LIBRARY */}
+          <MenuItem
+            title={t(
+              'menu.pravachanas',
+              'Pravachana Library'
+            )}
+            onPress={() =>
+              router.push('/pravachanas' as any)
+            }
+          />
 
           <MenuItem
-            title={t('menu.pravachanas', 'Pravachana Library')}
-            onPress={() => router.push('/pravachanas' as any)}
+            title={t(
+              'menu.mahaswamijiProgrammes',
+              'Mahaswamiji Programmes'
+            )}
+            onPress={() =>
+              router.push('/mahaswamiji-programmes' as any)
+            }
           />
-          <MenuItem
-  title={t(
-    'menu.mahaswamijiProgrammes',
-    'Mahaswamiji Programmes'
-  )}
-  onPress={() =>
-    router.push('/mahaswamiji-programmes' as any)
-  }
-/>
 
           <MenuItem
             title={t('features.rooms')}
             onPress={() => router.push('/room-booking')}
           />
 
-          {/* POOJA SERVICES */}
-
           <MenuItem
-            title={t('menu.poojaServices', 'Pooja Services')}
+            title={t(
+              'menu.poojaServices',
+              'Pooja Services'
+            )}
             onPress={() =>
               router.push('/pooja-services' as any)
+            }
+          />
+
+          {/* VOLUNTEER SEVA */}
+
+          <MenuItem
+            title={t(
+              'home.volunteerSeva',
+              'Volunteer Seva'
+            )}
+            onPress={() =>
+              router.push('/volunteer')
+            }
+          />
+
+          {/* MY SEVAS */}
+
+          <MenuItem
+            title={t(
+              'home.mySevas',
+              'My Sevas'
+            )}
+            onPress={() =>
+              router.push('/my-sevas')
             }
           />
 
@@ -113,7 +137,10 @@ export default function MenuScreen() {
           />
 
           <MenuItem
-            title={t('menu.nearby', 'Nearby Places / Hotels')}
+            title={t(
+              'menu.nearby',
+              'Nearby Places / Hotels'
+            )}
             onPress={() => router.push('/nearby')}
           />
 
@@ -126,8 +153,6 @@ export default function MenuScreen() {
             title={t('menu.policies', 'Policies')}
             onPress={() => router.push('/policies')}
           />
-
-          {/* LANGUAGE SETTINGS */}
 
           <MenuItem
             title={t('common.language')}
@@ -157,13 +182,14 @@ function MenuItem({
       style={styles.item}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
     >
       <Text style={styles.itemText}>
         {title}
       </Text>
 
       <Text style={styles.arrow}>
-        ›
+        {'\u203A'}
       </Text>
     </TouchableOpacity>
   );

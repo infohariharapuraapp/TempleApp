@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import React, { useRef, useState } from 'react';
 
-import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,16 +11,85 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiRequest } from '@/services/api';
-import { getToken, removeToken } from '@/services/authStorage';
-import { notifyAuthChanged } from '@/services/authSession';
+import { router } from 'expo-router';
+
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+
+import {
+  apiRequest,
+  ApiError,
+} from '@/services/api';
+
+import {
+  getToken,
+  removeTokenIfMatches,
+} from '@/services/authStorage';
+
+import {
+  notifyAuthChanged,
+} from '@/services/authSession';
+
+import {
+  pausePushRegistration,
+  resumePushRegistration,
+  registerForPushNotificationsAsync,
+} from '@/services/notifications';
+
+// ========================================
+// CONFIGURATION
+// ========================================
+
+const STORAGE_TIMEOUT_MS = 5000;
+const DELETION_TIMEOUT_MS = 30000;
+const VALIDATION_TIMEOUT_MS = 15000;
+
+// Prevent simultaneous deletion requests even
+// if the deletion screen is remounted.
+
+let accountDeletionRunning = false;
+
+// ========================================
+// TIMEOUT HELPER
+// ========================================
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  milliseconds: number
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation,
+
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error('Operation timed out'));
+        }, milliseconds);
+      }),
+    ]);
+
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+// ========================================
+// DELETE ACCOUNT SCREEN
+// ========================================
 
 export default function DeleteAccountScreen() {
-  // ACCOUNT_LANGUAGE_V1
   const { t, i18n } = useTranslation();
+
+  // ========================================
+  // LOCALIZED ERROR MESSAGES
+  // ========================================
+
   const localizeAccountError = (
     message: unknown,
     fallback: string
@@ -28,6 +97,7 @@ export default function DeleteAccountScreen() {
     if (typeof message !== 'string') {
       return fallback;
     }
+
     const knownMessages: Record<string, string> = {
       "TEMPLE ACCOUNT": "accountLocal.temple_account",
       "My Account": "accountLocal.my_account",
@@ -106,6 +176,7 @@ export default function DeleteAccountScreen() {
       "Session Expired": "accountLocal.session_expired",
       "Please log in again.": "accountLocal.please_log_in_again",
       "Unable to delete account.": "accountLocal.unable_to_delete_account",
+      "Unable to delete account": "accountLocal.unable_to_delete_account",
       "Account Deleted": "accountLocal.account_deleted",
       "Your temple app account has been deleted.": "accountLocal.your_temple_app_account_has_been_deleted",
       "Deletion Failed": "accountLocal.deletion_failed",
@@ -122,93 +193,464 @@ export default function DeleteAccountScreen() {
       "Confirm your password": "accountLocal.confirm_your_password",
       "Enter your password": "accountLocal.enter_your_password",
       "Delete My Account Permanently": "accountLocal.delete_my_account_permanently",
-      "Cancel — Keep My Account": "accountLocal.cancel_keep_my_account"
+      "Cancel — Keep My Account": "accountLocal.cancel_keep_my_account",
     };
+
     const clean = message.trim();
+
     const key = Object.prototype.hasOwnProperty.call(
       knownMessages,
       clean
     )
       ? knownMessages[clean]
       : null;
+
     return key
-      ? String(i18n.t(key))
+      ? String(i18n.t(key, { defaultValue: fallback }))
       : fallback;
   };
+
+  // ========================================
+  // STATE
+  // ========================================
 
   const [password, setPassword] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  const deletionInProgress = useRef(false);
+  const confirmationOpen = useRef(false);
+
+  // ========================================
+  // CLEAR MATCHING SESSION
+  // ========================================
+
+  const clearMatchingSession = async (
+    expectedToken: string
+  ): Promise<boolean> => {
+    const removed = await withTimeout(
+      removeTokenIfMatches(expectedToken),
+      STORAGE_TIMEOUT_MS
+    );
+
+    if (!removed) {
+      const currentToken = await withTimeout(
+        getToken(),
+        STORAGE_TIMEOUT_MS
+      );
+
+      if (currentToken) {
+        return false;
+      }
+    }
+
+    notifyAuthChanged(false);
+    router.replace('/login');
+
+    return true;
+  };
+
+  // ========================================
+  // RESTORE PUSH REGISTRATION
+  // ========================================
+
+  const restorePushRegistration = async (
+    expectedToken: string
+  ) => {
+    try {
+      const currentToken = await withTimeout(
+        getToken(),
+        STORAGE_TIMEOUT_MS
+      );
+
+      if (currentToken !== expectedToken) {
+        return;
+      }
+
+      resumePushRegistration();
+
+      void registerForPushNotificationsAsync()
+        .catch((error) => {
+          console.warn(
+            'Push registration recovery unavailable:',
+            error
+          );
+        });
+
+    } catch (error) {
+      console.warn(
+        'Unable to restore notification session:',
+        error
+      );
+    }
+  };
+
+  // ========================================
+  // DELETE ACCOUNT
+  // ========================================
+
   const deleteAccount = async () => {
-    if (deleting) return;
+    if (
+      deletionInProgress.current ||
+      accountDeletionRunning
+    ) {
+      return;
+    }
+
+    deletionInProgress.current = true;
+    accountDeletionRunning = true;
+
+    setDeleting(true);
+
+    let originalToken: string | null = null;
+    let serverDeleted = false;
+    let registrationPaused = false;
 
     try {
-      setDeleting(true);
+      originalToken = await withTimeout(
+        getToken(),
+        STORAGE_TIMEOUT_MS
+      );
 
-      const token = await getToken();
+      // No local authentication session.
 
-      if (!token) {
-        Alert.alert(t('accountLocal.session_expired'),
+      if (!originalToken) {
+        notifyAuthChanged(false);
+
+        Alert.alert(
+          t('accountLocal.session_expired'),
           t('accountLocal.please_log_in_again')
         );
+
         router.replace('/login');
         return;
       }
 
-      const response = await apiRequest('/auth/account', {
-        method: 'DELETE',
-        token,
-        body: { password },
-      });
+      // Prevent new push registration during deletion.
+
+      pausePushRegistration();
+      registrationPaused = true;
+
+      const response = await withTimeout(
+        apiRequest('/auth/account', {
+          method: 'DELETE',
+          token: originalToken,
+          body: { password },
+          timeoutMs: DELETION_TIMEOUT_MS,
+        }),
+        DELETION_TIMEOUT_MS + 1000
+      );
 
       if (!response.success) {
         throw new Error(
-          response.message || 'Unable to delete account.'
+          response.message ||
+          'Unable to delete account.'
         );
       }
 
-      await removeToken();
-      notifyAuthChanged(false);
+      serverDeleted = true;
+
       setPassword('');
 
-      Alert.alert(t('accountLocal.account_deleted'),
-        t('accountLocal.your_temple_app_account_has_been_deleted'),
+      // Never remove a different, newer login.
+
+      const cleared = await clearMatchingSession(
+        originalToken
+      );
+
+      if (!cleared) {
+        return;
+      }
+
+      Alert.alert(
+        t('accountLocal.account_deleted'),
+        t(
+          'accountLocal.your_temple_app_account_has_been_deleted'
+        ),
         [
           {
             text: t('accountLocal.ok'),
-            onPress: () => router.replace('/login'),
           },
-        ]
+        ],
+        {
+          cancelable: false,
+        }
       );
-    } catch (error: any) {
-      Alert.alert(t('accountLocal.deletion_failed'),
-        localizeAccountError(error?.message, t('accountLocal.please_try_again'))
+
+    } catch (error: unknown) {
+      console.warn(
+        'Account deletion operation failed:',
+        error
       );
+
+      // ========================================
+      // SERVER DELETED ACCOUNT
+      // LOCAL CLEANUP FAILED
+      // ========================================
+
+      if (serverDeleted) {
+        setPassword('');
+
+        try {
+          if (originalToken) {
+            const currentToken = await withTimeout(
+              getToken(),
+              STORAGE_TIMEOUT_MS
+            );
+
+            if (
+              currentToken &&
+              currentToken !== originalToken
+            ) {
+              return;
+            }
+
+            // Retry matching session cleanup.
+
+            await clearMatchingSession(
+              originalToken
+            );
+          }
+
+        } catch (cleanupError) {
+          console.warn(
+            'Local session cleanup failed:',
+            cleanupError
+          );
+
+          // Server deletion is already confirmed.
+          // Avoid reporting that deletion failed.
+          // A later startup will revalidate the token.
+        }
+
+        Alert.alert(
+          t('accountLocal.account_deleted'),
+          t(
+            'accountLocal.your_temple_app_account_has_been_deleted'
+          )
+        );
+
+        return;
+      }
+
+      // ========================================
+      // DETERMINE UNCERTAIN DELETION RESULT
+      // ========================================
+
+      const uncertainResult =
+        !(error instanceof ApiError) ||
+        error.status === undefined ||
+        error.status >= 500;
+
+      const requiresValidation =
+        uncertainResult ||
+        (
+          error instanceof ApiError &&
+          (
+            error.status === 401 ||
+            error.status === 404
+          )
+        );
+
+      let sessionVerified = false;
+
+      if (
+        requiresValidation &&
+        originalToken
+      ) {
+        try {
+          const profile = await withTimeout(
+            apiRequest('/auth/me', {
+              method: 'GET',
+              token: originalToken,
+              timeoutMs: VALIDATION_TIMEOUT_MS,
+            }),
+            VALIDATION_TIMEOUT_MS + 1000
+          );
+
+          sessionVerified = Boolean(
+            profile.success &&
+            profile.data
+          );
+
+        } catch (validationError) {
+          if (
+            validationError instanceof ApiError &&
+            validationError.status === 401
+          ) {
+            try {
+              const cleared =
+                await clearMatchingSession(
+                  originalToken
+                );
+
+              if (cleared) {
+                setPassword('');
+
+                Alert.alert(
+                  t('accountLocal.session_expired'),
+                  t('accountLocal.please_log_in_again')
+                );
+              }
+
+            } catch (cleanupError) {
+              console.warn(
+                'Invalid session cleanup failed:',
+                cleanupError
+              );
+
+              Alert.alert(
+                t('accountLocal.session_expired'),
+                t('accountLocal.please_log_in_again')
+              );
+            }
+
+            // A 401 confirms an invalid session,
+            // not necessarily successful deletion.
+
+            return;
+          }
+
+          console.warn(
+            'Unable to verify deletion result:',
+            validationError
+          );
+        }
+      }
+
+      // ========================================
+      // RECOVER EXISTING SESSION
+      // ========================================
+
+      if (
+        registrationPaused &&
+        originalToken &&
+        (
+          !requiresValidation ||
+          sessionVerified
+        )
+      ) {
+        await restorePushRegistration(
+          originalToken
+        );
+      }
+
+      // Do not describe a network timeout as
+      // confirmed server-side deletion failure.
+
+      if (uncertainResult) {
+        Alert.alert(
+          t('accountLocal.error'),
+          t('accountLocal.deletion_result_uncertain', {
+            defaultValue:
+              'We could not confirm whether your account was deleted. Check your internet connection and account status before trying again.',
+          })
+        );
+
+        return;
+      }
+
+      if (
+        error instanceof ApiError &&
+        error.status === 401 &&
+        sessionVerified
+      ) {
+        Alert.alert(
+          t('accountLocal.deletion_failed'),
+          t('accountLocal.incorrect_password', {
+            defaultValue: 'Incorrect password',
+          })
+        );
+
+        return;
+      }
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : undefined;
+
+      Alert.alert(
+        t('accountLocal.deletion_failed'),
+        localizeAccountError(
+          errorMessage,
+          t('accountLocal.please_try_again')
+        )
+      );
+
     } finally {
+      deletionInProgress.current = false;
+      confirmationOpen.current = false;
+
+      accountDeletionRunning = false;
+
       setDeleting(false);
     }
   };
 
+  // ========================================
+  // CONFIRM DELETION
+  // ========================================
+
   const confirmDeletion = () => {
-    if (!password.trim()) {
-      Alert.alert(t('accountLocal.password_required'),
-        t('accountLocal.enter_your_account_password_to_continue')
-      );
+    if (
+      deletionInProgress.current ||
+      confirmationOpen.current ||
+      accountDeletionRunning
+    ) {
       return;
     }
 
-    Alert.alert(t('accountLocal.permanently_delete_account'),
-      t('accountLocal.this_action_cannot_be_undone_your_temple_app_login_and_profile_will_be_deleted_separate_website_bookings_are_managed_through_the_temple_website'),
+    if (!password.trim()) {
+      Alert.alert(
+        t('accountLocal.password_required'),
+        t(
+          'accountLocal.enter_your_account_password_to_continue'
+        )
+      );
+
+      return;
+    }
+
+    confirmationOpen.current = true;
+
+    Alert.alert(
+      t('accountLocal.permanently_delete_account'),
+
+      t(
+        'accountLocal.this_action_cannot_be_undone_your_temple_app_login_and_profile_will_be_deleted_separate_website_bookings_are_managed_through_the_temple_website'
+      ),
+
       [
-        { text: t('accountLocal.cancel'), style: 'cancel' },
+        {
+          text: t('accountLocal.cancel'),
+          style: 'cancel',
+
+          onPress: () => {
+            confirmationOpen.current = false;
+          },
+        },
+
         {
           text: t('accountLocal.delete_permanently'),
           style: 'destructive',
-          onPress: deleteAccount,
+
+          onPress: () => {
+            confirmationOpen.current = false;
+
+            void deleteAccount();
+          },
         },
-      ]
+      ],
+
+      {
+        cancelable: false,
+      }
     );
   };
+
+  // ========================================
+  // UI
+  // ========================================
 
   return (
     <SafeAreaView style={styles.container}>
@@ -216,27 +658,51 @@ export default function DeleteAccountScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.label}>{t('accountLocal.account_settings')}</Text>
+        <Text style={styles.label}>
+          {t('accountLocal.account_settings')}
+        </Text>
 
-        <Text style={styles.title}>{t('accountLocal.delete_my_account')}</Text>
+        <Text style={styles.title}>
+          {t('accountLocal.delete_my_account')}
+        </Text>
 
         <View style={styles.warningCard}>
-          <Text style={styles.warningTitle}>{t('accountLocal.permanent_account_deletion')}</Text>
+          <Text style={styles.warningTitle}>
+            {t(
+              'accountLocal.permanent_account_deletion'
+            )}
+          </Text>
 
-          <Text style={styles.warningText}>{t('accountLocal.deleting_your_account_is_permanent_and_cannot_be_undone')}</Text>
+          <Text style={styles.warningText}>
+            {t(
+              'accountLocal.deleting_your_account_is_permanent_and_cannot_be_undone'
+            )}
+          </Text>
 
-          <Text style={styles.warningText}>{t('accountLocal.your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name')}</Text>
+          <Text style={styles.warningText}>
+            {t(
+              'accountLocal.your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name'
+            )}
+          </Text>
 
-          <Text style={styles.warningText}>{t('accountLocal.room_and_seva_bookings_made_through_the_separate_temple_website_are_managed_by_that_website')}</Text>
+          <Text style={styles.warningText}>
+            {t(
+              'accountLocal.room_and_seva_bookings_made_through_the_separate_temple_website_are_managed_by_that_website'
+            )}
+          </Text>
         </View>
 
-        <Text style={styles.inputLabel}>{t('accountLocal.confirm_your_password')}</Text>
+        <Text style={styles.inputLabel}>
+          {t('accountLocal.confirm_your_password')}
+        </Text>
 
         <TextInput
           style={styles.input}
           value={password}
           onChangeText={setPassword}
-          placeholder={t('accountLocal.enter_your_password')}
+          placeholder={t(
+            'accountLocal.enter_your_password'
+          )}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
@@ -254,7 +720,11 @@ export default function DeleteAccountScreen() {
           {deleting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.deleteButtonText}>{t('accountLocal.delete_my_account_permanently')}</Text>
+            <Text style={styles.deleteButtonText}>
+              {t(
+                'accountLocal.delete_my_account_permanently'
+              )}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -263,22 +733,32 @@ export default function DeleteAccountScreen() {
           onPress={() => router.back()}
           disabled={deleting}
         >
-          <Text style={styles.cancelButtonText}>{t('accountLocal.cancel_keep_my_account')}</Text>
+          <Text style={styles.cancelButtonText}>
+            {t(
+              'accountLocal.cancel_keep_my_account'
+            )}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ========================================
+// STYLES
+// ========================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFDF8',
   },
+
   content: {
     padding: 22,
     paddingBottom: 40,
   },
+
   label: {
     fontSize: 11,
     fontWeight: '700',
@@ -286,12 +766,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 8,
   },
+
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: '#6B1720',
     marginBottom: 22,
   },
+
   warningCard: {
     backgroundColor: '#FFF1F0',
     borderColor: '#F0C3BF',
@@ -300,24 +782,28 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 26,
   },
+
   warningTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: '#B42318',
     marginBottom: 12,
   },
+
   warningText: {
     fontSize: 13,
     lineHeight: 21,
     color: '#68413D',
     marginBottom: 10,
   },
+
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4A2C18',
     marginBottom: 10,
   },
+
   input: {
     height: 52,
     borderWidth: 1,
@@ -329,6 +815,7 @@ const styles = StyleSheet.create({
     color: '#4A2C18',
     marginBottom: 24,
   },
+
   deleteButton: {
     minHeight: 52,
     backgroundColor: '#B42318',
@@ -337,21 +824,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
+
   disabledButton: {
     opacity: 0.6,
   },
+
   deleteButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
+
   cancelButton: {
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
   },
+
   cancelButtonText: {
     color: '#6B1720',
     fontSize: 14,

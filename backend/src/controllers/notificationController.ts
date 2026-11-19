@@ -190,6 +190,114 @@ export const registerDevice = async (
   }
 };
 
+
+
+// ========================================
+// UNREGISTER CURRENT PUSH DEVICE
+// ========================================
+
+export const unregisterDevice = async (
+  req: AuthRequest,
+  res: Response
+) => {
+
+  try {
+
+    const userId = req.user?.userId;
+
+    if (!userId) {
+
+      return res.status(401).json({
+
+        success: false,
+
+        message: 'Authentication required',
+      });
+    }
+
+    const expoPushToken =
+      req.body?.expoPushToken;
+
+    if (
+      typeof expoPushToken !== 'string' ||
+      !expoPushToken.trim() ||
+      expoPushToken.length > 512
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: 'Invalid Expo push token',
+      });
+    }
+
+    // ====================================
+    // DEACTIVATE ONLY THE CURRENT USER'S
+    // REGISTERED DEVICE
+    // ====================================
+
+    const result = await pool.query(
+
+      `
+      UPDATE device_tokens
+
+      SET
+        is_active = FALSE,
+
+        updated_at = CURRENT_TIMESTAMP
+
+      WHERE user_id = $1
+
+        AND expo_push_token = $2
+
+        AND is_active IS DISTINCT FROM FALSE
+
+      RETURNING id
+      `,
+
+      [
+        userId,
+
+        expoPushToken.trim(),
+      ]
+    );
+
+    // ====================================
+    // IDEMPOTENT SUCCESS RESPONSE
+    // ====================================
+
+    return res.status(200).json({
+
+      success: true,
+
+      message: 'Device unregistered for notifications',
+
+      data: {
+
+        deactivated:
+          (result.rowCount ?? 0) > 0,
+      },
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Unregister device error:',
+      error
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      message:
+        'Failed to unregister device',
+    });
+  }
+};
+
+
 // ========================================
 // SEND TEST PUSH NOTIFICATION
 // ========================================

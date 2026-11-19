@@ -1002,10 +1002,57 @@ export const deleteAccount = async (
       });
     }
 
-    await client.query(
-      'DELETE FROM users WHERE id = $1',
-      [userId]
-    );
+  // ========================================
+// REMOVE PERSONAL VOLUNTEER NOTIFICATIONS
+// ========================================
+
+await client.query(
+  `
+  DELETE FROM volunteer_notification_jobs
+  WHERE recipient_user_id = $1
+    AND target_type = 'user'
+  `,
+  [userId]
+);
+
+// ========================================
+// DETACH VOLUNTEER REGISTRATION OWNERSHIP
+// ========================================
+
+// Preserve registrations and other group members.
+
+await client.query(
+  `
+  UPDATE volunteer_registrations
+  SET user_id = NULL,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE user_id = $1
+  `,
+  [userId]
+);
+
+// ========================================
+// DETACH LINKED VOLUNTEER MEMBERS
+// ========================================
+
+await client.query(
+  `
+  UPDATE volunteer_members
+  SET user_id = NULL,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE user_id = $1
+  `,
+  [userId]
+);
+
+// ========================================
+// DELETE USER ACCOUNT
+// ========================================
+
+await client.query(
+  'DELETE FROM users WHERE id = $1',
+  [userId]
+);
 
     await client.query('COMMIT');
 

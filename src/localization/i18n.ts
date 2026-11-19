@@ -1,4 +1,9 @@
 import i18n from 'i18next';
+import volunteerEn from './volunteer.en.json';
+import volunteerTe from './volunteer.te.json';
+import volunteerKn from './volunteer.kn.json';
+import volunteerHi from './volunteer.hi.json';
+import volunteerTa from './volunteer.ta.json';
 import aboutTa from './about.ta.json';
 import aboutHi from './about.hi.json';
 import aboutKn from './about.kn.json';
@@ -178,7 +183,8 @@ const resources = {
       sreemathEn,
       guruParamparaEn,
       aboutEn,
-      policyEn
+      policyEn,
+      volunteerEn
     ),
   },
 
@@ -195,7 +201,8 @@ const resources = {
       sreemathTe,
       guruParamparaTe,
       aboutTe,
-      policyTe
+      policyTe,
+      volunteerTe
     ),
   },
 
@@ -212,7 +219,8 @@ const resources = {
       sreemathKn,
       guruParamparaKn,
       aboutKn,
-      policyKn
+      policyKn,
+      volunteerKn
     ),
   },
 
@@ -229,7 +237,8 @@ const resources = {
       sreemathHi,
       guruParamparaHi,
       aboutHi,
-      policyHi
+      policyHi,
+      volunteerHi
     ),
   },
 
@@ -246,7 +255,8 @@ const resources = {
       sreemathTa,
       guruParamparaTa,
       aboutTa,
-      policyTa
+      policyTa,
+      volunteerTa
     ),
   },
 };
