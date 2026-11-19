@@ -125,7 +125,32 @@ async function lockOpportunity(
 // ID CARD SELECT QUERY
 // ========================================
 
-const CARD_SELECT = `
+const CARD_SERVICE_DATES_SQL = `
+  SELECT
+    s.service_date,
+    (
+      (s.service_date + s.end_time)
+      AT TIME ZONE 'Asia/Kolkata'
+    ) > clock_timestamp() AS has_remaining_service
+  FROM volunteer_assignments a
+  JOIN volunteer_shifts s
+    ON s.id = a.shift_id
+  WHERE a.member_id = m.id
+    AND a.opportunity_id = o.id
+    AND o.attendance_mode = 'legacy'
+    AND a.status NOT IN ('cancelled', 'reassigned')
+  UNION ALL
+  SELECT
+    sd.service_date,
+    sd.service_date >= (
+      clock_timestamp() AT TIME ZONE 'Asia/Kolkata'
+    )::date AS has_remaining_service
+  FROM volunteer_service_dates sd
+  WHERE sd.member_id = m.id
+    AND sd.opportunity_id = o.id
+    AND o.attendance_mode IN ('simple', 'detailed', 'none')
+`;
+export const CARD_SELECT = `
   SELECT
     c.id,
     c.opportunity_id,
@@ -164,15 +189,7 @@ const CARD_SELECT = `
 
       WHEN NOT EXISTS (
         SELECT 1
-
-        FROM volunteer_assignments a
-
-        WHERE a.member_id = c.member_id
-
-        AND a.status NOT IN (
-          'cancelled',
-          'reassigned'
-        )
+        FROM (${CARD_SERVICE_DATES_SQL}) service
       )
         THEN 'inactive'
 
@@ -183,22 +200,9 @@ const CARD_SELECT = `
 
       WHEN NOT EXISTS (
         SELECT 1
-
-        FROM volunteer_assignments a
-
-        JOIN volunteer_shifts s
-          ON s.id = a.shift_id
-
-        WHERE a.member_id = c.member_id
-
-        AND a.status NOT IN (
-          'cancelled',
-          'reassigned'
-        )
-
-        AND s.service_date =
-          (NOW() AT TIME ZONE
-            'Asia/Kolkata')::date
+        FROM (${CARD_SERVICE_DATES_SQL}) service
+        WHERE service.service_date =
+          (NOW() AT TIME ZONE 'Asia/Kolkata')::date
       )
         THEN 'not_scheduled_today'
 
@@ -227,23 +231,11 @@ const CARD_SELECT = `
     revoker.full_name AS revoked_by_name,
 
     ARRAY(
-      SELECT DISTINCT
-        s.service_date::text
-
-      FROM volunteer_assignments a
-
-      JOIN volunteer_shifts s
-        ON s.id = a.shift_id
-
-      WHERE a.member_id = c.member_id
-
-      AND a.status NOT IN (
-        'cancelled',
-        'reassigned'
-      )
-
-      ORDER BY s.service_date::text
-
+      SELECT DISTINCT service.service_date::text
+      FROM (${CARD_SERVICE_DATES_SQL}) service
+      WHERE service.service_date
+        BETWEEN c.valid_from AND c.valid_until
+      ORDER BY service.service_date::text
     ) AS authorized_service_dates
 
   FROM volunteer_id_cards c
@@ -333,45 +325,23 @@ async function getEligibleMember(
   const dates = await client.query(
     `
     SELECT
-      MIN(s.service_date)::text
-        AS valid_from,
-
-      MAX(s.service_date)::text
-        AS valid_until,
-
-      COUNT(*)::integer
-        AS total_assignments,
-
+      MIN(service.service_date)::text AS valid_from,
+      MAX(service.service_date)::text AS valid_until,
+      COUNT(*)::integer AS total_assignments,
       COALESCE(
-        BOOL_OR(
-          (
-            (s.service_date + s.end_time)
-
-            AT TIME ZONE 'Asia/Kolkata'
-
-          ) > clock_timestamp()
-        ),
+        BOOL_OR(service.has_remaining_service),
         FALSE
       ) AS has_remaining_service
-
-    FROM volunteer_assignments a
-
-    JOIN volunteer_shifts s
-      ON s.id = a.shift_id
-
-    WHERE a.member_id = $1
-
-    AND a.opportunity_id = $2
-
-    AND a.status NOT IN (
-      'cancelled',
-      'reassigned'
-    )
+    FROM volunteer_members m
+    JOIN volunteer_opportunities o
+      ON o.id = m.opportunity_id
+    CROSS JOIN LATERAL (
+      ${CARD_SERVICE_DATES_SQL}
+    ) service
+    WHERE m.id = $1
+      AND o.id = $2
     `,
-    [
-      memberId,
-      opportunityId,
-    ]
+    [memberId, opportunityId]
   );
 
   const service = dates.rows[0];
@@ -379,14 +349,14 @@ async function getEligibleMember(
   if (!service.total_assignments) {
     fail(
       409,
-      `${member.full_name} has no assigned service duties`
+      `${member.full_name} has no eligible service dates or assignments`
     );
   }
 
   if (!service.has_remaining_service) {
     fail(
       409,
-      `${member.full_name} has no remaining service shifts`
+      `${member.full_name} has no remaining service dates or shifts`
     );
   }
 
@@ -425,63 +395,35 @@ export const getEligibleIdCardMembers = async (
         m.photo_url,
         m.gender,
         m.is_team_leader,
-
         r.registration_code,
         r.registration_type,
         r.group_name,
-
         c.id AS existing_card_id,
         c.status AS existing_card_status,
-
-        MIN(s.service_date)::text
-          AS valid_from,
-
-        MAX(s.service_date)::text
-          AS valid_until,
-
-        COUNT(a.id)::integer
-          AS total_assignments
-
+        MIN(service.service_date)::text AS valid_from,
+        MAX(service.service_date)::text AS valid_until,
+        COUNT(*)::integer AS total_assignments
       FROM volunteer_members m
-
       JOIN volunteer_registrations r
         ON r.id = m.registration_id
-
-      JOIN volunteer_assignments a
-        ON a.member_id = m.id
-
-      JOIN volunteer_shifts s
-        ON s.id = a.shift_id
-
+      JOIN volunteer_opportunities o
+        ON o.id = m.opportunity_id
+      CROSS JOIN LATERAL (
+        ${CARD_SERVICE_DATES_SQL}
+      ) service
       LEFT JOIN volunteer_id_cards c
         ON c.member_id = m.id
-
       WHERE m.opportunity_id = $1
-
-      AND m.status = 'approved'
-
-      AND r.status IN (
-        'approved',
-        'assigned',
-        'in_progress'
-      )
-
-      AND a.status NOT IN (
-        'cancelled',
-        'reassigned'
-      )
-
+        AND m.status = 'approved'
+        AND r.status IN (
+          'approved',
+          'assigned',
+          'in_progress'
+        )
       GROUP BY m.id, r.id, c.id
-
       HAVING BOOL_OR(
-        (
-          (s.service_date + s.end_time)
-
-          AT TIME ZONE 'Asia/Kolkata'
-
-        ) > clock_timestamp()
+        service.has_remaining_service
       )
-
       ORDER BY m.full_name ASC
       `,
       [opportunityId]

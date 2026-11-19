@@ -1,3 +1,4 @@
+import { CARD_SELECT } from './volunteerIdCardController';
 import {
   DAILY_SERVICE_SUMMARY_SQL,
   calculateDailyServiceSummary,
@@ -470,58 +471,26 @@ export const getMySevaDetails = async (
       const idCardResult =
         await client.query(
           `
+          WITH cards AS (
+            ${CARD_SELECT}
+            WHERE c.member_id = ANY($1::integer[])
+              AND c.status <> 'revoked'
+              AND m.status IN (
+                'approved',
+                'completed'
+              )
+          )
           SELECT
-            c.id,
-            c.member_id,
-            c.card_number,
-            c.photo_url,
-
-            c.valid_from::text
-              AS valid_from,
-
-            c.valid_until::text
-              AS valid_until,
-
-            c.issued_at,
-
-            CASE
-
-              WHEN c.status = 'revoked'
-                THEN 'revoked'
-
-              WHEN c.valid_until <
-                (NOW() AT TIME ZONE
-                  'Asia/Kolkata')::date
-
-                THEN 'expired'
-
-              WHEN c.status = 'expired'
-                THEN 'expired'
-
-              WHEN c.valid_from >
-                (NOW() AT TIME ZONE
-                  'Asia/Kolkata')::date
-
-                THEN 'upcoming'
-
-              ELSE 'active'
-
-            END AS status
-
-          FROM volunteer_id_cards c
-
-          JOIN volunteer_members m
-            ON m.id = c.member_id
-
-          WHERE c.member_id =
-            ANY($1::integer[])
-
-            AND c.status <> 'revoked'
-
-            AND m.status IN (
-              'approved',
-              'completed'
-            )
+            id,
+            member_id,
+            card_number,
+            photo_url,
+            valid_from,
+            valid_until,
+            issued_at,
+            authorized_service_dates,
+            effective_status AS status
+          FROM cards
           `,
           [memberIds]
         );
