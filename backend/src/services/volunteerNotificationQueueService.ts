@@ -23,7 +23,10 @@ export type VolunteerNotificationEvent =
   | 'accommodation_available'
   | 'service_completed'
   | 'certificate_issued'
-  | 'certificate_revoked';
+  | 'certificate_revoked'
+  | 'reporting_sent'
+  | 'reporting_updated'
+  | 'reporting_cancelled';
 
 export type NotificationTarget =
   | 'all'

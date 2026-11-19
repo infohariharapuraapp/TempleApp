@@ -1,3 +1,6 @@
+import {
+  validateVolunteerReportingEvent,
+} from './volunteerReportingNotificationService';
 import { pool } from '../db';
 
 import {
@@ -2530,6 +2533,14 @@ export async function validateVolunteerNotificationEvent(
   job: VolunteerNotificationJob
 ): Promise<VolunteerDeliveryContent | null> {
 
+  // Date-based reporting notifications.
+  if (
+    job.event_type === 'reporting_sent' ||
+    job.event_type === 'reporting_updated' ||
+    job.event_type === 'reporting_cancelled'
+  ) {
+    return validateVolunteerReportingEvent(job);
+  }
   // Broadcast events.
 
   if (BROADCAST_EVENTS.has(job.event_type)) {

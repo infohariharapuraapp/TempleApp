@@ -1,3 +1,7 @@
+import {
+  DAILY_SERVICE_SUMMARY_SQL,
+  calculateDailyServiceSummary,
+} from '../services/volunteerDailyServiceSummary';
 import { Request, Response } from 'express';
 import { PoolClient } from 'pg';
 import { pool } from '../db';
@@ -113,6 +117,27 @@ const SERVICE_SUMMARY_SELECT = `
 
     o.id AS opportunity_id,
     o.title AS programme_name,
+    o.attendance_mode,
+    MAX(daily.total_selected_dates)
+      AS total_selected_dates,
+    MAX(daily.finalized_dates)
+      AS daily_finalized_dates,
+    MAX(daily.present_count)
+      AS daily_present_count,
+    MAX(daily.absent_count)
+      AS daily_absent_count,
+    MAX(daily.excused_count)
+      AS daily_excused_count,
+    MAX(daily.unfinalized_count)
+      AS daily_unfinalized_count,
+    MAX(daily.remaining_dates)
+      AS remaining_dates,
+    MAX(daily.total_service_hours)
+      AS daily_service_hours,
+    MAX(daily.service_start_date)
+      AS daily_service_start_date,
+    MAX(daily.service_end_date)
+      AS daily_service_end_date,
 
     COUNT(a.id)::integer
       AS total_assignments,
@@ -202,6 +227,9 @@ const SERVICE_SUMMARY_SELECT = `
   JOIN volunteer_opportunities o
     ON o.id = m.opportunity_id
 
+  CROSS JOIN LATERAL (
+    ${DAILY_SERVICE_SUMMARY_SQL}
+  ) daily
   LEFT JOIN volunteer_assignments a
     ON a.member_id = m.id
 
@@ -233,6 +261,35 @@ const SERVICE_SUMMARY_GROUP = `
 // ========================================
 
 function calculateEligibility(row: any) {
+  if (row.attendance_mode !== 'legacy') {
+    const daily = calculateDailyServiceSummary({
+      ...row,
+      finalized_dates:
+        row.daily_finalized_dates,
+      present_count:
+        row.daily_present_count,
+      absent_count:
+        row.daily_absent_count,
+      excused_count:
+        row.daily_excused_count,
+      unfinalized_count:
+        row.daily_unfinalized_count,
+      total_service_hours:
+        row.daily_service_hours,
+      service_start_date:
+        row.daily_service_start_date,
+      service_end_date:
+        row.daily_service_end_date,
+    });
+    return {
+      ...row,
+      ...daily,
+      // Assignment counts are not attendance counts.
+      total_assignments: 0,
+      completed_assignments: 0,
+      remaining_assignments: 0,
+    };
+  }
   const total = Number(
     row.total_assignments
   );
@@ -545,6 +602,46 @@ export const getVolunteerCompletionDetails =
           Number(memberId)
         );
 
+        const dailyAttendance =
+          summary.attendance_mode === 'legacy'
+            ? { rows: [] }
+            : await client.query(
+                `
+                SELECT
+                  sd.id AS service_date_id,
+                  sd.service_date::text AS service_date,
+                  COALESCE(
+                    da.attendance_status,
+                    'not_marked'
+                  ) AS attendance_status,
+                  COALESCE(
+                    da.is_finalized,
+                    FALSE
+                  ) AS is_finalized,
+                  da.check_in_at,
+                  da.check_out_at,
+                  da.remarks,
+                  CASE
+                    WHEN $3 = 'detailed'
+                      AND da.is_finalized = TRUE
+                      AND da.attendance_status = 'present'
+                      AND da.attendance_mode = 'detailed'
+                    THEN da.total_service_hours
+                    ELSE NULL
+                  END AS service_hours
+                FROM volunteer_service_dates sd
+                LEFT JOIN volunteer_daily_attendance da
+                  ON da.service_date_id = sd.id
+                WHERE sd.member_id = $1
+                  AND sd.opportunity_id = $2
+                ORDER BY sd.service_date ASC
+                `,
+                [
+                  memberId,
+                  opportunityId,
+                  summary.attendance_mode,
+                ]
+              );
         const assignments = await client.query(
           `
           SELECT
@@ -632,7 +729,11 @@ export const getVolunteerCompletionDetails =
             ...summary,
 
             assignments:
-              assignments.rows,
+              summary.attendance_mode === 'legacy'
+                ? assignments.rows
+                : [],
+            daily_attendance:
+              dailyAttendance.rows,
           },
         });
       } catch (error) {
@@ -1091,7 +1192,16 @@ export const reopenVolunteerCompletion =
 
           SET
             status = CASE
-
+              WHEN EXISTS (
+                SELECT 1
+                FROM volunteer_opportunities o
+                WHERE o.id = r.opportunity_id
+                AND o.attendance_mode IN (
+                  'simple',
+                  'detailed',
+                  'none'
+                )
+              ) THEN 'approved'
               WHEN EXISTS (
                 SELECT 1
 

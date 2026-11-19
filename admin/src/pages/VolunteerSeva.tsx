@@ -3,8 +3,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import DailyReporting from './volunteer/DailyReporting';
 import Assignments from './volunteer/Assignments';
-import Attendance from './volunteer/Attendance';
+import AttendanceManager from './volunteer/AttendanceManager';
 
 import Completion from './volunteer/Completion';
 import Certificates from './volunteer/Certificates';
@@ -39,7 +40,13 @@ type RegistrationStatus =
 // TYPES
 // ========================================
 
+type AttendanceMode =
+  | 'legacy'
+  | 'simple'
+  | 'detailed'
+  | 'none';
 type OpportunityForm = {
+  attendance_mode: AttendanceMode;
   title: string;
   description: string;
   instructions: string;
@@ -83,6 +90,7 @@ type Section =
   | 'overview'
   | 'opportunities'
   | 'registrations'
+  | 'reporting'
   | 'duties'
   | 'shifts'
   | 'requirements'
@@ -98,6 +106,7 @@ type Section =
 // ========================================
 
 const emptyForm: OpportunityForm = {
+  attendance_mode: 'simple',
   title: '',
   description: '',
   instructions: '',
@@ -406,6 +415,8 @@ const imageUploadLock = useRef(false);
     setExtension(null);
 
     setEditing({
+      attendance_mode:
+        item.attendance_mode ?? 'legacy',
       title: item.title,
       description: item.description || '',
       instructions: item.instructions || '',
@@ -956,6 +967,7 @@ const imageUploadLock = useRef(false);
   ['overview', 'Overview'],
   ['opportunities', 'Seva Opportunities'],
   ['registrations', 'Registrations'],
+  ['reporting', 'Daily Reporting'],
   ['duties', 'Duties'],
   ['shifts', 'Service Shifts'],
   ['requirements', 'Duty Requirements'],
@@ -1027,11 +1039,12 @@ const imageUploadLock = useRef(false);
               }}
             >
               <li>Create seva opportunity</li>
-              <li>Configure duties and shifts</li>
+              <li>Configure service dates and registration period</li>
               <li>Publish opportunity</li>
               <li>Enable registration</li>
               <li>Review applications</li>
-              <li>Assign volunteer duties</li>
+              <li>Send daily reporting details</li>
+              <li>Coordinator assigns duties at the venue</li>
               <li>Issue digital ID cards</li>
               <li>Allocate accommodation if needed</li>
               <li>Record attendance</li>
@@ -1228,6 +1241,66 @@ const imageUploadLock = useRef(false);
                   />
                 )}
 
+                <div
+                  className="panel"
+                  style={{
+                    background: '#FFFDF8',
+                    border: '1px solid #e8dfcf',
+                    borderRadius: 12,
+                    padding: 18,
+                    marginBottom: 20,
+                  }}
+                >
+                  <h3 style={{ color: '#6B1720' }}>
+                    Attendance Configuration
+                  </h3>
+                  <label>
+                    Attendance Mode
+                    <select
+                      value={editing.attendance_mode}
+                      disabled={
+                        disabled ||
+                        Boolean(
+                          editingId &&
+                          items.find(
+                            item => item.id === editingId
+                          )?.total_registrations
+                        )
+                      }
+                      onChange={event =>
+                        update(
+                          'attendance_mode',
+                          event.target.value as AttendanceMode
+                        )
+                      }
+                    >
+                      <option value="simple">
+                        Simple Attendance (Recommended)
+                      </option>
+                      <option value="detailed">
+                        Detailed Attendance
+                      </option>
+                      <option value="none">
+                        No Attendance Tracking
+                      </option>
+                      <option value="legacy">
+                        Duty & Shift Based
+                      </option>
+                    </select>
+                  </label>
+                  <p>
+                    {editing.attendance_mode === 'simple'
+                      ? 'Track daily present, absent and excused attendance. No check-in or check-out required.'
+                      : editing.attendance_mode === 'detailed'
+                        ? 'Track daily attendance, check-in, check-out and actual service hours.'
+                        : editing.attendance_mode === 'none'
+                          ? 'Verify service completion manually without attendance records.'
+                          : 'Use the existing duties, shifts and assignment-based workflow.'}
+                  </p>
+                  <small>
+                    Attendance mode is locked after volunteers register.
+                  </small>
+                </div>
                 <h3>Registration Period</h3>
 
                 <p>
@@ -1424,7 +1497,7 @@ const imageUploadLock = useRef(false);
                 <div className="panel">
                   {editingId
                     ? 'Changes will update the existing opportunity.'
-                    : 'New opportunities are saved as drafts. Configure service shifts and publish before enabling registration.'}
+                    : 'New opportunities are saved as drafts. Configure service dates and publish before enabling registration.'}
                 </div>
 
                 <div className="actions">
@@ -1797,6 +1870,9 @@ const imageUploadLock = useRef(false);
   <Registrations opportunities={items} />
 )}
 
+{section === 'reporting' && (
+  <DailyReporting opportunities={items} />
+)}
 {section === 'duties' && (
   <Duties />
 )}
@@ -1813,7 +1889,7 @@ const imageUploadLock = useRef(false);
 )}
 
 {section === 'attendance' && (
-  <Attendance opportunities={items} />
+  <AttendanceManager opportunities={items} />
 )}
 
 {section === 'id-cards' && (

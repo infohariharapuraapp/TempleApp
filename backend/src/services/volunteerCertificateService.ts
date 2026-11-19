@@ -7,10 +7,15 @@ interface CertificateData {
   programme_name: string;
   certificate_title: string;
   certificate_message: string | null;
-  service_start_date: string;
-  service_end_date: string;
-  total_service_days: number;
-  total_service_hours: number | string;
+  attendance_mode?:
+    | 'legacy'
+    | 'simple'
+    | 'detailed'
+    | 'none';
+  service_start_date: string | null;
+  service_end_date: string | null;
+  total_service_days: number | null;
+  total_service_hours: number | string | null;
   signatory_name: string | null;
   signatory_designation: string | null;
   issued_at: string | Date | null;
@@ -271,40 +276,72 @@ export function generateVolunteerCertificate(
   // SERVICE DETAILS
   // ========================================
 
-  const startDate = formatDate(
-    certificate.service_start_date
-  );
-
-  const endDate = formatDate(
+  const attendanceMode =
+    certificate.attendance_mode ?? 'legacy';
+  if (
+    attendanceMode !== 'none' &&
+    certificate.service_start_date &&
     certificate.service_end_date
-  );
-
-  doc.font('Helvetica-Bold')
-    .fontSize(11)
-    .fillColor(COLORS.maroon)
-    .text(
-      `Service period: ${startDate} - ${endDate}`,
-      60,
-      342,
-      {
-        width: width - 120,
-        align: 'center',
-      }
+  ) {
+    const startDate = formatDate(
+      certificate.service_start_date
     );
-
-  doc.font('Helvetica')
-    .fontSize(12)
-    .fillColor(COLORS.text)
-    .text(
-      `Service days: ${certificate.total_service_days}     |     Scheduled hours attended: ${Number(certificate.total_service_hours)}`,
-      60,
-      366,
-      {
-        width: width - 120,
-        align: 'center',
-      }
+    const endDate = formatDate(
+      certificate.service_end_date
     );
-
+    doc.font('Helvetica-Bold')
+      .fontSize(11)
+      .fillColor(COLORS.maroon)
+      .text(
+        `Service period: ${startDate} - ${endDate}`,
+        60,
+        342,
+        {
+          width: width - 120,
+          align: 'center',
+        }
+      );
+  }
+  const serviceDetails: string[] = [];
+  if (
+    attendanceMode !== 'none' &&
+    certificate.total_service_days != null
+  ) {
+    serviceDetails.push(
+      `Service days: ${certificate.total_service_days}`
+    );
+  }
+  if (
+    ['legacy', 'detailed'].includes(attendanceMode) &&
+    certificate.total_service_hours != null
+  ) {
+    const hours = Number(
+      certificate.total_service_hours
+    );
+    if (Number.isFinite(hours) && hours >= 0) {
+      const label =
+        attendanceMode === 'detailed'
+          ? 'Actual service hours'
+          : 'Scheduled hours attended';
+      serviceDetails.push(
+        `${label}: ${hours}`
+      );
+    }
+  }
+  if (serviceDetails.length > 0) {
+    doc.font('Helvetica')
+      .fontSize(12)
+      .fillColor(COLORS.text)
+      .text(
+        serviceDetails.join('     |     '),
+        60,
+        366,
+        {
+          width: width - 120,
+          align: 'center',
+        }
+      );
+  }
   // ========================================
   // SIGNATORY
   // ========================================

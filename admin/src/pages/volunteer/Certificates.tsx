@@ -36,6 +36,7 @@ interface Form {
 }
 
 interface Certificate {
+  attendance_mode?: 'legacy' | 'simple' | 'detailed' | 'none';
   id: number;
   member_id: number;
   member_code: string;
@@ -47,10 +48,10 @@ interface Certificate {
   certificate_message: string | null;
   signatory_name: string | null;
   signatory_designation: string | null;
-  service_start_date: string;
-  service_end_date: string;
-  total_service_days: number;
-  total_service_hours: number | string;
+  service_start_date: string | null;
+  service_end_date: string | null;
+  total_service_days: number | null;
+  total_service_hours: number | string | null;
   status: 'draft' | 'issued' | 'revoked';
   issued_at: string | null;
   issued_by_name: string | null;
@@ -1066,21 +1067,38 @@ function CertificateManager({
                       </td>
 
                       <td>
-                        {formatServiceDate(
-                          item.service_start_date
+                        {item.attendance_mode === 'none' ? (
+                          <>
+                            <div>Manually verified service</div>
+                            <small>Attendance statistics not required</small>
+                          </>
+                        ) : (
+                          <>
+                            {item.service_start_date &&
+                             item.service_end_date && (
+                              <div>
+                                {formatServiceDate(item.service_start_date)}
+                                {' - '}
+                                {formatServiceDate(item.service_end_date)}
+                              </div>
+                            )}
+                            {item.total_service_days != null && (
+                              <div>
+                                {item.total_service_days} days
+                              </div>
+                            )}
+                            {item.attendance_mode !== 'simple' &&
+                             item.total_service_hours != null && (
+                              <div>
+                                {item.total_service_hours}
+                                {' '}
+                                {item.attendance_mode === 'detailed'
+                                  ? 'actual hours'
+                                  : 'scheduled hours'}
+                              </div>
+                            )}
+                          </>
                         )}
-                        {' - '}
-                        {formatServiceDate(
-                          item.service_end_date
-                        )}
-
-                        <div>
-                          {item.total_service_days} days
-                        </div>
-
-                        <div>
-                          {item.total_service_hours} hours
-                        </div>
                       </td>
 
                       <td>

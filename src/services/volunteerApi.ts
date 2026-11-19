@@ -26,6 +26,7 @@ export type VolunteerStatus =
   | 'cancelled';
 
 export interface VolunteerOpportunity {
+  attendance_mode?: VolunteerAttendanceMode;
   id: number;
   title: string;
   description: string | null;
@@ -83,6 +84,7 @@ export interface VolunteerMemberInput {
 
   is_team_leader: boolean;
   shift_ids: number[];
+  service_dates?: string[];
 }
 
 export interface VolunteerRegistrationInput {
@@ -219,10 +221,14 @@ async function volunteerRequest<T>(
 // PUBLIC API
 // ========================================
 
-export async function getVolunteerOpportunities() {
+export async function getVolunteerOpportunities(
+  includeClosed = false
+) {
   const data =
     await volunteerRequest<VolunteerOpportunity[]>(
-      '/opportunities'
+      includeClosed
+        ? '/opportunities?include_closed=true'
+        : '/opportunities'
     );
 
   if (!Array.isArray(data)) {
@@ -301,14 +307,14 @@ export async function getMyVolunteerRegistrations() {
 export function formatVolunteerDate(
   value?: string | null
 ): string {
-  if (!value) return '—';
+  if (!value) return 'â€”';
 
   const date = new Date(
     `${value.slice(0, 10)}T00:00:00+05:30`
   );
 
   if (Number.isNaN(date.getTime())) {
-    return '—';
+    return 'â€”';
   }
 
   return date.toLocaleDateString('en-IN', {
@@ -322,12 +328,12 @@ export function formatVolunteerDate(
 export function formatVolunteerDateTime(
   value?: string | null
 ): string {
-  if (!value) return '—';
+  if (!value) return 'â€”';
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return '—';
+    return 'â€”';
   }
 
   return date.toLocaleString('en-IN', {
@@ -344,7 +350,7 @@ export function formatVolunteerDateTime(
 export function formatVolunteerTime(
   value?: string | null
 ): string {
-  if (!value) return '—';
+  if (!value) return 'â€”';
 
   const [hour, minute] =
     value.split(':').map(Number);
@@ -357,7 +363,7 @@ export function formatVolunteerTime(
     minute < 0 ||
     minute > 59
   ) {
-    return '—';
+    return 'â€”';
   }
 
   return `${hour % 12 || 12}:${String(
@@ -488,7 +494,44 @@ export interface VolunteerDutyAssignment {
   service_hours: number | string | null;
 }
 
+export type VolunteerAttendanceMode =
+  | 'legacy'
+  | 'simple'
+  | 'detailed'
+  | 'none';
+export interface VolunteerDailyAttendance {
+  service_date_id: number;
+  service_date: string;
+  attendance_status:
+    | 'not_marked'
+    | 'present'
+    | 'absent'
+    | 'excused';
+  is_finalized: boolean;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  service_hours: number | string | null;
+}
+export interface VolunteerDailyServiceSummary {
+  attendance_mode: VolunteerAttendanceMode;
+  total_selected_dates: number;
+  finalized_dates: number | null;
+  remaining_dates: number;
+  present: number | null;
+  absent: number | null;
+  excused: number | null;
+  attendance_percentage: number | null;
+  total_service_days: number | null;
+  total_service_hours: number | string | null;
+  service_start_date: string | null;
+  service_end_date: string | null;
+  is_completed: boolean;
+}
 export interface VolunteerSevaMember {
+  attendance_mode?: VolunteerAttendanceMode;
+  service_dates?: string[];
+  daily_attendance?: VolunteerDailyAttendance[];
+  daily_service_summary?: VolunteerDailyServiceSummary | null;
   id: number;
   member_code: string;
   full_name: string;
@@ -556,6 +599,7 @@ export interface VolunteerAccommodation {
 }
 
 export interface VolunteerCertificate {
+  attendance_mode?: VolunteerAttendanceMode;
   id: number;
   member_id: number;
   certificate_number: string;
@@ -564,10 +608,10 @@ export interface VolunteerCertificate {
   certificate_title: string;
   certificate_message: string | null;
 
-  service_start_date: string;
-  service_end_date: string;
-  total_service_days: number;
-  total_service_hours: number | string;
+  service_start_date: string | null;
+  service_end_date: string | null;
+  total_service_days: number | null;
+  total_service_hours: number | string | null;
 
   certificate_url: string | null;
   signatory_name: string | null;
@@ -606,4 +650,119 @@ export async function getVolunteerRegistrationDetails(
   }
 
   return data;
+}export interface VolunteerServiceDates {
+  opportunity_id: number;
+  programme_name: string;
+  service_start_date: string;
+  service_end_date: string;
+  registration_open: boolean;
+  total_available_dates: number;
+  service_dates: string[];
+}
+export async function getVolunteerServiceDates(
+  opportunityId: number
+): Promise<VolunteerServiceDates> {
+  if (
+    !Number.isSafeInteger(opportunityId) ||
+    opportunityId <= 0 ||
+    opportunityId > 2147483647
+  ) {
+    throw new ApiError(
+      'Invalid opportunity ID.'
+    );
+  }
+  const data =
+    await volunteerRequest<VolunteerServiceDates>(
+      `/opportunities/${opportunityId}/service-dates`
+    );
+  if (
+    !data ||
+    data.opportunity_id !== opportunityId ||
+    typeof data.registration_open !== 'boolean' ||
+    !Array.isArray(data.service_dates) ||
+    !data.service_dates.every(date =>
+      typeof date === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(date)
+    )
+  ) {
+    throw new ApiError(
+      'Invalid service dates response.'
+    );
+  }
+  return data;
+}
+export interface VolunteerDailyReporting {
+  service_date_id: number;
+  service_date: string;
+  member_id: number;
+  member_code: string;
+  full_name: string;
+  reporting_id: number | null;
+  reporting_status: string;
+  reporting_time: string | null;
+  reporting_location: string | null;
+  coordinator_name: string | null;
+  coordinator_phone: string | null;
+  special_instructions: string | null;
+  revision: number | null;
+  responded_at: string | null;
+  can_confirm: boolean;
+}
+export async function getMyVolunteerReporting(
+  registrationId: number
+): Promise<VolunteerDailyReporting[]> {
+  if (
+    !Number.isSafeInteger(registrationId) ||
+    registrationId <= 0 ||
+    registrationId > 2147483647
+  ) {
+    throw new ApiError('Invalid registration ID.');
+  }
+  const data =
+    await volunteerRequest<VolunteerDailyReporting[]>(
+      `/my-registrations/${registrationId}/reporting`,
+      {
+        authenticated: true,
+      }
+    );
+  if (
+    !Array.isArray(data) ||
+    !data.every(item =>
+      item &&
+      Number.isSafeInteger(item.service_date_id) &&
+      Number.isSafeInteger(item.member_id) &&
+      typeof item.service_date === 'string' &&
+      typeof item.reporting_status === 'string' &&
+      typeof item.can_confirm === 'boolean'
+    )
+  ) {
+    throw new ApiError(
+      'Invalid reporting response.'
+    );
+  }
+  return data;
+}
+export async function confirmVolunteerReporting(
+  reportingId: number,
+  revision: number
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(reportingId) ||
+    reportingId <= 0 ||
+    reportingId > 2147483647 ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0
+  ) {
+    throw new ApiError(
+      'Invalid reporting confirmation.'
+    );
+  }
+  await volunteerRequest<unknown>(
+    `/reporting/${reportingId}/confirm`,
+    {
+      method: 'POST',
+      authenticated: true,
+      body: { revision },
+    }
+  );
 }

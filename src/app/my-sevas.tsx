@@ -47,6 +47,7 @@ import {
 type Filter =
   | 'all'
   | 'active'
+  | 'pending'
   | 'completed'
   | 'closed';
 
@@ -130,7 +131,6 @@ export default function MySevasScreen() {
   );
 
   const activeStatuses = [
-    'pending',
     'approved',
     'assigned',
     'in_progress',
@@ -149,6 +149,9 @@ export default function MySevasScreen() {
       return activeStatuses.includes(item.status);
     }
 
+    if (filter === 'pending') {
+      return item.status === 'pending';
+    }
     if (filter === 'completed') {
       return item.status === 'completed';
     }
@@ -174,6 +177,13 @@ export default function MySevasScreen() {
     {
       value: 'active',
       label: t('volunteer.active', 'Active'),
+    },
+    {
+      value: 'pending',
+      label: t(
+        'volunteer.awaitingApproval',
+        'Awaiting Admin Approval'
+      ),
     },
     {
       value: 'completed',

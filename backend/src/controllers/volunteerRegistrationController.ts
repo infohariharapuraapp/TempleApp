@@ -1,3 +1,8 @@
+import {
+  normalizeServiceDates,
+  saveMemberServiceDates,
+  VolunteerServiceDateError,
+} from '../services/volunteerServiceDateService';
 import { Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { pool } from '../db';
@@ -213,21 +218,44 @@ function normalizeMember(member: any) {
     fail(400, 'Invalid team leader value');
   }
 
-  if (
-    !Array.isArray(member.shift_ids) ||
-    member.shift_ids.length === 0 ||
-    member.shift_ids.length > 500 ||
-    !member.shift_ids.every(validId)
-  ) {
-    fail(
-      400,
-      `Select valid service shifts for ${fullName}`
-    );
+  let serviceDates: string[] = [];
+  let shiftIds: number[] = [];
+  if (member.service_dates !== undefined) {
+    try {
+      serviceDates = normalizeServiceDates(
+        member.service_dates
+      );
+    } catch (error) {
+      if (error instanceof VolunteerServiceDateError) {
+        fail(400, `${fullName}: ${error.message}`);
+      }
+      throw error;
+    }
+    if (
+      member.shift_ids !== undefined &&
+      (
+        !Array.isArray(member.shift_ids) ||
+        member.shift_ids.length > 0
+      )
+    ) {
+      fail(400, 'Select dates or shifts, not both');
+    }
+  } else {
+    if (
+      !Array.isArray(member.shift_ids) ||
+      member.shift_ids.length === 0 ||
+      member.shift_ids.length > 500 ||
+      !member.shift_ids.every(validId)
+    ) {
+      fail(
+        400,
+        `Select valid service dates for ${fullName}`
+      );
+    }
+    shiftIds = [
+      ...new Set<number>(member.shift_ids),
+    ];
   }
-
-  const shiftIds = [
-    ...new Set<number>(member.shift_ids),
-  ];
 
   return {
     full_name: fullName,
@@ -277,6 +305,7 @@ function normalizeMember(member: any) {
       member.is_team_leader === true,
 
     shift_ids: shiftIds,
+    service_dates: serviceDates,
   };
 }
 
@@ -327,6 +356,17 @@ export const createVolunteerRegistration = async (
     ) as ReturnType<typeof normalizeMember>[];
 
     const totalMembers = members.length;
+    const usesServiceDates = members.some(
+      member => member.service_dates.length > 0
+    );
+    if (
+      usesServiceDates &&
+      members.some(
+        member => member.service_dates.length === 0
+      )
+    ) {
+      fail(400, 'All members must select service dates');
+    }
 
     if (
       registrationType === 'individual' &&
@@ -403,6 +443,27 @@ export const createVolunteerRegistration = async (
 
       const opportunity =
         opportunityResult.rows[0];
+      // Enforce the registration method configured for
+      // this opportunity while holding its database lock.
+      const attendanceMode = opportunity.attendance_mode;
+      if (
+        !['legacy', 'simple', 'detailed', 'none']
+          .includes(attendanceMode)
+      ) {
+        fail(409, 'Invalid programme attendance configuration');
+      }
+      if (attendanceMode === 'legacy' && usesServiceDates) {
+        fail(
+          409,
+          'This programme requires service shift selection'
+        );
+      }
+      if (attendanceMode !== 'legacy' && !usesServiceDates) {
+        fail(
+          409,
+          'This programme requires service date selection. Please update the app if necessary.'
+        );
+      }
 
       const statusResult = await client.query(
         `
@@ -649,35 +710,50 @@ export const createVolunteerRegistration = async (
         const createdMember =
           memberResult.rows[0];
 
-        // Save each member's selected availability.
-
-        await client.query(
-          `
-          INSERT INTO volunteer_availability (
-            opportunity_id,
-            member_id,
-            shift_id
-          )
-
-          SELECT
-            $1::integer,
-            $2::integer,
-            shift_id
-
-          FROM unnest(
-            $3::integer[]
-          ) AS selected(shift_id)
-          `,
-          [
-            opportunityId,
-            createdMember.id,
-            member.shift_ids,
-          ]
-        );
-
+        // Save selected volunteer availability.
+        let savedServiceDates: string[] = [];
+        if (member.service_dates.length > 0) {
+          try {
+            savedServiceDates =
+              await saveMemberServiceDates(
+                client,
+                opportunityId,
+                createdMember.id,
+                member.service_dates
+              );
+          } catch (error) {
+            if (error instanceof VolunteerServiceDateError) {
+              fail(400, error.message);
+            }
+            throw error;
+          }
+        } else {
+          await client.query(
+            `
+            INSERT INTO volunteer_availability (
+              opportunity_id,
+              member_id,
+              shift_id
+            )
+            SELECT
+              $1::integer,
+              $2::integer,
+              shift_id
+            FROM UNNEST(
+              $3::integer[]
+            ) AS selected(shift_id)
+            `,
+            [
+              opportunityId,
+              createdMember.id,
+              member.shift_ids,
+            ]
+          );
+        }
         createdMembers.push({
           ...createdMember,
           shift_ids: member.shift_ids,
+          service_dates: savedServiceDates,
         });
       }
 

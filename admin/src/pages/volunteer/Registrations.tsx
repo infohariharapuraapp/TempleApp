@@ -59,6 +59,7 @@ type Member = {
   area_of_interest: string | null;
   is_team_leader: boolean;
   status: string;
+  service_dates?: string[];
   availability: {
     shift_id: number;
     shift_name: string;
@@ -814,7 +815,55 @@ export default function Registrations({
                 ))}
               </div>
 
-              <h4>Available Service Shifts</h4>
+              <h4>Selected Service Dates</h4>
+              {member.service_dates === undefined ? (
+                <p>
+                  Service date information is unavailable
+                  from this backend version.
+                </p>
+              ) : member.service_dates.length > 0 ? (
+                <>
+                  <p style={{ color: '#15803d' }}>
+                    <strong>
+                      {member.service_dates.length}
+                      {' '}
+                      service day(s) selected
+                    </strong>
+                  </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {member.service_dates.map(date => (
+                      <div
+                        key={date}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: 8,
+                          border: '1px solid #C69A3A',
+                          background: '#FFF8E7',
+                          color: '#6B1720',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatServiceDate(date)}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : member.availability?.length ? (
+                <p>
+                  This application uses legacy
+                  shift-based registration.
+                </p>
+              ) : (
+                <p>No selected service dates.</p>
+              )}
+              <h4>Legacy Service Shifts</h4>
 
               {member.availability?.length ? (
                 <div className="table-wrap">
@@ -856,7 +905,7 @@ export default function Registrations({
                   </table>
                 </div>
               ) : (
-                <p>No selected shifts.</p>
+                <p>No shift-based availability recorded.</p>
               )}
             </div>
           ))}

@@ -1,3 +1,10 @@
+import {
+  getMyReporting,
+  confirmMyReporting,
+} from '../controllers/volunteerReportingController';
+import {
+  getAvailableServiceDates,
+} from '../controllers/volunteerServiceDateController';
 import { Router } from 'express';
 
 import {
@@ -54,6 +61,13 @@ router.get(
 router.get(
   '/opportunities/:opportunityId/shifts',
   getAvailableShifts
+);
+// ========================================
+// AVAILABLE SERVICE DATES
+// ========================================
+router.get(
+  '/opportunities/:opportunityId/service-dates',
+  getAvailableServiceDates
 );
 
 // ========================================
@@ -126,4 +140,17 @@ router.get(
   downloadMyVolunteerCertificate
 );
 
+// ========================================
+// MY DAILY REPORTING
+// ========================================
+router.get(
+  '/my-registrations/:registrationId/reporting',
+  authenticateToken,
+  getMyReporting
+);
+router.post(
+  '/reporting/:reportingId/confirm',
+  authenticateToken,
+  confirmMyReporting
+);
 export default router;

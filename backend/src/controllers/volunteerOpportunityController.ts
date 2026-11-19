@@ -176,6 +176,7 @@ const PUBLIC_SELECT = `
       AS service_end_date,
 
     o.required_volunteers,
+    o.attendance_mode,
     o.allow_individual,
     o.allow_group,
     o.minimum_group_size,
@@ -191,6 +192,12 @@ const PUBLIC_SELECT = `
 // ========================================
 
 function validateOpportunity(body: any): string | null {
+  if (
+    !['legacy', 'simple', 'detailed', 'none']
+      .includes(body.attendance_mode)
+  ) {
+    return 'Invalid attendance mode';
+  }
   if (
     typeof body.title !== 'string' ||
     !body.title.trim() ||
@@ -290,23 +297,31 @@ function validateOpportunity(body: any): string | null {
 // ========================================
 
 export const getAvailableOpportunities = async (
-  _req: Request,
+  req: Request,
   res: Response
 ) => {
   try {
+    const includeClosed =
+      req.query.include_closed === 'true';
+    res.setHeader('Cache-Control', 'no-store');
     const result = await pool.query(`
       ${PUBLIC_SELECT}
 
       WHERE o.is_published = TRUE
-      AND o.registration_enabled = TRUE
-      AND NOW() < o.registration_end_at
-      AND o.service_end_date >=
-        (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+      AND (
+        $1::boolean = TRUE
+        OR (
+          o.registration_enabled = TRUE
+          AND NOW() < o.registration_end_at
+          AND o.service_end_date >=
+            (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+        )
+      )
 
       ORDER BY
         o.registration_start_at ASC,
         o.id DESC
-    `);
+    `, [includeClosed]);
 
     return res.json({
       success: true,
@@ -448,6 +463,8 @@ export const createOpportunity = async (
 
       maximum_group_size:
         req.body?.maximum_group_size ?? 100,
+      attendance_mode:
+        req.body?.attendance_mode ?? 'legacy',
     };
 
     const validation = validateOpportunity(body);
@@ -474,12 +491,13 @@ export const createOpportunity = async (
         maximum_group_size,
         is_published,
         registration_enabled,
-        created_by
+        created_by,
+        attendance_mode
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,
         $9,$10,$11,$12,$13,
-        FALSE,FALSE,$14
+        FALSE,FALSE,$14,$15
       )
       RETURNING *
       `,
@@ -503,6 +521,7 @@ export const createOpportunity = async (
         body.maximum_group_size,
 
         req.user!.userId,
+        body.attendance_mode,
       ]
     );
 
@@ -534,6 +553,7 @@ const EDITABLE_FIELDS = [
   'allow_group',
   'minimum_group_size',
   'maximum_group_size',
+  'attendance_mode',
 ];
 
 export const updateOpportunity = async (
@@ -615,6 +635,54 @@ export const updateOpportunity = async (
       return badRequest(res, validation);
     }
 
+    // Attendance mode cannot change after registration.
+    if (
+      merged.attendance_mode !== current.attendance_mode
+    ) {
+      const registrations = await client.query(
+        `
+        SELECT id
+        FROM volunteer_registrations
+        WHERE opportunity_id = $1
+        LIMIT 1
+        `,
+        [id]
+      );
+      if (registrations.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message:
+            'Attendance mode cannot change after volunteers have registered',
+        });
+      }
+    }
+    // Preserve dates already selected by volunteers.
+    const invalidServiceDates = await client.query(
+      `
+      SELECT id
+      FROM volunteer_service_dates
+      WHERE opportunity_id = $1
+        AND (
+          service_date < $2::date
+          OR service_date > $3::date
+        )
+      LIMIT 1
+      `,
+      [
+        id,
+        merged.service_start_date,
+        merged.service_end_date,
+      ]
+    );
+    if (invalidServiceDates.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        message:
+          'Service dates cannot exclude dates selected by volunteers',
+      });
+    }
     // Existing shifts must remain within service dates.
 
     const invalidShifts = await client.query(
@@ -886,33 +954,10 @@ export const updateOpportunityPublishStatus = async (
 
             AND o.registration_end_at > NOW()
 
-            AND EXISTS (
-
-              SELECT 1
-
-              FROM volunteer_shifts s
-
-              WHERE s.opportunity_id = o.id
-
-                AND s.is_active = TRUE
-
-                AND s.service_date >=
-                  (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-
-                AND s.service_date BETWEEN
-
-                  o.service_start_date
-
-                  AND o.service_end_date
-
-                AND (
-
-                  (s.service_date + s.start_time)
-
-                  AT TIME ZONE 'Asia/Kolkata'
-
-                ) > NOW()
-            )
+            AND o.service_end_date >= (
+              clock_timestamp()
+              AT TIME ZONE 'Asia/Kolkata'
+            )::date
           )
         )
 
@@ -931,7 +976,7 @@ export const updateOpportunityPublishStatus = async (
       return res.status(409).json({
         success: false,
         message:
-          'Publish the opportunity, configure available shifts and ensure the registration deadline is in the future',
+          'Publish the opportunity and ensure the registration deadline and service dates are valid',
       });
     }
 

@@ -81,12 +81,20 @@ export function normalizeVolunteerMember(
     profession: member.profession?.trim(),
     area_of_interest: member.area_of_interest?.trim(),
     shift_ids: [...new Set(member.shift_ids)],
+    ...(member.service_dates !== undefined
+      ? {
+          service_dates: [
+            ...new Set(member.service_dates),
+          ].sort(),
+        }
+      : {}),
   };
 }
 
 export function validateVolunteerMember(
   member: VolunteerMemberInput,
-  availableShifts: VolunteerShift[]
+  availableShifts: VolunteerShift[],
+  availableDates?: string[]
 ): string | null {
   const m = normalizeVolunteerMember(member);
 
@@ -158,6 +166,56 @@ export function validateVolunteerMember(
     }
   }
 
+  if (availableDates !== undefined) {
+    const selectedDates =
+      m.service_dates ?? [];
+    if (
+      selectedDates.length === 0 ||
+      selectedDates.length > 366
+    ) {
+      return i18n.t(
+        'volunteer.selectServiceDates',
+        'Select at least one available service date.'
+      );
+    }
+    if (m.shift_ids.length > 0) {
+      return i18n.t(
+        'volunteer.mixedAvailability',
+        'Select service dates without shifts.'
+      );
+    }
+    const allowed = new Set(availableDates);
+    const today = getTodayIST();
+    if (
+      selectedDates.some(date => {
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(date)
+        ) {
+          return true;
+        }
+        const parsed =
+          new Date(`${date}T00:00:00Z`);
+        return (
+          Number.isNaN(parsed.getTime()) ||
+          parsed.toISOString().slice(0, 10) !== date ||
+          !allowed.has(date) ||
+          date < today
+        );
+      })
+    ) {
+      return i18n.t(
+        'volunteer.serviceDateUnavailable',
+        'One or more selected service dates are unavailable.'
+      );
+    }
+    return null;
+  }
+  if (m.service_dates !== undefined) {
+    return i18n.t(
+      'volunteer.serviceDateUnavailable',
+      'Refresh the available service dates.'
+    );
+  }
   if (
     m.shift_ids.length === 0 ||
     m.shift_ids.length > 500
@@ -192,7 +250,8 @@ export function validateVolunteerMember(
 export function validateVolunteerRegistration(
   input: VolunteerRegistrationInput,
   opportunity: VolunteerOpportunity,
-  shifts: VolunteerShift[]
+  shifts: VolunteerShift[],
+  availableDates?: string[]
 ): string | null {
   if (input.opportunity_id !== opportunity.id) {
     return i18n.t('volunteer.invalidOpportunity');
@@ -274,7 +333,8 @@ export function validateVolunteerRegistration(
 
     const error = validateVolunteerMember(
       member,
-      shifts
+      shifts,
+      availableDates
     );
 
     if (error) {

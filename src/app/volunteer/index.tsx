@@ -61,6 +61,9 @@ export default function VolunteerHomeScreen() {
     useState('');
 
   const requestVersion = useRef(0);
+  const [filter, setFilter] = useState<
+    'all' | 'active' | 'upcoming' | 'closed'
+  >('all');
 
   const load = useCallback(
     async (refresh = false) => {
@@ -77,7 +80,7 @@ export default function VolunteerHomeScreen() {
 
       try {
         const data =
-          await getVolunteerOpportunities();
+          await getVolunteerOpportunities(true);
 
         if (
           version !== requestVersion.current
@@ -116,6 +119,36 @@ export default function VolunteerHomeScreen() {
     }, [load, i18n.language])
   );
 
+  const filtered = items.filter(item => {
+    if (filter === 'active') {
+      return item.registration_status === 'open';
+    }
+    if (filter === 'upcoming') {
+      return item.registration_status === 'upcoming';
+    }
+    if (filter === 'closed') {
+      return item.registration_status === 'closed';
+    }
+    return true;
+  });
+  const filters = [
+    {
+      value: 'all',
+      label: t('volunteer.all', 'All'),
+    },
+    {
+      value: 'active',
+      label: t('volunteer.active', 'Active'),
+    },
+    {
+      value: 'upcoming',
+      label: t('volunteer.upcoming', 'Upcoming'),
+    },
+    {
+      value: 'closed',
+      label: t('volunteer.closed', 'Closed'),
+    },
+  ] as const;
   return (
     <VolunteerScreen
       title={t(
@@ -163,6 +196,52 @@ export default function VolunteerHomeScreen() {
           <View style={styles.goldLine} />
         </View>
 
+        {/* OPPORTUNITY FILTERS */}
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 20,
+        }}>
+          {filters.map(option => {
+            const selected =
+              filter === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() =>
+                  setFilter(option.value)
+                }
+                style={{
+                  flexGrow: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: selected
+                    ? C.maroon
+                    : C.border,
+                  backgroundColor: selected
+                    ? C.maroon
+                    : C.lightGold,
+                }}
+              >
+                <Text style={{
+                  color: selected
+                    ? C.white
+                    : C.maroon,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                }}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         {/* OPPORTUNITIES */}
 
         <View style={styles.sectionHeader}>
@@ -175,7 +254,7 @@ export default function VolunteerHomeScreen() {
 
           {!loading && !error && (
             <Text style={styles.count}>
-              {items.length}
+              {filtered.length}
             </Text>
           )}
         </View>
@@ -194,7 +273,7 @@ export default function VolunteerHomeScreen() {
             message={error}
             onRetry={() => void load()}
           />
-        ) : items.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <VolunteerEmpty
             title={t(
               'volunteer.noOpportunities',
@@ -206,7 +285,7 @@ export default function VolunteerHomeScreen() {
             )}
           />
         ) : (
-          items.map(item => (
+          filtered.map(item => (
             <TouchableOpacity
               key={item.id}
               style={styles.card}
@@ -271,10 +350,15 @@ export default function VolunteerHomeScreen() {
                         'volunteer.opensOn',
                         'Opens on'
                       )
-                    : t(
-                        'volunteer.registerBefore',
-                        'Register before'
-                      )}
+                    : item.registration_status === 'closed'
+                      ? t(
+                          'volunteer.registrationDeadline',
+                          'Registration deadline'
+                        )
+                      : t(
+                          'volunteer.registerBefore',
+                          'Register before'
+                        )}
                   {': '}
                   {formatVolunteerDateTime(
                     item.registration_status ===

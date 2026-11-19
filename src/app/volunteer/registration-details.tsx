@@ -1,3 +1,4 @@
+import VolunteerDailyService from '@/components/volunteer/VolunteerDailyService';
 import volunteerI18n from '@/localization/i18n';
 import React, {
   useCallback,
@@ -58,9 +59,12 @@ import {
   VolunteerButton,
 } from '@/components/volunteer/VolunteerUI';
 
+import VolunteerReporting from '@/components/volunteer/VolunteerReporting';
+
 type Section =
   | 'overview'
   | 'availability'
+  | 'reporting'
   | 'duties'
   | 'idcard'
   | 'accommodation'
@@ -81,6 +85,11 @@ const SECTIONS: {
     id: 'availability',
     label: 'Availability',
     icon: '📅',
+  },
+  {
+    id: 'reporting',
+    label: 'Daily Reporting',
+    icon: '📍',
   },
   {
     id: 'duties',
@@ -509,7 +518,19 @@ export default function RegistrationDetailsScreen() {
           )}
 
           <View style={styles.navigationGrid}>
-            {SECTIONS.map(item => (
+            {SECTIONS.filter(item => {
+      if (!member?.attendance_mode ||
+          member.attendance_mode === 'legacy') {
+        return true;
+      }
+      if (item.id === 'duties') {
+        return (
+          member.assignments.length > 0 ||
+          section === 'duties'
+        );
+      }
+      return true;
+    }).map(item => (
               <TouchableOpacity
                 key={item.id}
                 accessibilityRole="button"
@@ -536,12 +557,37 @@ export default function RegistrationDetailsScreen() {
                       styles.selectedText,
                   ]}
                 >
-                  {t('volunteer.sections.' + item.id, item.label)}
+                  {item.id === 'availability' &&
+      member?.attendance_mode &&
+      member.attendance_mode !== 'legacy'
+      ? t(
+          'volunteer.selectedServiceDates',
+          'Selected Service Dates'
+        )
+      : item.id === 'attendance' &&
+        member?.attendance_mode === 'none'
+        ? t(
+            'volunteer.dailyServiceProgress',
+            'Service Progress'
+          )
+        : t(
+            'volunteer.sections.' + item.id,
+            item.label
+          )}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {section === 'reporting' && !!member && (
+            <VolunteerReporting
+              key={`${id}-${member.id}`}
+              registrationId={id}
+              memberId={member.id}
+              programmeName={registration.programme_name}
+              registrationStatus={registration.status}
+            />
+          )}
           {section === 'overview' && (
             <View style={styles.panel}>
               <Text style={styles.heading}>
@@ -633,7 +679,15 @@ export default function RegistrationDetailsScreen() {
           )}
 
           {!!member && section === 'availability' && (
-            <AvailabilitySection member={member} />
+            member.attendance_mode &&
+    member.attendance_mode !== 'legacy' ? (
+      <VolunteerDailyService
+        member={member}
+        section="availability"
+      />
+    ) : (
+      <AvailabilitySection member={member} />
+    )
           )}
 
           {!!member && section === 'duties' && (
@@ -649,7 +703,15 @@ export default function RegistrationDetailsScreen() {
           )}
 
           {!!member && section === 'attendance' && (
-            <AttendanceSection member={member} />
+            member.attendance_mode &&
+    member.attendance_mode !== 'legacy' ? (
+      <VolunteerDailyService
+        member={member}
+        section="attendance"
+      />
+    ) : (
+      <AttendanceSection member={member} />
+    )
           )}
 
           {!!member && section === 'certificate' && (
@@ -1346,17 +1408,81 @@ function CertificateSection({
         </Text>
       )}
 
-      <VolunteerInfo
-        label={volunteerI18n.t('volunteer.serviceDays')}
-        value={certificate.total_service_days}
-      />
-
-      <VolunteerInfo
-        label={volunteerI18n.t('volunteer.serviceHours')}
-        value={String(
-          certificate.total_service_hours
-        )}
-      />
+      {(certificate.attendance_mode ??
+        member.attendance_mode ??
+        'legacy') === 'none' ? (
+        <View style={styles.innerCard}>
+          <Text style={styles.cardTitle}>
+            {t(
+              'volunteer.dailyManualVerification',
+              'Manual Service Verification'
+            )}
+          </Text>
+          <Text style={styles.description}>
+            {t(
+              'volunteer.dailyCompletionVerified',
+              'Your service has been verified by the temple administration.'
+            )}
+          </Text>
+          <Text style={styles.description}>
+            {t(
+              'volunteer.certificateNoAttendance',
+              'Attendance statistics are not recorded for this programme.'
+            )}
+          </Text>
+        </View>
+      ) : (
+        <>
+          {!!certificate.service_start_date &&
+            !!certificate.service_end_date && (
+              <VolunteerInfo
+                label={t(
+                  'volunteer.certificateServicePeriod',
+                  'Service period'
+                )}
+                value={
+                  formatVolunteerDate(
+                    certificate.service_start_date
+                  ) +
+                  ' - ' +
+                  formatVolunteerDate(
+                    certificate.service_end_date
+                  )
+                }
+              />
+            )}
+          {certificate.total_service_days != null && (
+            <VolunteerInfo
+              label={volunteerI18n.t(
+                'volunteer.serviceDays'
+              )}
+              value={certificate.total_service_days}
+            />
+          )}
+          {(certificate.attendance_mode ??
+            member.attendance_mode ??
+            'legacy') !== 'simple' &&
+            certificate.total_service_hours != null && (
+              <VolunteerInfo
+                label={
+                  (certificate.attendance_mode ??
+                    member.attendance_mode ??
+                    'legacy') === 'detailed'
+                    ? t(
+                        'volunteer.actualServiceHours',
+                        'Actual service hours'
+                      )
+                    : volunteerI18n.t(
+                        'volunteer.serviceHours'
+                      )
+                }
+                value={String(
+                  certificate.total_service_hours
+                )}
+              />
+            )}
+        </>
+      )}
 
       <VolunteerInfo
         label={volunteerI18n.t('volunteer.issuedOn')}

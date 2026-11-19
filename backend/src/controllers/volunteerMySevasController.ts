@@ -1,3 +1,7 @@
+import {
+  DAILY_SERVICE_SUMMARY_SQL,
+  calculateDailyServiceSummary,
+} from '../services/volunteerDailyServiceSummary';
 import { Response } from 'express';
 import { pool } from '../db';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -72,6 +76,7 @@ export const getMySevaDetails = async (
   AS is_registration_owner,
 
             o.title AS programme_name,
+            o.attendance_mode,
             o.description,
             o.instructions,
             o.image_url,
@@ -174,6 +179,119 @@ export const getMySevaDetails = async (
       // SELECTED SERVICE AVAILABILITY
       // ========================================
 
+      const serviceDateResult =
+        await client.query(
+          `
+          SELECT
+            sd.id AS service_date_id,
+            sd.member_id,
+            sd.service_date::text AS service_date
+          FROM volunteer_service_dates sd
+          WHERE sd.member_id = ANY($1::integer[])
+            AND sd.opportunity_id = $2
+          ORDER BY
+            sd.member_id,
+            sd.service_date
+          `,
+          [
+            memberIds,
+            registration.opportunity_id,
+          ]
+        );
+      // ========================================
+      // FINALIZED DAILY ATTENDANCE
+      // ========================================
+      const dailyAttendanceResult =
+        await client.query(
+          `
+          SELECT
+            sd.id AS service_date_id,
+            sd.member_id,
+            sd.service_date::text AS service_date,
+            CASE
+              WHEN da.is_finalized = TRUE
+                THEN da.attendance_status
+              ELSE 'not_marked'
+            END AS attendance_status,
+            COALESCE(
+              da.is_finalized,
+              FALSE
+            ) AS is_finalized,
+            CASE
+              WHEN da.is_finalized = TRUE
+                AND o.attendance_mode = 'detailed'
+                AND da.attendance_status = 'present'
+                THEN da.check_in_at
+              ELSE NULL
+            END AS check_in_at,
+            CASE
+              WHEN da.is_finalized = TRUE
+                AND o.attendance_mode = 'detailed'
+                AND da.attendance_status = 'present'
+                THEN da.check_out_at
+              ELSE NULL
+            END AS check_out_at,
+            CASE
+              WHEN da.is_finalized = TRUE
+                AND o.attendance_mode = 'detailed'
+                AND da.attendance_status = 'present'
+                THEN da.total_service_hours
+              ELSE NULL
+            END AS service_hours
+          FROM volunteer_service_dates sd
+          JOIN volunteer_opportunities o
+            ON o.id = sd.opportunity_id
+          LEFT JOIN volunteer_daily_attendance da
+            ON da.service_date_id = sd.id
+            AND da.attendance_mode = o.attendance_mode
+          WHERE sd.member_id = ANY($1::integer[])
+            AND sd.opportunity_id = $2
+            AND o.attendance_mode IN (
+              'simple',
+              'detailed'
+            )
+          ORDER BY
+            sd.member_id,
+            sd.service_date
+          `,
+          [
+            memberIds,
+            registration.opportunity_id,
+          ]
+        );
+      // ========================================
+      // SHARED SERVICE SUMMARY
+      // ========================================
+      const dailySummaryResult =
+        await client.query(
+          `
+          SELECT
+            m.id AS member_id,
+            m.status AS member_status,
+            r.status AS registration_status,
+            o.attendance_mode,
+            daily.*
+          FROM volunteer_members m
+          JOIN volunteer_registrations r
+            ON r.id = m.registration_id
+          JOIN volunteer_opportunities o
+            ON o.id = m.opportunity_id
+          CROSS JOIN LATERAL (
+            ${DAILY_SERVICE_SUMMARY_SQL}
+          ) daily
+          WHERE m.id = ANY($1::integer[])
+            AND m.opportunity_id = $2
+            AND o.attendance_mode IN (
+              'simple',
+              'detailed',
+              'none'
+            )
+          `,
+          [
+            memberIds,
+            registration.opportunity_id,
+          ]
+        );
       const availabilityResult =
         await client.query(
           `
@@ -474,6 +592,7 @@ export const getMySevaDetails = async (
 
             c.total_service_days,
             c.total_service_hours,
+            c.attendance_mode,
 
             c.certificate_url,
             c.signatory_name,
@@ -520,6 +639,21 @@ export const getMySevaDetails = async (
         return grouped;
       }
 
+      const serviceDateMap =
+        groupByMember(serviceDateResult.rows);
+      const dailyAttendanceMap =
+        groupByMember(dailyAttendanceResult.rows);
+      const dailySummaryMap =
+        new Map<
+          number,
+          ReturnType<typeof calculateDailyServiceSummary>
+        >();
+      for (const row of dailySummaryResult.rows) {
+        dailySummaryMap.set(
+          Number(row.member_id),
+          calculateDailyServiceSummary(row)
+        );
+      }
       const availabilityMap =
         groupByMember(
           availabilityResult.rows
@@ -621,9 +755,70 @@ export const getMySevaDetails = async (
                 )
               : null;
 
+          const attendanceMode =
+            registration.attendance_mode ?? 'legacy';
+          const selectedDates =
+            serviceDateMap.get(member.id) || [];
+          const dailyAttendance =
+            allowed &&
+            ['simple', 'detailed'].includes(attendanceMode)
+              ? dailyAttendanceMap.get(member.id) || []
+              : [];
+          const dailySummary =
+            allowed &&
+            attendanceMode !== 'legacy'
+              ? dailySummaryMap.get(Number(member.id))
+              : undefined;
+          const dailyServiceSummary =
+            dailySummary
+              ? {
+                  attendance_mode: attendanceMode,
+                  total_selected_dates:
+                    dailySummary.total_selected_dates,
+                  finalized_dates:
+                    attendanceMode === 'none'
+                      ? null
+                      : dailySummary.finalized_dates,
+                  remaining_dates:
+                    dailySummary.remaining_dates,
+                  present:
+                    attendanceMode === 'none'
+                      ? null
+                      : dailySummary.present_count,
+                  absent:
+                    attendanceMode === 'none'
+                      ? null
+                      : dailySummary.absent_count,
+                  excused:
+                    attendanceMode === 'none'
+                      ? null
+                      : dailySummary.excused_count,
+                  attendance_percentage:
+                    attendanceMode === 'none' ||
+                    dailySummary.finalized_dates !==
+                      dailySummary.total_selected_dates
+                      ? null
+                      : dailySummary.attendance_percentage,
+                  total_service_days:
+                    dailySummary.total_service_days,
+                  total_service_hours:
+                    dailySummary.total_service_hours,
+                  service_start_date:
+                    dailySummary.service_start_date,
+                  service_end_date:
+                    dailySummary.service_end_date,
+                  is_completed:
+                    member.status === 'completed',
+                }
+              : null;
           return {
             ...member,
-
+            attendance_mode: attendanceMode,
+            service_dates: selectedDates.map(
+              item => item.service_date
+            ),
+            daily_attendance: dailyAttendance,
+            daily_service_summary: dailyServiceSummary,
             availability:
               availabilityMap.get(member.id)
                 || [],

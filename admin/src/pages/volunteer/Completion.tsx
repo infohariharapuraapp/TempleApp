@@ -13,7 +13,16 @@ interface Props {
   opportunities: VolunteerOpportunity[];
 }
 
+type AttendanceMode =
+  | 'legacy'
+  | 'simple'
+  | 'detailed'
+  | 'none';
 interface Member {
+  attendance_mode?: AttendanceMode;
+  total_selected_dates?: number;
+  finalized_dates?: number | null;
+  remaining_dates?: number;
   member_id: number;
   full_name: string;
   member_code: string;
@@ -28,9 +37,9 @@ interface Member {
   excused_count: number;
   unfinalized_count: number;
   remaining_assignments: number;
-  total_service_days: number;
-  total_service_hours: number;
-  attendance_percentage: number;
+  total_service_days: number | null;
+  total_service_hours: number | null;
+  attendance_percentage: number | null;
   service_start_date: string | null;
   service_end_date: string | null;
   certificate_status: string | null;
@@ -55,9 +64,92 @@ interface Assignment {
 }
 
 interface Details extends Member {
+  daily_attendance?: {
+    service_date_id: number;
+    service_date: string;
+    attendance_status: string;
+    is_finalized: boolean;
+    check_in_at: string | null;
+    check_out_at: string | null;
+    remarks: string | null;
+    service_hours: number | string | null;
+  }[];
   assignments: Assignment[];
 }
 
+function ServiceInformation({ item }: { item: Member }) {
+  const mode = item.attendance_mode ?? 'legacy';
+  if (mode === 'none') {
+    return (
+      <span>Manually verified service</span>
+    );
+  }
+  return (
+    <>
+      <div>
+        Service days: {item.total_service_days ?? 'Not available'}
+      </div>
+      {(mode === 'legacy' || mode === 'detailed') && (
+        <div>
+          {mode === 'detailed' ? 'Actual hours' : 'Scheduled hours'}:
+          {' '}
+          {item.total_service_hours ?? 'Not available'}
+        </div>
+      )}
+    </>
+  );
+}
+function ServiceProgress({ item }: { item: Member }) {
+  const mode = item.attendance_mode ?? 'legacy';
+  if (mode === 'legacy') {
+    return (
+      <>
+        {item.completed_assignments} / {item.total_assignments}
+        <div>Remaining: {item.remaining_assignments}</div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div>
+        Selected dates: {item.total_selected_dates ?? 0}
+      </div>
+      {mode !== 'none' && (
+        <div>
+          Finalized: {item.finalized_dates ?? 0}
+          {' / '}
+          {item.total_selected_dates ?? 0}
+        </div>
+      )}
+      <div>
+        Future dates: {item.remaining_dates ?? 0}
+      </div>
+      {mode === 'none' && (
+        <small>Manual completion</small>
+      )}
+    </>
+  );
+}
+function AttendanceInformation({ item }: { item: Member }) {
+  if (item.attendance_mode === 'none') {
+    return <span>Attendance not required</span>;
+  }
+  return (
+    <>
+      <strong>
+        {item.attendance_percentage == null
+          ? 'Pending'
+          : String(item.attendance_percentage) + '%'}
+      </strong>
+      <div>Present: {item.present_count ?? 0}</div>
+      <div>Absent: {item.absent_count ?? 0}</div>
+      <div>Excused: {item.excused_count ?? 0}</div>
+      <small>
+        Unfinalized: {item.unfinalized_count ?? 0}
+      </small>
+    </>
+  );
+}
 export default function Completion({
   opportunities,
 }: Props) {
@@ -294,7 +386,12 @@ function CompletionManager({
     ) return;
 
     if (!window.confirm(
-      `Confirm service completion for ${ids.length} volunteer(s)?`
+      eligible.some(item =>
+        ids.includes(item.member_id) &&
+        item.attendance_mode === 'none'
+      )
+        ? 'Confirm that the selected volunteers have successfully completed their service, including manual verification where attendance is disabled?'
+        : 'Confirm service completion for ' + ids.length + ' volunteer(s)?'
     )) return;
 
     await mutate(base, 'POST', {
@@ -445,23 +542,19 @@ function CompletionManager({
                 Service Details — {details.full_name}
               </h3>
 
-              <p>
-                Service Days: {details.total_service_days}
-                {' | '}
-                Hours: {details.total_service_hours}
-                {' | '}
-                Attendance: {details.attendance_percentage}%
-              </p>
+              <ServiceInformation item={details} />
+              <ServiceProgress item={details} />
+              <AttendanceInformation item={details} />
 
-              <p>
-                {formatServiceDate(
-                  details.service_start_date
+              {details.attendance_mode !== 'none' &&
+                details.service_start_date &&
+                details.service_end_date && (
+                  <p>
+                    {formatServiceDate(details.service_start_date)}
+                    {' - '}
+                    {formatServiceDate(details.service_end_date)}
+                  </p>
                 )}
-                {' - '}
-                {formatServiceDate(
-                  details.service_end_date
-                )}
-              </p>
 
               {details.member_status !== 'completed' &&
                 (details.completion_reasons || [])
@@ -473,6 +566,60 @@ function CompletionManager({
                     </p>
                   ))}
 
+              {details.attendance_mode &&
+               details.attendance_mode !== 'legacy' ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Service Date</th>
+                        {details.attendance_mode !== 'none' && (
+                          <>
+                            <th>Attendance</th>
+                            <th>Finalized</th>
+                            <th>Remarks</th>
+                          </>
+                        )}
+                        {details.attendance_mode === 'detailed' && (
+                          <>
+                            <th>Check-in</th>
+                            <th>Check-out</th>
+                            <th>Actual Hours</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(details.daily_attendance || []).map(day => (
+                        <tr key={day.service_date_id}>
+                          <td>
+                            {formatServiceDate(day.service_date)}
+                          </td>
+                          {details.attendance_mode !== 'none' && (
+                            <>
+                              <td>{day.attendance_status}</td>
+                              <td>
+                                {day.is_finalized ? 'Yes' : 'No'}
+                              </td>
+                              <td>{day.remarks || '-'}</td>
+                            </>
+                          )}
+                          {details.attendance_mode === 'detailed' && (
+                            <>
+                              <td>{formatIST(day.check_in_at)}</td>
+                              <td>{formatIST(day.check_out_at)}</td>
+                              <td>{day.service_hours ?? '-'}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!details.daily_attendance?.length && (
+                    <p>No service dates found.</p>
+                  )}
+                </div>
+              ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table>
                   <thead>
@@ -523,7 +670,7 @@ function CompletionManager({
                   </tbody>
                 </table>
               </div>
-
+              )}
               <button
                 type="button"
                 onClick={() => setDetails(null)}
@@ -594,7 +741,7 @@ function CompletionManager({
                   <tr>
                     <th>Select</th>
                     <th>Volunteer</th>
-                    <th>Assignments</th>
+                    <th>Service Progress</th>
                     <th>Attendance</th>
                     <th>Service</th>
                     <th>Status</th>
@@ -635,31 +782,15 @@ function CompletionManager({
                       </td>
 
                       <td>
-                        {item.completed_assignments}
-                        {' / '}
-                        {item.total_assignments}
-                        <div>
-                          Remaining: {item.remaining_assignments}
-                        </div>
+                        <ServiceProgress item={item} />
                       </td>
 
                       <td>
-                        <strong>
-                          {item.attendance_percentage}%
-                        </strong>
-                        <div>Present: {item.present_count}</div>
-                        <div>Absent: {item.absent_count}</div>
-                        <div>Excused: {item.excused_count}</div>
-                        <small>
-                          Unfinalized: {item.unfinalized_count}
-                        </small>
+                        <AttendanceInformation item={item} />
                       </td>
 
                       <td>
-                        {item.total_service_days} days
-                        <div>
-                          {item.total_service_hours} hours
-                        </div>
+                        <ServiceInformation item={item} />
                       </td>
 
                       <td>

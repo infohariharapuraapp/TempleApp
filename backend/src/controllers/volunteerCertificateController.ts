@@ -1,3 +1,6 @@
+import {
+  getDailyServiceSummary,
+} from '../services/volunteerDailyServiceSummary';
 import { Request, Response } from 'express';
 import { PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
@@ -254,6 +257,7 @@ async function getServiceSnapshot(
         m.full_name,
         m.status,
         o.title AS programme_name,
+        o.attendance_mode,
         r.status AS registration_status
 
       FROM volunteer_members m
@@ -307,6 +311,56 @@ async function getServiceSnapshot(
     );
   }
 
+  if (member.attendance_mode !== 'legacy') {
+    const summary = await getDailyServiceSummary(
+      opportunityId,
+      memberId,
+      client
+    );
+    if (!summary) {
+      fail(404, 'Volunteer service summary not found');
+    }
+    if (
+      !['simple', 'detailed', 'none']
+        .includes(summary.attendance_mode)
+    ) {
+      fail(409, 'Invalid attendance mode');
+    }
+    if (
+      summary.total_selected_dates === 0 ||
+      summary.remaining_dates > 0
+    ) {
+      fail(409, 'Volunteer service is not fully completed');
+    }
+    if (summary.attendance_mode !== 'none') {
+      if (
+        summary.unfinalized_count > 0 ||
+        summary.finalized_dates !==
+          summary.total_selected_dates ||
+        summary.present_count === 0 ||
+        !summary.service_start_date ||
+        !summary.service_end_date
+      ) {
+        fail(
+          409,
+          'Daily attendance is not fully verified'
+        );
+      }
+    }
+    return {
+      ...member,
+      attendance_mode:
+        summary.attendance_mode,
+      service_start_date:
+        summary.service_start_date,
+      service_end_date:
+        summary.service_end_date,
+      total_service_days:
+        summary.total_service_days,
+      total_service_hours:
+        summary.total_service_hours,
+    };
+  }
   const serviceResult =
     await client.query(
       `
@@ -779,12 +833,14 @@ export const createVolunteerCertificates =
                   total_service_hours,
                   signatory_name,
                   signatory_designation,
+                  attendance_mode,
                   status
                 )
 
                 VALUES (
                   $1,$2,$3,$4,$5,$6,$7,
                   $8,$9,$10,$11,$12,$13,
+                  $14,
                   'draft'
                 )
 
@@ -810,6 +866,7 @@ export const createVolunteerCertificates =
 
                   signatoryName,
                   signatoryDesignation,
+                  snapshot.attendance_mode,
                 ]
               );
 
@@ -1115,6 +1172,15 @@ export const issueVolunteerCertificates =
                 certificate.member_id
               );
 
+            if (
+              certificate.attendance_mode !==
+              snapshot.attendance_mode
+            ) {
+              fail(
+                409,
+                'Certificate attendance mode does not match the programme'
+              );
+            }
             const downloadPath =
               `/api/volunteer/certificates/${certificateId}/download`;
 
@@ -1428,6 +1494,7 @@ export const getMyVolunteerCertificates =
 
           c.total_service_days,
           c.total_service_hours,
+          c.attendance_mode,
 
           c.certificate_url,
           c.signatory_name,

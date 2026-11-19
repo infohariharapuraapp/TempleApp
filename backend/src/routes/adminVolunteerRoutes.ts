@@ -1,3 +1,13 @@
+import {
+  getDailyAttendance,
+  saveDailyAttendance,
+  finalizeDailyAttendance,
+  reopenDailyAttendance,
+} from '../controllers/volunteerDailyAttendanceController';import {
+  getDailyReporting,
+  sendDailyReporting,
+  updateDailyReporting,
+} from '../controllers/volunteerReportingController';
 import { Router } from 'express';
 
 import {
@@ -464,4 +474,43 @@ router.patch(
   revokeVolunteerCertificate
 );
 
+// ========================================
+// DAILY REPORTING MANAGEMENT
+// ========================================
+router.get(
+  '/opportunities/:opportunityId/reporting',
+  getDailyReporting
+);
+router.post(
+  '/opportunities/:opportunityId/reporting',
+  sendDailyReporting
+);
+router.patch(
+  '/reporting/:reportingId',
+  updateDailyReporting
+);
+
+// ========================================
+// DAILY ATTENDANCE
+// ========================================
+
+router.get(
+  '/opportunities/:opportunityId/daily-attendance',
+  getDailyAttendance
+);
+
+router.post(
+  '/opportunities/:opportunityId/daily-attendance',
+  saveDailyAttendance
+);
+
+router.post(
+  '/opportunities/:opportunityId/daily-attendance/finalize',
+  finalizeDailyAttendance
+);
+
+router.patch(
+  '/opportunities/:opportunityId/daily-attendance/:serviceDateId/reopen',
+  reopenDailyAttendance
+);
 export default router;

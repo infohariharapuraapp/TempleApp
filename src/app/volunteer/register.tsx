@@ -23,17 +23,18 @@ import { useTranslation } from 'react-i18next';
 
 import {
   getVolunteerOpportunity,
+  getVolunteerServiceDates,
   getVolunteerShifts,
+  formatVolunteerTime,
   submitVolunteerRegistration,
   getMyVolunteerRegistrations,
   getVolunteerError,
   formatVolunteerDate,
-  formatVolunteerTime,
 } from '@/services/volunteerApi';
 
 import type {
-  VolunteerOpportunity,
   VolunteerShift,
+  VolunteerOpportunity,
   VolunteerMemberInput,
   VolunteerRegistrationInput,
 } from '@/services/volunteerApi';
@@ -59,7 +60,7 @@ type RegistrationType = 'individual' | 'group';
 
 type TextField = Exclude<
   keyof VolunteerMemberInput,
-  'gender' | 'is_team_leader' | 'shift_ids'
+  'gender' | 'is_team_leader' | 'shift_ids' | 'service_dates'
 >;
 
 let submissionRunning = false;
@@ -84,8 +85,21 @@ export default function VolunteerRegisterScreen() {
   const [opportunity, setOpportunity] =
     useState<VolunteerOpportunity | null>(null);
 
+  const [serviceDates, setServiceDates] =
+    useState<string[]>([]);
   const [shifts, setShifts] =
     useState<VolunteerShift[]>([]);
+  const isLegacy =
+    (opportunity?.attendance_mode ?? 'legacy') === 'legacy';
+  const availableShifts = shifts.filter(shift => {
+    const start = Date.parse(
+      shift.service_date.slice(0, 10) +
+      'T' +
+      shift.start_time.slice(0, 8) +
+      '+05:30'
+    );
+    return Number.isFinite(start) && start > Date.now();
+  });
 
   const [type, setType] =
     useState<RegistrationType>('individual');
@@ -144,12 +158,19 @@ export default function VolunteerRegisterScreen() {
         throw new ApiError('Invalid opportunity.');
       }
 
-      const [item, available, history] =
+      const [item, history] =
         await Promise.all([
           getVolunteerOpportunity(id),
-          getVolunteerShifts(id),
           getMyVolunteerRegistrations(),
         ]);
+      const legacy =
+        (item.attendance_mode ?? 'legacy') === 'legacy';
+      const available = legacy
+        ? null
+        : await getVolunteerServiceDates(id);
+      const loadedShifts = legacy
+        ? await getVolunteerShifts(id)
+        : [];
 
       if (
         !mounted.current ||
@@ -159,7 +180,12 @@ export default function VolunteerRegisterScreen() {
       }
 
       setOpportunity(item);
-      setShifts(available);
+      setServiceDates(
+        available?.registration_open
+          ? available.service_dates
+          : []
+      );
+      setShifts(loadedShifts);
 
       const existing = history.find(
         record =>
@@ -289,7 +315,8 @@ export default function VolunteerRegisterScreen() {
 
     const validation = validateVolunteerMember(
       member,
-      shifts
+      availableShifts,
+      isLegacy ? undefined : serviceDates
     );
 
     if (validation) {
@@ -369,17 +396,23 @@ export default function VolunteerRegisterScreen() {
   }
 
   function toggleShift(shiftId: number) {
-    const selected = member.shift_ids.includes(shiftId);
-
+    const selected = member.shift_ids;
     updateMember({
-      shift_ids: selected
-        ? member.shift_ids.filter(
-            value => value !== shiftId
-          )
-        : [...member.shift_ids, shiftId],
+      service_dates: undefined,
+      shift_ids: selected.includes(shiftId)
+        ? selected.filter(value => value !== shiftId)
+        : [...selected, shiftId],
     });
   }
-
+  function toggleServiceDate(date: string) {
+    const selected = member.service_dates ?? [];
+    updateMember({
+      shift_ids: [],
+      service_dates: selected.includes(date)
+        ? selected.filter(value => value !== date)
+        : [...selected, date].sort(),
+    });
+  }
   async function checkRegistration() {
     if (submissionRunning) return;
 
@@ -456,7 +489,8 @@ export default function VolunteerRegisterScreen() {
       validateVolunteerRegistration(
         payload,
         opportunity,
-        shifts
+        availableShifts,
+        isLegacy ? undefined : serviceDates
       );
 
     if (validation) {
@@ -584,13 +618,20 @@ export default function VolunteerRegisterScreen() {
     opportunity?.registration_status === 'open' &&
     Date.parse(opportunity.registration_end_at) > Date.now();
 
-  const availableShifts = shifts.filter(shift => {
-    const time = Date.parse(
-      `${shift.service_date.slice(0, 10)}T${shift.start_time.slice(0, 8)}+05:30`
-    );
-
-    return Number.isFinite(time) && time > Date.now();
-  });
+  const todayIST = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const today = ['year', 'month', 'day']
+    .map(type =>
+      todayIST.find(part => part.type === type)?.value
+    )
+    .join('-');
+  const availableDates = serviceDates
+    .filter(date => date >= today)
+    .sort();
 
   return (
     <VolunteerScreen
@@ -869,58 +910,219 @@ export default function VolunteerRegisterScreen() {
               {t("volunteer.availability")} *
             </Text>
 
+            {isLegacy ? (
+              <>
+                <Text style={styles.description}>
+                  {t(
+                    'volunteer.chooseShifts',
+                    'Select your available service shifts.'
+                  )}
+                </Text>
+                {availableShifts.length === 0 && (
+                  <Text style={styles.error}>
+                    {t(
+                      'volunteer.noShifts',
+                      'No service shifts are currently available.'
+                    )}
+                  </Text>
+                )}
+                {availableShifts.map(shift => {
+                  const selected =
+                    member.shift_ids.includes(shift.id);
+                  return (
+                    <TouchableOpacity
+                      key={shift.id}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{
+                        checked: selected,
+                        disabled: submitting || uncertain,
+                      }}
+                      disabled={submitting || uncertain}
+                      onPress={() => toggleShift(shift.id)}
+                      style={{
+                        padding: 14,
+                        marginTop: 10,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: selected
+                          ? C.maroon
+                          : C.border,
+                        backgroundColor: selected
+                          ? C.lightGold
+                          : C.white,
+                      }}
+                    >
+                      <Text style={{
+                        color: C.maroon,
+                        fontWeight: '700',
+                        fontSize: 15,
+                      }}>
+                        {selected ? '✓ ' : ''}
+                        {shift.shift_name}
+                      </Text>
+                      <Text style={styles.description}>
+                        {formatVolunteerDate(
+                          shift.service_date
+                        )}
+                      </Text>
+                      <Text style={styles.description}>
+                        {formatVolunteerTime(
+                          shift.start_time
+                        )}
+                        {' - '}
+                        {formatVolunteerTime(
+                          shift.end_time
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <Text style={{
+                  marginTop: 12,
+                  fontWeight: '700',
+                  color: C.maroon,
+                }}>
+                  {t(
+                    'volunteer.selectedShifts',
+                    'Selected shifts'
+                  )}
+                  {': '}
+                  {member.shift_ids.length}
+                </Text>
+              </>
+            ) : (
+              <>
             <Text style={styles.description}>
-              {t('volunteer.selectAvailableShifts')}
+              {t(
+                'volunteer.chooseServiceDates',
+                'Choose the dates on which you are available to perform Seva.'
+              )}
             </Text>
-
-            {availableShifts.length === 0 && (
+            {availableDates.length === 0 ? (
               <Text style={styles.error}>
-                {t('volunteer.noFutureShifts')}
+                {t(
+                  'volunteer.noServiceDates',
+                  'No service dates are currently available.'
+                )}
               </Text>
+            ) : (
+              <>
+                <View style={{
+                  flexDirection: 'row',
+                  gap: 8,
+                  marginVertical: 12,
+                }}>
+                  <View style={{ flex: 1 }}>
+                    <VolunteerButton
+                      title={t(
+                        'volunteer.selectAllDates',
+                        'Select All'
+                      )}
+                      secondary
+                      disabled={submitting || uncertain}
+                      onPress={() =>
+                        updateMember({
+                          shift_ids: [],
+                          service_dates: [...availableDates],
+                        })
+                      }
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <VolunteerButton
+                      title={t(
+                        'volunteer.clearDates',
+                        'Clear All'
+                      )}
+                      secondary
+                      disabled={submitting || uncertain}
+                      onPress={() =>
+                        updateMember({
+                          shift_ids: [],
+                          service_dates: [],
+                        })
+                      }
+                    />
+                  </View>
+                </View>
+                <View style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}>
+                  {availableDates.map(date => {
+                    const selected =
+                      (member.service_dates ?? [])
+                        .includes(date);
+                    return (
+                      <TouchableOpacity
+                        key={date}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{
+                          checked: selected,
+                          disabled: submitting || uncertain,
+                        }}
+                        disabled={submitting || uncertain}
+                        onPress={() =>
+                          toggleServiceDate(date)
+                        }
+                        style={{
+                          width: '47%',
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: selected
+                            ? C.maroon
+                            : C.border,
+                          backgroundColor: selected
+                            ? C.maroon
+                            : C.white,
+                        }}
+                      >
+                        <Text style={{
+                          color: selected
+                            ? C.white
+                            : C.maroon,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                        }}>
+                          {selected ? '✓ ' : ''}
+                          {formatVolunteerDate(date)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
             )}
-
-            {availableShifts.map(shift => {
-              const selected =
-                member.shift_ids.includes(shift.id);
-
-              return (
-                <TouchableOpacity
-                  key={shift.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{
-                    checked: selected,
-                    disabled: submitting || uncertain,
-                  }}
-                  disabled={submitting || uncertain}
-                  style={[
-                    styles.shift,
-                    selected && styles.selectedShift,
-                  ]}
-                  onPress={() => toggleShift(shift.id)}
-                >
-                  <Text style={styles.shiftTitle}>
-                    {selected ? '☑' : '☐'}
-                    {'  '}
-                    {shift.shift_name}
-                  </Text>
-
-                  <Text style={styles.description}>
-                    {formatVolunteerDate(shift.service_date)}
-                  </Text>
-
-                  <Text style={styles.description}>
-                    {formatVolunteerTime(shift.start_time)}
-                    {' – '}
-                    {formatVolunteerTime(shift.end_time)}
-                    {' IST'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            <Text style={styles.label}>
-              Selected shifts: {member.shift_ids.length}
+            <View style={{
+              backgroundColor: C.lightGold,
+              padding: 12,
+              borderRadius: 12,
+              marginTop: 14,
+            }}>
+              <Text style={styles.label}>
+                {t(
+                  'volunteer.selectedServiceDates',
+                  'Selected Service Dates'
+                )}
+                {': '}
+                {(member.service_dates ?? []).length}
+              </Text>
+              <Text style={styles.description}>
+                {(member.service_dates ?? [])
+                  .map(date => formatVolunteerDate(date))
+                  .join(', ')}
+              </Text>
+            </View>
+            <Text style={styles.description}>
+              {t(
+                'volunteer.reportingAfterApproval',
+                'Reporting time and coordinator details will be communicated after approval.'
+              )}
             </Text>
+              </>
+            )}
           </View>
 
           {type === 'group' && (
@@ -1023,7 +1225,9 @@ export default function VolunteerRegisterScreen() {
                 disabled={
                   submitting ||
                   !registrationOpen ||
-                  availableShifts.length === 0 ||
+                  (isLegacy
+                    ? availableShifts.length === 0
+                    : availableDates.length === 0) ||
                   !consent
                 }
                 onPress={() => void submit()}

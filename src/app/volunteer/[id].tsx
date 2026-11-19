@@ -22,16 +22,14 @@ import { useTranslation } from 'react-i18next';
 
 import {
   getVolunteerOpportunity,
-  getVolunteerShifts,
+  getVolunteerServiceDates,
   getVolunteerError,
   formatVolunteerDate,
   formatVolunteerDateTime,
-  formatVolunteerTime,
 } from '@/services/volunteerApi';
 
 import type {
   VolunteerOpportunity,
-  VolunteerShift,
 } from '@/services/volunteerApi';
 
 import {
@@ -67,8 +65,8 @@ export default function VolunteerDetailsScreen() {
       null
     );
 
-  const [shifts, setShifts] =
-    useState<VolunteerShift[]>([]);
+  const [serviceDates, setServiceDates] =
+    useState<string[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -108,7 +106,7 @@ export default function VolunteerDetailsScreen() {
         const [opportunity, availableShifts] =
           await Promise.all([
             getVolunteerOpportunity(id),
-            getVolunteerShifts(id),
+            getVolunteerServiceDates(id),
           ]);
 
         if (
@@ -118,7 +116,7 @@ export default function VolunteerDetailsScreen() {
         }
 
         setItem(opportunity);
-        setShifts(availableShifts);
+        setServiceDates(availableShifts.registration_open ? availableShifts.service_dates : []);
       } catch (error) {
         if (
           version !== requestVersion.current
@@ -127,7 +125,7 @@ export default function VolunteerDetailsScreen() {
         }
 
         setItem(null);
-        setShifts([]);
+        setServiceDates([]);
         setError(getVolunteerError(error));
       } finally {
         if (
@@ -338,54 +336,56 @@ export default function VolunteerDetailsScreen() {
             )}
           </View>
 
-          {/* AVAILABLE SHIFTS */}
-
+          {/* AVAILABLE SERVICE DATES */}
           <View style={styles.panel}>
             <Text style={styles.sectionTitle}>
               {t(
-                'volunteer.serviceShifts',
-                'Available Service Shifts'
+                'volunteer.availableServiceDates',
+                'Available Service Dates'
               )}
             </Text>
-
-            {shifts.length === 0 ? (
+            {serviceDates.length === 0 ? (
               <Text style={styles.description}>
                 {t(
-                  'volunteer.noShifts',
-                  'No service shifts are currently available for registration.'
+                  'volunteer.noServiceDates',
+                  'No service dates are currently available for registration.'
                 )}
               </Text>
             ) : (
-              shifts.map(shift => (
-                <View
-                  key={shift.id}
-                  style={styles.shiftCard}
-                >
-                  <Text style={styles.shiftName}>
-                    {shift.shift_name}
-                  </Text>
-
-                  <Text style={styles.shiftDate}>
-                    {formatVolunteerDate(
-                      shift.service_date
-                    )}
-                  </Text>
-
-                  <Text style={styles.shiftTime}>
-                    {formatVolunteerTime(
-                      shift.start_time
-                    )}
-                    {' – '}
-                    {formatVolunteerTime(
-                      shift.end_time
-                    )}
-                    {' IST'}
-                  </Text>
-                </View>
-              ))
+              <View style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginTop: 12,
+              }}>
+                {serviceDates.map(date => (
+                  <View
+                    key={date}
+                    style={{
+                      backgroundColor: C.lightGold,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: C.border,
+                      padding: 12,
+                    }}
+                  >
+                    <Text style={{
+                      color: C.maroon,
+                      fontWeight: '700',
+                    }}>
+                      {formatVolunteerDate(date)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             )}
+            <Text style={styles.description}>
+              {t(
+                'volunteer.reportingAfterApproval',
+                'Reporting time and coordinator details will be communicated after approval.'
+              )}
+            </Text>
           </View>
-
           {/* INSTRUCTIONS */}
 
           {!!item.instructions && (
@@ -419,14 +419,14 @@ export default function VolunteerDetailsScreen() {
                     'volunteer.registrationUnavailable',
                     'Registration is not currently open.'
                   )
-                : shifts.length === 0
+                : serviceDates.length === 0
                   ? t(
-                      'volunteer.noShiftRegistration',
-                      'Registration requires at least one available service shift.'
+                      'volunteer.noDateRegistration',
+                      'Registration requires at least one available service date.'
                     )
                   : t(
-                      'volunteer.registrationReady',
-                      'Complete your volunteer details and select your available service shifts.'
+                      'volunteer.dateRegistrationReady',
+                      'Complete your volunteer details and select your available service dates.'
                     )}
             </Text>
 
@@ -438,7 +438,7 @@ export default function VolunteerDetailsScreen() {
               disabled={
                 refreshing ||
                 !registrationOpen ||
-                shifts.length === 0
+                serviceDates.length === 0
               }
               onPress={() => {
                 router.push({

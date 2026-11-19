@@ -569,7 +569,20 @@ u.phone AS registered_by_phone,
             WHERE a.member_id = m.id
           ),
           '[]'::jsonb
-        ) AS availability
+        ) AS availability,
+        COALESCE(
+          (
+            SELECT jsonb_agg(
+              sd.service_date::text
+              ORDER BY sd.service_date
+            )
+            FROM volunteer_service_dates sd
+            WHERE sd.member_id = m.id
+              AND sd.opportunity_id =
+                m.opportunity_id
+          ),
+          '[]'::jsonb
+        ) AS service_dates
 
       FROM volunteer_members m
 
