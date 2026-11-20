@@ -1,4 +1,16 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
+import {
+  captureAttendanceDrafts,
+  reconcileAttendanceDrafts,
+  type AttendanceDraftSnapshot,
+  type AttendanceDraftConflict,
+} from '../../lib/volunteerAttendanceDrafts';
+import {
+  useVolunteerUnsavedChanges,
+} from '../../lib/volunteerUnsavedChangesGuard';
 
 import {
   volunteerRequest,
@@ -12,6 +24,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 type AttendanceStatus =
@@ -46,11 +59,43 @@ interface Draft {
   remarks: string;
 }
 
+function matchesAttendanceValues(
+  record: AttendanceRecord,
+  draft: Draft
+): boolean {
+  return (
+    record.attendance_status === draft.attendance_status &&
+    (record.remarks || '') === draft.remarks.trim()
+  );
+}
+function attendanceBaseline(
+  record: AttendanceRecord
+): string {
+  return JSON.stringify([
+    record.assignment_id,
+    record.member_id,
+    record.shift_id,
+    record.service_date,
+    record.start_time,
+    record.end_time,
+    record.assignment_status,
+    record.attendance_status,
+    record.remarks || '',
+    record.is_finalized,
+    record.marked_at,
+    record.finalized_at,
+  ]);
+}
 export default function Attendance({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const opportunity = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId = opportunity
+    ? selectedProgrammeId
+    : '';
 
   const [records, setRecords] =
     useState<AttendanceRecord[]>([]);
@@ -72,13 +117,24 @@ export default function Attendance({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [draftConflicts, setDraftConflicts] =
+    useState<AttendanceDraftConflict<Draft>[]>([]);
+  const pendingRefreshDrafts =
+    useRef<AttendanceDraftSnapshot<Draft>[] | null>(null);
+  const [refreshRequired, setRefreshRequired] =
+    useState(false);
+  const uncertainOutcome = useRef(false);
+  const [mutationUncertain, setMutationUncertain] =
+    useState(false);
   const mutationLock = useRef(false);
   const loadVersion = useRef(0);
 
   const base =
     `/opportunities/${opportunityId}/attendance`;
 
-  async function load() {
+  async function load(
+    snapshots: AttendanceDraftSnapshot<Draft>[] = []
+  ) {
     const version = ++loadVersion.current;
 
     setLoading(true);
@@ -106,20 +162,59 @@ export default function Attendance({
 
       setRecords(response.data);
 
-      const initial: Record<number, Draft> = {};
-
-      response.data.forEach(item => {
-        initial[item.assignment_id] = {
+      const result = reconcileAttendanceDrafts(
+        response.data,
+        snapshots,
+        item => item.assignment_id,
+        item => ({
           attendance_status: item.attendance_status,
           remarks: item.remarks || '',
-        };
+        }),
+        attendanceBaseline,
+        canEdit,
+        uncertainOutcome.current
+          ? matchesAttendanceValues
+          : undefined
+      );
+      if (uncertainOutcome.current) {
+        setSuccess(
+          'Server records refreshed. ' +
+          `${result.matchedCount} draft(s) match server values. ` +
+          `${result.restoredCount} unsaved draft(s) restored. ` +
+          `${result.conflicts.length} new conflict(s) require review.`
+        );
+      }
+      setDrafts(result.drafts);
+      setDraftConflicts(previous => {
+        const combined = new Map(
+          previous.map(conflict => [
+            conflict.id,
+            conflict,
+          ])
+        );
+        for (const conflict of result.conflicts) {
+          combined.set(conflict.id, conflict);
+        }
+        return Array.from(combined.values());
       });
-
-      setDrafts(initial);
+      pendingRefreshDrafts.current = null;
+      uncertainOutcome.current = false;
+      setMutationUncertain(false);
+      setRefreshRequired(false);
       setReady(true);
     } catch (error) {
       if (version === loadVersion.current) {
-        setError(getErrorMessage(error));
+        setError(
+          pendingRefreshDrafts.current !== null
+            ? (
+                uncertainOutcome.current
+                  ? 'The previous operation remains unconfirmed. Refresh again before making changes. '
+                  : 'Attendance was saved, but refreshing the server records failed. Refresh again to recover the remaining drafts. '
+              ) +
+              getErrorMessage(error)
+            : getErrorMessage(error)
+        );
+        setReady(false);
       }
     } finally {
       if (version === loadVersion.current) {
@@ -129,6 +224,11 @@ export default function Attendance({
   }
 
   useEffect(() => {
+    pendingRefreshDrafts.current = null;
+    uncertainOutcome.current = false;
+    setMutationUncertain(false);
+    setRefreshRequired(false);
+    setDraftConflicts([]);
     setRecords([]);
     setDrafts({});
     setSelected([]);
@@ -159,6 +259,9 @@ export default function Attendance({
 
   function canEdit(record: AttendanceRecord) {
     return (
+      !draftConflicts.some(
+        conflict => conflict.id === record.assignment_id
+      ) &&
       !record.is_finalized &&
       record.assignment_status !== 'completed' &&
       hasStarted(record)
@@ -177,6 +280,12 @@ export default function Attendance({
   }
 
   const dirtyCount = records.filter(isDirty).length;
+  useVolunteerUnsavedChanges(
+    'Duty and shift attendance',
+    dirtyCount > 0 ||
+      draftConflicts.length > 0 ||
+      refreshRequired
+  );
 
   function canFinalize(record: AttendanceRecord) {
     return (
@@ -242,25 +351,51 @@ export default function Attendance({
     );
   });
 
-  const selectedRecords = records.filter(record =>
-    selected.includes(record.assignment_id)
+  const selectedRecords = filteredRecords.filter(record =>
+    selected.includes(record.assignment_id) &&
+    canEdit(record)
   );
+  const visibleSelectedIds = selectedRecords.map(
+    record => record.assignment_id
+  );
+  const selectionKey = visibleSelectedIds.join(',');
+  useEffect(() => {
+    setSelected(previous => {
+      const next = previous.filter(id =>
+        visibleSelectedIds.includes(id)
+      );
+      return next.length === previous.length
+        ? previous
+        : next;
+    });
+  }, [selectionKey]);
 
   async function mutate(
     endpoint: string,
     method: string,
     body: unknown,
-    fallbackMessage: string
+    fallbackMessage: string,
+    snapshots: AttendanceDraftSnapshot<Draft>[] = []
   ) {
     if (
       mutationLock.current ||
       busy ||
       loading ||
-      !ready
+      !ready ||
+      refreshRequired
     ) {
       return;
     }
 
+    const allSnapshots = captureAttendanceDrafts(
+      records,
+      drafts,
+      new Set<number>(),
+      item => item.assignment_id,
+      isDirty,
+      attendanceBaseline
+    );
+    const releaseOperation = beginVolunteerOperation('Shift attendance');
     mutationLock.current = true;
     setBusy(true);
     setSuccess('');
@@ -276,14 +411,26 @@ export default function Attendance({
         response.message || fallbackMessage
       );
 
-      await load();
+      uncertainOutcome.current = false;
+      setMutationUncertain(false);
+      pendingRefreshDrafts.current = snapshots;
+      setRefreshRequired(true);
+      await load(snapshots);
     } catch (error) {
-      setError(getErrorMessage(error));
-
+      pendingRefreshDrafts.current = allSnapshots;
+      uncertainOutcome.current = true;
+      setMutationUncertain(true);
+      setRefreshRequired(true);
       setReady(false);
       setSelected([]);
+      setError(
+        'The attendance operation could not be confirmed. ' +
+        'Refresh server records before retrying. ' +
+        getErrorMessage(error)
+      );
     } finally {
       mutationLock.current = false;
+      releaseOperation();
       setBusy(false);
     }
   }
@@ -304,19 +451,14 @@ export default function Attendance({
       items.map(item => item.assignment_id)
     );
 
-    const otherUnsaved = records.some(item =>
-      isDirty(item) &&
-      !ids.has(item.assignment_id)
+    const snapshots = captureAttendanceDrafts(
+      records,
+      drafts,
+      ids,
+      item => item.assignment_id,
+      isDirty,
+      attendanceBaseline
     );
-
-    if (
-      otherUnsaved &&
-      !window.confirm(
-        'Other unsaved attendance changes will be discarded after saving. Continue?'
-      )
-    ) {
-      return;
-    }
 
     await mutate(
       base,
@@ -330,7 +472,8 @@ export default function Attendance({
             drafts[item.assignment_id].remarks.trim() || null,
         })),
       },
-      'Attendance saved successfully'
+      'Attendance saved successfully',
+      snapshots
     );
   }
 
@@ -348,7 +491,7 @@ export default function Attendance({
       return;
     }
 
-    if (dirtyCount) {
+    if (dirtyCount || draftConflicts.length) {
       setError('Save or discard unsaved changes first.');
       return;
     }
@@ -374,7 +517,7 @@ export default function Attendance({
   async function reopenAttendance(
     item: AttendanceRecord
   ) {
-    if (dirtyCount) {
+    if (dirtyCount || draftConflicts.length) {
       setError('Save or discard unsaved changes first.');
       return;
     }
@@ -402,6 +545,13 @@ export default function Attendance({
 
   function applyBulkStatus(status: AttendanceStatus) {
     if (
+      mutationLock.current ||
+      busy ||
+      loading ||
+      !ready ||
+      refreshRequired
+    ) return;
+    if (
       !selectedRecords.length ||
       !selectedRecords.every(canEdit)
     ) {
@@ -422,14 +572,26 @@ export default function Attendance({
     });
   }
 
-  function confirmDiscard() {
-    return (
-      dirtyCount === 0 ||
-      window.confirm('Discard unsaved attendance changes?')
+  async function refreshAttendance() {
+    if (
+      mutationLock.current ||
+      busy ||
+      loading ||
+      !opportunityId
+    ) return;
+    const snapshots = pendingRefreshDrafts.current ?? captureAttendanceDrafts(
+      records,
+      drafts,
+      new Set<number>(),
+      item => item.assignment_id,
+      isDirty,
+      attendanceBaseline
     );
+    setSuccess('');
+    await load(snapshots);
   }
 
-  const disabled = loading || busy || !ready;
+  const disabled = loading || busy || !ready || refreshRequired;
 
   const stats = [
     ['Total Assignments', records.length],
@@ -460,41 +622,160 @@ export default function Attendance({
           completed service shifts.
         </p>
 
-        <label>
-          Seva Opportunity
-
-          <select
-            value={opportunityId}
-            disabled={loading || busy}
-            onChange={event => {
-              if (confirmDiscard()) {
-                setOpportunityId(event.target.value);
-              }
-            }}
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <p style={{
+          color: '#6B1720',
+          fontWeight: 700,
+        }}>
+          {opportunity?.title ||
+            'No programme selected'}
+        </p>
 
         <button
           type="button"
           disabled={!opportunityId || busy || loading}
-          onClick={() => {
-            if (confirmDiscard()) void load();
-          }}
+          onClick={() => void refreshAttendance()}
         >
           {loading ? 'Loading...' : 'Refresh Attendance'}
         </button>
       </div>
 
+      {refreshRequired && !loading && (
+        <div
+          className="panel"
+          role="alert"
+          style={{
+            background: '#FFF8E8',
+            border: '1px solid #E5C98C',
+            color: '#795318',
+            marginBottom: 16,
+          }}
+        >
+          <strong>
+            {mutationUncertain
+              ? 'Attendance outcome unconfirmed'
+              : 'Attendance saved — refresh required'}
+          </strong>
+          <p>
+            {mutationUncertain
+              ? 'The previous operation may or may not have reached the server. Refresh to inspect the latest records and recover compatible drafts.'
+              : 'The server accepted your save. Refresh attendance to verify the latest records and restore compatible remaining drafts.'}
+          </p>
+          <p>
+            Do not submit the same attendance again.
+            Editing remains disabled until refresh succeeds.
+          </p>
+          <button
+            type="button"
+            disabled={busy || loading}
+            onClick={() => void refreshAttendance()}
+          >
+            Retry Refresh
+          </button>
+        </div>
+      )}
+      {draftConflicts.length > 0 && (
+        <div
+          className="panel"
+          role="alert"
+          style={{
+            background: '#FFF8E8',
+            border: '1px solid #E5C98C',
+            color: '#795318',
+          }}
+        >
+          <h3>Attendance changes require review</h3>
+          <p>
+            Some attendance records changed or became
+            unavailable on the server. Your original
+            unsaved values have been retained below.
+          </p>
+          {draftConflicts.map(conflict => (
+            <div
+              key={conflict.id}
+              style={{
+                padding: 12,
+                marginBottom: 10,
+                border: '1px solid #E5C98C',
+                borderRadius: 8,
+              }}
+            >
+              <strong>
+                {records.find(
+                  record =>
+                    record.assignment_id === conflict.id
+                )?.full_name ||
+                  `Assignment #${conflict.id}`}
+              </strong>
+              <p>
+                Reason: {
+                  conflict.reason === 'record_missing'
+                    ? 'Record no longer available'
+                    : conflict.reason === 'record_locked'
+                      ? 'Record is locked'
+                      : 'Server record changed'
+                }
+              </p>
+              <p>
+                Unsaved attendance:
+                {' '}{conflict.draft.attendance_status}
+              </p>
+              <p style={{ whiteSpace: 'pre-wrap' }}>
+                Unsaved remarks:
+                {' '}{conflict.draft.remarks || 'None'}
+              </p>
+              <button
+                type="button"
+                disabled={busy || loading || !ready || refreshRequired}
+                onClick={() => {
+                  if (
+                    mutationLock.current ||
+                    busy ||
+                    loading ||
+                    !ready ||
+                    refreshRequired
+                  ) return;
+                  if (!window.confirm(
+                    'Discard this unsaved draft and keep the server record?'
+                  )) return;
+                  setDraftConflicts(previous =>
+                    previous.filter(
+                      item => item.id !== conflict.id
+                    )
+                  );
+                }}
+              >
+                Discard Draft / Keep Server Record
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {dirtyCount > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '12px 16px',
+            marginBottom: 16,
+            border: '1px solid #e5c98c',
+            borderRadius: 10,
+            background: '#FFF8E8',
+            color: '#795318',
+          }}
+        >
+          <strong>
+            Unsaved attendance changes
+          </strong>
+          <div style={{
+            fontSize: 13,
+            marginTop: 4,
+          }}>
+            {dirtyCount} modified record(s).
+            Refresh preserves compatible unsaved drafts.
+            Save your changes before leaving this workspace.
+          </div>
+        </div>
+      )}
       {error && (
         <div className="panel" role="alert"
           style={{ color: '#b91c1c' }}>
@@ -551,9 +832,10 @@ export default function Attendance({
               <input
                 placeholder="Search volunteers or duties"
                 value={search}
-                onChange={event =>
-                  setSearch(event.target.value)
-                }
+                onChange={event => {
+                  setSearch(event.target.value);
+                  setSelected([]);
+                }}
               />
 
               <select
@@ -590,7 +872,7 @@ export default function Attendance({
             </div>
 
             <p>
-              Selected: {selected.length}
+              Selected: {selectedRecords.length}
               {' | Unsaved changes: '}{dirtyCount}
             </p>
 
@@ -644,7 +926,7 @@ export default function Attendance({
                   <button
                     key={status}
                     type="button"
-                    disabled={!selected.length}
+                    disabled={!selectedRecords.length}
                     onClick={() => applyBulkStatus(status)}
                   >
                     Mark {status}
@@ -655,7 +937,7 @@ export default function Attendance({
                   type="button"
                   className="primary"
                   disabled={
-                    !selected.length ||
+                    !selectedRecords.length ||
                     !selectedRecords.every(canEdit)
                   }
                   onClick={() =>
@@ -668,9 +950,11 @@ export default function Attendance({
                 <button
                   type="button"
                   disabled={
-                    !selected.length ||
+                    !selectedRecords.length ||
                     !selectedRecords.every(canFinalize) ||
-                    dirtyCount > 0
+                    dirtyCount > 0 ||
+                    draftConflicts.length > 0 ||
+                    refreshRequired
                   }
                   onClick={() =>
                     void finalizeAttendance(selectedRecords)
@@ -817,7 +1101,7 @@ export default function Attendance({
                             {item.is_finalized ? (
                               <button
                                 type="button"
-                                disabled={dirtyCount > 0}
+                                disabled={dirtyCount > 0 || draftConflicts.length > 0 || refreshRequired}
                                 onClick={() =>
                                   void reopenAttendance(item)
                                 }
@@ -840,7 +1124,9 @@ export default function Attendance({
                                   type="button"
                                   disabled={
                                     !canFinalize(item) ||
-                                    dirtyCount > 0
+                                    dirtyCount > 0 ||
+                                    draftConflicts.length > 0 ||
+                                    refreshRequired
                                   }
                                   onClick={() =>
                                     void finalizeAttendance([item])

@@ -1,8 +1,26 @@
+import './VolunteerSeva.css';
+import {
+  hasVolunteerUnsavedChanges,
+  useVolunteerUnsavedChanges,
+} from '../lib/volunteerUnsavedChangesGuard';
+import {
+  pushAdminHistory,
+  replaceAdminHistory,
+} from '../lib/adminNavigationHistory';
+import {
+  beginVolunteerOperation,
+  canLeaveVolunteerWorkspace,
+  useVolunteerOperationBusy,
+} from '../lib/volunteerOperationGuard';
 import React, {
   useEffect,
   useRef,
   useState,
 } from 'react';
+import {
+  readProgrammeSelection,
+  writeProgrammeSelection,
+} from './volunteer/programmeNavigation';
 import DailyReporting from './volunteer/DailyReporting';
 import Assignments from './volunteer/Assignments';
 import AttendanceManager from './volunteer/AttendanceManager';
@@ -47,6 +65,7 @@ type AttendanceMode =
   | 'none';
 type OpportunityForm = {
   attendance_mode: AttendanceMode;
+  accommodation_enabled: boolean;
   title: string;
   description: string;
   instructions: string;
@@ -107,6 +126,7 @@ type Section =
 
 const emptyForm: OpportunityForm = {
   attendance_mode: 'simple',
+  accommodation_enabled: false,
   title: '',
   description: '',
   instructions: '',
@@ -240,9 +260,80 @@ async function volunteerRequest<T>(
 // ========================================
 
 export default function VolunteerSeva() {
-  const [section, setSection] =
-    useState<Section>('overview');
-
+  const volunteerOperationBusy = useVolunteerOperationBusy();
+  const validSections: Section[] = [
+    'overview',
+    'opportunities',
+    'registrations',
+    'reporting',
+    'duties',
+    'shifts',
+    'requirements',
+    'assignments',
+    'attendance',
+    'id-cards',
+    'accommodation',
+    'completion',
+    'certificates',
+  ];
+  function readSection(): Section {
+    const requested = new URLSearchParams(
+      window.location.search
+    ).get('section');
+    return validSections.includes(requested as Section)
+      ? requested as Section
+      : 'overview';
+  }
+  const [section, setCurrentSection] =
+    useState<Section>(readSection);
+  useEffect(() => {
+    function restoreSection() {
+      clearWorkspaceDrafts();
+      setCurrentSection(readSection());
+    }
+    window.addEventListener(
+      'popstate',
+      restoreSection
+    );
+    return () => {
+      window.removeEventListener(
+        'popstate',
+        restoreSection
+      );
+    };
+  }, []);
+  function setSection(nextSection: Section): boolean {
+    if (!validSections.includes(nextSection)) {
+      return false;
+    }
+    if (
+      nextSection === 'accommodation' &&
+      !accommodationAvailable
+    ) {
+      return false;
+    }
+    if (nextSection === section) {
+      return true;
+    }
+    if (!canLeaveVolunteerWorkspace()) {
+      return false;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', 'volunteer-seva');
+    if (nextSection === 'overview') {
+      url.searchParams.delete('section');
+    } else {
+      url.searchParams.set('section', nextSection);
+    }
+    if (url.href !== window.location.href) {
+      if (!pushAdminHistory(url.href)) {
+        return false;
+      }
+    }
+    clearWorkspaceDrafts();
+    setCurrentSection(nextSection);
+    return true;
+  }
   const [items, setItems] =
     useState<Opportunity[]>([]);
 
@@ -251,6 +342,10 @@ export default function VolunteerSeva() {
 
   const [editingId, setEditingId] =
     useState<number | null>(null);
+  const editingBaseline =
+    useRef<OpportunityForm | null>(null);
+  const extensionBaseline =
+    useRef<string | null>(null);
 
   const [loading, setLoading] =
     useState(true);
@@ -277,6 +372,126 @@ const imageUploadLock = useRef(false);
 
   const [loaded, setLoaded] =
     useState(false);
+  const [selectedProgrammeId, setSelectedProgrammeId] =
+    useState('');
+  useEffect(() => {
+    if (!loaded) return;
+    function restoreProgramme() {
+      setSelectedProgrammeId(
+        readProgrammeSelection(items)
+      );
+    }
+    restoreProgramme();
+    window.addEventListener(
+      'popstate',
+      restoreProgramme
+    );
+    return () => {
+      window.removeEventListener(
+        'popstate',
+        restoreProgramme
+      );
+    };
+  }, [items, loaded]);
+  function selectProgramme(value: string) {
+    if (busy || loading || requiresRefresh) return;
+    if (value === selectedProgrammeId) return;
+    if (
+      value &&
+      !items.some(item => String(item.id) === value)
+    ) {
+      return;
+    }
+    const hadUnsavedChanges =
+      hasVolunteerUnsavedChanges();
+    if (!canLeaveVolunteerWorkspace()) return;
+    const operationalSections: Section[] = [
+      'registrations',
+      'attendance',
+      'reporting',
+      'shifts',
+      'requirements',
+      'assignments',
+      'id-cards',
+      'accommodation',
+      'completion',
+      'certificates',
+    ];
+    if (
+      operationalSections.includes(section) &&
+      !hadUnsavedChanges
+    ) {
+      if (selectedProgrammeId && !window.confirm(
+        'Changing programme resets this workspace. Make sure all operations are finished and changes are saved. Continue?'
+      )) {
+        return;
+      }
+    }
+    writeProgrammeSelection(value);
+    if (readProgrammeSelection(items) !== value) {
+      return;
+    }
+    clearWorkspaceDrafts();
+    setSelectedProgrammeId(value);
+  }
+  const selectedProgramme = items.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const accommodationAvailable =
+    loaded &&
+    selectedProgramme?.accommodation_enabled === true;
+  // Wait for programme restoration before
+  // correcting an unavailable accommodation route.
+  useEffect(() => {
+    if (
+      !loaded ||
+      loading ||
+      volunteerOperationBusy ||
+      section !== 'accommodation'
+    ) {
+      return;
+    }
+    const restoredProgrammeId =
+      readProgrammeSelection(items);
+    // The URL selection may have changed before
+    // React finishes restoring programme state.
+    if (
+      restoredProgrammeId !== selectedProgrammeId
+    ) {
+      return;
+    }
+    if (accommodationAvailable) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (
+      url.searchParams.get('page') !==
+      'volunteer-seva'
+    ) {
+      return;
+    }
+    if (
+      url.searchParams.get('section') !==
+      'accommodation'
+    ) {
+      return;
+    }
+    url.searchParams.delete('section');
+    // Replace invalid routes instead of creating
+    // another browser history entry.
+    if (!replaceAdminHistory(url.href)) {
+      return;
+    }
+    setCurrentSection('overview');
+  }, [
+    loaded,
+    loading,
+    volunteerOperationBusy,
+    section,
+    accommodationAvailable,
+    selectedProgrammeId,
+    items,
+  ]);
 
   const [requiresRefresh, setRequiresRefresh] =
     useState(false);
@@ -288,6 +503,44 @@ const imageUploadLock = useRef(false);
       deadline: string;
     } | null>(null);
 
+  const programmeDirty =
+    editing !== null &&
+    editingBaseline.current !== null &&
+    JSON.stringify(editing) !==
+      JSON.stringify(editingBaseline.current);
+  const deadlineDirty =
+    extension !== null &&
+    extensionBaseline.current !== null &&
+    extension.deadline !== extensionBaseline.current;
+  useVolunteerUnsavedChanges(
+    'Seva opportunity form',
+    programmeDirty
+  );
+  useVolunteerUnsavedChanges(
+    'Registration deadline form',
+    deadlineDirty
+  );
+  function clearProgrammeDraft() {
+    editingBaseline.current = null;
+    setEditing(null);
+    setEditingId(null);
+  }
+  function clearDeadlineDraft() {
+    extensionBaseline.current = null;
+    setExtension(null);
+  }
+  function clearWorkspaceDrafts() {
+    clearProgrammeDraft();
+    clearDeadlineDraft();
+  }
+  function cancelProgrammeDraft() {
+    if (!canLeaveVolunteerWorkspace()) return;
+    clearProgrammeDraft();
+  }
+  function cancelDeadlineDraft() {
+    if (!canLeaveVolunteerWorkspace()) return;
+    clearDeadlineDraft();
+  }
   const mutationRunning = useRef(false);
   const loadVersion = useRef(0);
 
@@ -366,6 +619,9 @@ const imageUploadLock = useRef(false);
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation(
+      'Seva opportunity update'
+    );
     mutationRunning.current = true;
 
     setBusy(true);
@@ -393,6 +649,7 @@ const imageUploadLock = useRef(false);
     } finally {
       mutationRunning.current = false;
       setBusy(false);
+      releaseOperation();
     }
   }
 
@@ -400,23 +657,48 @@ const imageUploadLock = useRef(false);
   // CREATE AND EDIT
   // ========================================
 
+  function prepareProgrammeForm(): boolean {
+    if (
+      busy ||
+      loading ||
+      requiresRefresh ||
+      imageUploadLock.current
+    ) {
+      return false;
+    }
+    if (section === 'opportunities') {
+      return canLeaveVolunteerWorkspace();
+    }
+    return setSection('opportunities');
+  }
   function add() {
-    setSection('opportunities');
+    if (!prepareProgrammeForm()) return;
+    clearWorkspaceDrafts();
+    const initialForm = { ...emptyForm };
+    editingBaseline.current = { ...initialForm };
     setEditingId(null);
-    setEditing({ ...emptyForm });
-    setExtension(null);
+    setEditing(initialForm);
     setError('');
     setSuccess('');
   }
 
   function edit(item: Opportunity) {
-    setSection('opportunities');
+    if (
+      typeof item.accommodation_enabled !== 'boolean'
+    ) {
+      setError(
+        'Programme configuration is unavailable. Refresh after the server update before editing.'
+      );
+      return;
+    }
+    if (!prepareProgrammeForm()) return;
+    clearWorkspaceDrafts();
     setEditingId(item.id);
-    setExtension(null);
-
-    setEditing({
+    const initialForm: OpportunityForm = {
       attendance_mode:
         item.attendance_mode ?? 'legacy',
+      accommodation_enabled:
+        item.accommodation_enabled === true,
       title: item.title,
       description: item.description || '',
       instructions: item.instructions || '',
@@ -448,7 +730,9 @@ const imageUploadLock = useRef(false);
 
       maximum_group_size:
         item.maximum_group_size,
-    });
+    };
+    editingBaseline.current = { ...initialForm };
+    setEditing(initialForm);
 
     setError('');
     setSuccess('');
@@ -580,6 +864,9 @@ const imageUploadLock = useRef(false);
     return;
   }
 
+  const releaseOperation = beginVolunteerOperation(
+    'Seva opportunity image upload'
+  );
   imageUploadLock.current = true;
 
   setUploadingImage(true);
@@ -609,6 +896,7 @@ const imageUploadLock = useRef(false);
   } finally {
     imageUploadLock.current = false;
     setUploadingImage(false);
+    releaseOperation();
   }
 }
 
@@ -621,7 +909,12 @@ const imageUploadLock = useRef(false);
   ) {
     event.preventDefault();
 
-    if (!editing || busy) return;
+    if (
+      !editing ||
+      busy ||
+      uploadingImage ||
+      imageUploadLock.current
+    ) return;
 
     const validation = validate(editing);
 
@@ -674,8 +967,7 @@ const imageUploadLock = useRef(false);
         : 'Opportunity created as a draft.',
 
       () => {
-        setEditing(null);
-        setEditingId(null);
+        clearProgrammeDraft();
       }
     );
   }
@@ -828,7 +1120,7 @@ const imageUploadLock = useRef(false);
 
       'Registration deadline extended.',
 
-      () => setExtension(null)
+      () => clearDeadlineDraft()
     );
   }
 
@@ -897,40 +1189,218 @@ const imageUploadLock = useRef(false);
   };
 
   // ========================================
+  // GUIDED PROGRAMME WORKFLOW
+  // ========================================
+  type WorkflowStage = {
+    title: string;
+    icon: string;
+    description: string;
+    actions: {
+      key: Section;
+      label: string;
+    }[];
+  };
+  const attendanceMode =
+    selectedProgramme?.attendance_mode ?? 'legacy';
+  const isLegacy = attendanceMode === 'legacy';
+  const hasAttendance = attendanceMode !== 'none';
+  const workflow: WorkflowStage[] = [
+    {
+      title: 'Programme Setup',
+      icon: '⚙',
+      description:
+        'Create the programme, configure service dates, publish and enable registration.',
+      actions: [
+        {
+          key: 'opportunities',
+          label: 'Manage Programmes',
+        },
+      ],
+    },
+    {
+      title: 'Registration & Approval',
+      icon: '♙',
+      description:
+        'Review individual and group applications, verify photographs and approve eligible volunteers.',
+      actions: [
+        {
+          key: 'registrations',
+          label: 'Review Registrations',
+        },
+      ],
+    },
+    {
+      title: 'Volunteer ID Cards',
+      icon: '▣',
+      description:
+        'Generate and issue digital ID cards to approved volunteers.',
+      actions: [
+        {
+          key: 'id-cards',
+          label: 'Manage ID Cards',
+        },
+      ],
+    },
+    {
+      title: 'Service Preparation',
+      icon: '▦',
+      description: isLegacy
+        ? 'Configure duties, shifts, requirements and volunteer assignments.'
+        : 'Send reporting information and review volunteer availability.',
+      actions: [
+        {
+          key: 'reporting',
+          label: 'Daily Reporting',
+        },
+        ...(isLegacy ? [
+          {
+            key: 'duties' as Section,
+            label: 'Duties',
+          },
+          {
+            key: 'shifts' as Section,
+            label: 'Service Shifts',
+          },
+          {
+            key: 'requirements' as Section,
+            label: 'Duty Requirements',
+          },
+          {
+            key: 'assignments' as Section,
+            label: 'Assignments',
+          },
+        ] : []),
+        ...(accommodationAvailable ? [
+          {
+            key: 'accommodation' as Section,
+            label: 'Accommodation',
+          },
+        ] : []),
+      ],
+    },
+    ...(hasAttendance ? [{
+      title: 'Attendance Management',
+      icon: '✓',
+      description:
+        attendanceMode === 'simple'
+          ? 'Mark volunteers present, absent or excused and finalise daily attendance.'
+          : attendanceMode === 'detailed'
+            ? 'Record check-in, check-out, attendance and actual service hours.'
+            : 'Record and finalise duty and shift-based attendance.',
+      actions: [
+        {
+          key: 'attendance' as Section,
+          label: 'Manage Attendance',
+        },
+      ],
+    }] : []),
+    {
+      title: 'Service Completion',
+      icon: '◎',
+      description:
+        attendanceMode === 'none'
+          ? 'Manually verify and complete volunteer service.'
+          : 'Review completed service and finalised attendance before completion.',
+      actions: [
+        {
+          key: 'completion',
+          label: 'Review Completion',
+        },
+      ],
+    },
+    {
+      title: 'Certificates',
+      icon: '★',
+      description:
+        'Create certificate drafts, verify details and issue certificates.',
+      actions: [
+        {
+          key: 'certificates',
+          label: 'Manage Certificates',
+        },
+      ],
+    },
+  ];
+  const activeStageIndex = workflow.findIndex(
+    stage => stage.actions.some(
+      action => action.key === section
+    )
+  );
+  const activeStage = workflow[activeStageIndex];
+  const navigationDisabled =
+    busy ||
+    loading ||
+    volunteerOperationBusy;
+  const modeLabel =
+    attendanceMode === 'simple'
+      ? 'Simple Attendance'
+      : attendanceMode === 'detailed'
+        ? 'Detailed Attendance'
+        : attendanceMode === 'none'
+          ? 'No Attendance Tracking'
+          : 'Duty & Shift Based';
+  function openWorkflowSection(key: Section) {
+    if (navigationDisabled) return;
+    if (setSection(key)) {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+    }
+  }
+  const registeredCount = Number(
+    selectedProgramme?.registered_volunteers || 0
+  );
+  const approvedCount = Number(
+    selectedProgramme?.approved_volunteers || 0
+  );
+  const requiredCount = Number(
+    selectedProgramme?.required_volunteers || 0
+  );
+  const recruitmentPercentage =
+    requiredCount > 0
+      ? Math.round(
+          approvedCount / requiredCount * 100
+        )
+      : 0;
+  // ========================================
   // UI
   // ========================================
 
   return (
-    <main className="content">
-      <div className="page-head">
-        <div>
+    <main className="content volunteer-dashboard">
+      <header className="volunteer-dashboard-hero">
+        <div className="volunteer-hero-copy">
+          <span className="volunteer-eyebrow">
+            DIVYAKSHETRA HARIHARAPURA
+          </span>
           <h2>Volunteer Seva Management</h2>
-
           <p>
-            Manage seva opportunities,
-            registrations and volunteer services.
+            A dedicated workspace to organise,
+            guide and manage volunteer service.
           </p>
         </div>
-
-        <div className="actions">
+        <div className="volunteer-hero-actions">
           <button
             type="button"
-            disabled={busy || loading}
-            onClick={() => void load()}
+            disabled={navigationDisabled}
+            onClick={() => {
+              if (!canLeaveVolunteerWorkspace()) return;
+              void load();
+            }}
           >
-            {loading ? 'Loading…' : 'Refresh'}
+            {loading ? 'Loading...' : '↻ Refresh'}
           </button>
-
           <button
             type="button"
-            className="primary"
-            disabled={disabled}
+            className="volunteer-gold-button"
+            disabled={disabled || volunteerOperationBusy}
             onClick={add}
           >
-            + Create Opportunity
+            + Create Programme
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <div className="error" role="alert">
@@ -956,112 +1426,306 @@ const imageUploadLock = useRef(false);
         </div>
       )}
 
-      <div
-        className="actions"
-        style={{
-          marginBottom: 20,
-          flexWrap: 'wrap',
-        }}
-      >
-        {[
-  ['overview', 'Overview'],
-  ['opportunities', 'Seva Opportunities'],
-  ['registrations', 'Registrations'],
-  ['reporting', 'Daily Reporting'],
-  ['duties', 'Duties'],
-  ['shifts', 'Service Shifts'],
-  ['requirements', 'Duty Requirements'],
-  ['assignments', 'Assignments'],
-['attendance', 'Attendance'],
 
-['id-cards', 'ID Cards'],
-['accommodation', 'Accommodation'],
-['completion', 'Service Completion'],
-['certificates', 'Certificates'],
-].map(([key, label]) => (
+
+      {(programmeDirty || deadlineDirty) && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '12px 16px',
+            marginBottom: 16,
+            border: '1px solid #e5c98c',
+            borderRadius: 10,
+            background: '#FFF8E8',
+            color: '#795318',
+          }}
+        >
+          <strong>Unsaved changes</strong>
+          <div style={{ fontSize: 13, marginTop: 4 }}>
+            Save your changes before leaving this workspace.
+          </div>
+        </div>
+      )}
+      {volunteerOperationBusy && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '14px 18px',
+            marginBottom: 16,
+            border: '1px solid #e5c98c',
+            borderRadius: 10,
+            background: '#FFF8E8',
+            color: '#795318',
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{ fontSize: 23 }}
+          >
+            &#9203;
+          </span>
+          <div>
+            <strong>Operation in progress</strong>
+            <div style={{
+              fontSize: 13,
+              marginTop: 4,
+              lineHeight: 1.5,
+            }}>
+              Please wait while the operation finishes.
+              Navigation will become available automatically.
+            </div>
+          </div>
+        </div>
+      )}
+      <section className="volunteer-workspace">
+        <div className="volunteer-workspace-heading">
+          <div>
+            <span className="volunteer-section-kicker">
+              PROGRAMME WORKSPACE
+            </span>
+            <h3>Select your seva programme</h3>
+            <p>
+              All programme-specific operations use
+              the selected programme.
+            </p>
+          </div>
           <button
             type="button"
-            key={key}
-            disabled={busy}
+            disabled={navigationDisabled}
+            onClick={() => openWorkflowSection('overview')}
+          >
+            Dashboard Overview
+          </button>
+        </div>
+        <select
+          aria-label="Selected Seva Programme"
+          className="volunteer-programme-select"
+          value={selectedProgrammeId}
+          disabled={
+            navigationDisabled ||
+            !loaded ||
+            requiresRefresh
+          }
+          onChange={event =>
+            selectProgramme(event.target.value)
+          }
+        >
+          <option value="">Select a programme</option>
+          {items.map(item => (
+            <option key={item.id} value={item.id}>
+              {item.title}
+            </option>
+          ))}
+        </select>
+        {selectedProgramme && (
+          <div className="volunteer-programme-meta">
+            <span>{modeLabel}</span>
+            <span>
+              {selectedProgramme.allow_individual &&
+              selectedProgramme.allow_group
+                ? 'Individual & Group'
+                : selectedProgramme.allow_group
+                  ? 'Group Registration'
+                  : 'Individual Registration'}
+            </span>
+            <span>
+              {selectedProgramme.registration_status}
+            </span>
+            <span>
+              {formatDate(
+                selectedProgramme.service_start_date
+              )}
+              {' - '}
+              {formatDate(
+                selectedProgramme.service_end_date
+              )}
+            </span>
+            {accommodationAvailable && (
+              <span>Accommodation Available</span>
+            )}
+          </div>
+        )}
+      </section>
+      <nav
+        className="volunteer-workflow-nav"
+        aria-label="Programme workflow navigation"
+      >
+        {workflow.map((stage, index) => (
+          <button
+            type="button"
+            key={stage.title}
             className={
-              section === key ? 'primary' : ''
+              'volunteer-workflow-tab' +
+              (activeStageIndex === index
+                ? ' active'
+                : '')
             }
+            aria-current={
+              activeStageIndex === index
+                ? 'step'
+                : undefined
+            }
+            disabled={navigationDisabled}
             onClick={() =>
-              setSection(key as Section)
+              openWorkflowSection(
+                stage.actions[0].key
+              )
             }
           >
-            {label}
+            <span className="volunteer-step-number">
+              {index + 1}
+            </span>
+            <span>{stage.title}</span>
           </button>
         ))}
-      </div>
-
-      {/* DASHBOARD STATISTICS */}
-
-      <div className="stats">
-        {[
-          ['Opportunities', stats.opportunities],
-          ['Published', stats.published],
-          ['Open Registrations', stats.open],
-          ['Registrations', stats.registrations],
-          ['Registered Volunteers', stats.volunteers],
-          ['Approved Volunteers', stats.approved],
-        ].map(([label, count]) => (
-          <div
-            className="stat"
-            key={String(label)}
-          >
-            <span>{label}</span>
-
-            <strong>
-              {loaded ? count : '—'}
-            </strong>
+      </nav>
+      {activeStage && (
+        <section className="volunteer-current-stage">
+          <span className="volunteer-section-kicker">
+            WORKFLOW STAGE {activeStageIndex + 1}
+            {' OF '}
+            {workflow.length}
+          </span>
+          <h3>{activeStage.title}</h3>
+          <p>{activeStage.description}</p>
+          {activeStage.actions.length > 1 && (
+            <div className="volunteer-stage-actions">
+              {activeStage.actions.map(action => (
+                <button
+                  type="button"
+                  key={action.key}
+                  disabled={navigationDisabled}
+                  className={
+                    section === action.key
+                      ? 'primary'
+                      : ''
+                  }
+                  onClick={() =>
+                    openWorkflowSection(action.key)
+                  }
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {section === 'overview' && (
+        <section className="volunteer-dashboard-stats">
+          {(selectedProgramme ? [
+            ['Registrations',
+              Number(selectedProgramme.total_registrations || 0)],
+            ['Registered Volunteers', registeredCount],
+            ['Approved Volunteers', approvedCount],
+            ['Required Volunteers', requiredCount],
+          ] : [
+            ['Total Programmes', stats.opportunities],
+            ['Published', stats.published],
+            ['Open Registrations', stats.open],
+            ['Total Registrations', stats.registrations],
+            ['Registered Volunteers', stats.volunteers],
+            ['Approved Volunteers', stats.approved],
+          ]).map(([label, count]) => (
+            <article
+              key={String(label)}
+              className="volunteer-stat-card"
+            >
+              <span>{label}</span>
+              <strong>
+                {loaded ? count : '—'}
+              </strong>
+            </article>
+          ))}
+        </section>
+      )}
+      {section === 'overview' && selectedProgramme && (
+        <section className="volunteer-recruitment">
+          <div className="volunteer-recruitment-heading">
+            <div>
+              <h3>Volunteer Recruitment</h3>
+              <p>
+                {approvedCount} approved out of
+                {' '}{requiredCount} required volunteers
+              </p>
+            </div>
+            <strong>{recruitmentPercentage}%</strong>
           </div>
-        ))}
-      </div>
-
+          <progress
+            value={Math.min(recruitmentPercentage, 100)}
+            max={100}
+            aria-label="Approved volunteers against required volunteers"
+          />
+          <small>
+            {Math.max(requiredCount - approvedCount, 0)}
+            {' '}additional volunteers required
+          </small>
+        </section>
+      )}
       {/* OVERVIEW */}
 
       {section === 'overview' && (
         <>
-          <div className="panel">
-            <h3>Volunteer Seva Workflow</h3>
-
-            <p>
-              Manage the complete volunteer
-              service lifecycle from registration
-              through certificate issuance.
-            </p>
-
-            <ol
-              style={{
-                lineHeight: 2,
-                paddingLeft: 24,
-              }}
-            >
-              <li>Create seva opportunity</li>
-              <li>Configure service dates and registration period</li>
-              <li>Publish opportunity</li>
-              <li>Enable registration</li>
-              <li>Review applications</li>
-              <li>Send daily reporting details</li>
-              <li>Coordinator assigns duties at the venue</li>
-              <li>Issue digital ID cards</li>
-              <li>Allocate accommodation if needed</li>
-              <li>Record attendance</li>
-              <li>Complete volunteer service</li>
-              <li>Issue certificates</li>
-            </ol>
-
-            <button
-              type="button"
-              className="primary"
-              onClick={() =>
-                setSection('opportunities')
-              }
-            >
-              Manage Seva Opportunities
-            </button>
-          </div>
+          <section className="volunteer-workflow-section">
+            <div className="volunteer-section-heading">
+              <span className="volunteer-section-kicker">
+                STEP-BY-STEP MANAGEMENT
+              </span>
+              <h3>Programme Workflow</h3>
+              <p>
+                Follow these stages to manage the
+                complete volunteer service lifecycle.
+              </p>
+            </div>
+            {!selectedProgramme && (
+              <div className="volunteer-selection-notice">
+                Select a programme above to customise
+                the workflow and view its statistics.
+              </div>
+            )}
+            <div className="volunteer-workflow-grid">
+              {workflow.map((stage, index) => (
+                <article
+                  key={stage.title}
+                  className="volunteer-workflow-card"
+                >
+                  <div className="volunteer-card-top">
+                    <span
+                      className="volunteer-stage-icon"
+                      aria-hidden="true"
+                    >
+                      {stage.icon}
+                    </span>
+                    <span className="volunteer-stage-label">
+                      STAGE {String(index + 1).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <h3>{stage.title}</h3>
+                  <p>{stage.description}</p>
+                  <div className="volunteer-card-actions">
+                    {stage.actions.map(action => (
+                      <button
+                        type="button"
+                        key={action.key}
+                        disabled={navigationDisabled}
+                        onClick={() =>
+                          openWorkflowSection(action.key)
+                        }
+                      >
+                        <span>{action.label}</span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
 
           <div className="panel">
             <h3>Recent Opportunities</h3>
@@ -1301,6 +1965,115 @@ const imageUploadLock = useRef(false);
                     Attendance mode is locked after volunteers register.
                   </small>
                 </div>
+                <div
+                  style={{
+                    padding: 20,
+                    marginTop: 20,
+                    marginBottom: 24,
+                    border: '1px solid #e7d9be',
+                    borderRadius: 12,
+                    background: '#FFFDF8',
+                  }}
+                >
+                  <h3 style={{
+                    color: '#6B1720',
+                    marginTop: 0,
+                    marginBottom: 16,
+                  }}>
+                    Accommodation Configuration
+                  </h3>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    cursor: disabled
+                      ? 'not-allowed'
+                      : 'pointer',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={
+                        editing.accommodation_enabled
+                      }
+                      disabled={disabled}
+                      onChange={event =>
+                        update(
+                          'accommodation_enabled',
+                          event.target.checked
+                        )
+                      }
+                      style={{
+                        width: 20,
+                        height: 20,
+                        flexShrink: 0,
+                        accentColor: '#6B1720',
+                      }}
+                    />
+                    <div>
+                      <strong style={{
+                        color: '#6B1720',
+                        fontSize: 15,
+                      }}>
+                        Enable Accommodation Facility
+                      </strong>
+                      <p style={{
+                        margin: '6px 0 0',
+                        color: '#6b7280',
+                        lineHeight: 1.6,
+                      }}>
+                        Provide accommodation to
+                        volunteers participating in
+                        this programme.
+                      </p>
+                    </div>
+                  </label>
+                  <div style={{
+                    marginTop: 16,
+                    padding: 14,
+                    borderRadius: 8,
+                    background:
+                      editing.accommodation_enabled
+                        ? '#ECFDF5'
+                        : '#F3F4F6',
+                    border:
+                      editing.accommodation_enabled
+                        ? '1px solid #BBF7D0'
+                        : '1px solid #E5E7EB',
+                  }}>
+                    <strong style={{
+                      color:
+                        editing.accommodation_enabled
+                          ? '#166534'
+                          : '#4B5563',
+                    }}>
+                      {editing.accommodation_enabled
+                        ? 'Accommodation Enabled'
+                        : 'Accommodation Not Required'}
+                    </strong>
+                    <p style={{
+                      margin: '8px 0 0',
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                    }}>
+                      {editing.accommodation_enabled
+                        ? 'Administrators can allocate accommodation, provide stay details and publish them to volunteers.'
+                        : 'Accommodation management is not required for this programme.'}
+                    </p>
+                  </div>
+                  <p style={{
+                    fontSize: 12,
+                    color: '#6b7280',
+                    lineHeight: 1.6,
+                    marginBottom: 0,
+                  }}>
+                    Accommodation is optional and does
+                    not affect registration, approval,
+                    attendance, service completion or
+                    certificates. Programmes with existing
+                    accommodation allocations cannot
+                    disable this facility.
+                  </p>
+                </div>
                 <h3>Registration Period</h3>
 
                 <p>
@@ -1519,10 +2292,7 @@ const imageUploadLock = useRef(false);
                 type="button"
                 disabled={busy}
                 style={{ marginTop: 12 }}
-                onClick={() => {
-                  setEditing(null);
-                  setEditingId(null);
-                }}
+                onClick={cancelProgrammeDraft}
               >
                 Cancel
               </button>
@@ -1573,7 +2343,7 @@ const imageUploadLock = useRef(false);
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => setExtension(null)}
+                  onClick={cancelDeadlineDraft}
                 >
                   Cancel
                 </button>
@@ -1835,15 +2605,18 @@ const imageUploadLock = useRef(false);
                           type="button"
                           disabled={disabled}
                           onClick={() => {
-                            setEditing(null);
-                            setEditingId(null);
-
+                            if (!prepareProgrammeForm()) return;
+                            clearWorkspaceDrafts();
+                            const deadline =
+                              toISTInput(
+                                item.registration_end_at
+                              );
+                            extensionBaseline.current =
+                              deadline;
                             setExtension({
                               id: item.id,
                               title: item.title,
-                              deadline: toISTInput(
-                                item.registration_end_at
-                              ),
+                              deadline,
                             });
 
                             setError('');
@@ -1867,46 +2640,132 @@ const imageUploadLock = useRef(false);
         </>
       )}
       {section === 'registrations' && (
-  <Registrations opportunities={items} />
+  <Registrations
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
 {section === 'reporting' && (
-  <DailyReporting opportunities={items} />
+  <DailyReporting
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 {section === 'duties' && (
   <Duties />
 )}
 
 {section === 'shifts' && (
-  <Shifts opportunities={items} />
+  <Shifts
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
 {section === 'requirements' && (
-  <Requirements opportunities={items} />
+  <Requirements
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 {section === 'assignments' && (
-  <Assignments opportunities={items} />
+  <Assignments
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
 {section === 'attendance' && (
-  <AttendanceManager opportunities={items} />
+  <AttendanceManager
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
 {section === 'id-cards' && (
-  <IdCards opportunities={items} />
+  <IdCards
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
-{section === 'accommodation' && (
-  <Accommodation opportunities={items} />
+{section === 'accommodation' &&
+ accommodationAvailable && (
+  <Accommodation
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 {section === 'completion' && (
-  <Completion opportunities={items} />
+  <Completion
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
 {section === 'certificates' && (
-  <Certificates opportunities={items} />
+  <Certificates
+    key={selectedProgrammeId || 'unselected'}
+    opportunities={items}
+    selectedProgrammeId={selectedProgrammeId}
+  />
 )}
 
+      {activeStage && (
+        <section className="volunteer-stage-footer">
+          <button
+            type="button"
+            disabled={navigationDisabled}
+            onClick={() =>
+              openWorkflowSection(
+                activeStageIndex > 0
+                  ? workflow[
+                      activeStageIndex - 1
+                    ].actions[0].key
+                  : 'overview'
+              )
+            }
+          >
+            ← {activeStageIndex > 0
+              ? workflow[activeStageIndex - 1].title
+              : 'Dashboard Overview'}
+          </button>
+          <div>
+            <small>
+              Stage {activeStageIndex + 1}
+              {' of '}{workflow.length}
+            </small>
+          </div>
+          <button
+            type="button"
+            className="primary"
+            disabled={navigationDisabled}
+            onClick={() =>
+              openWorkflowSection(
+                activeStageIndex < workflow.length - 1
+                  ? workflow[
+                      activeStageIndex + 1
+                    ].actions[0].key
+                  : 'overview'
+              )
+            }
+          >
+            {activeStageIndex < workflow.length - 1
+              ? workflow[activeStageIndex + 1].title
+              : 'Return to Dashboard'} →
+          </button>
+        </section>
+      )}
     </main>
   );
 }

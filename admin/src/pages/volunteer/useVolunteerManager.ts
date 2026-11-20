@@ -1,4 +1,7 @@
 import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
+import {
   useCallback,
   useEffect,
   useRef,
@@ -100,6 +103,10 @@ export function useVolunteerManager<T>(
       return false;
     }
 
+    const releaseOperation = beginVolunteerOperation(
+      'Volunteer management update'
+    );
+
     mutationLock.current = true;
 
     setBusy(true);
@@ -135,6 +142,8 @@ export function useVolunteerManager<T>(
       if (mounted.current) {
         setBusy(false);
       }
+
+      releaseOperation();
     }
   }
 

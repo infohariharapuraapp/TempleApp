@@ -1,3 +1,11 @@
+import {
+  initializeAdminNavigationHistory,
+  pushAdminHistory,
+} from './lib/adminNavigationHistory';
+import {
+  canLeaveVolunteerWorkspace,
+  useVolunteerOperationBusy,
+} from './lib/volunteerOperationGuard';
 import React, {
   useEffect,
   useState,
@@ -1080,6 +1088,7 @@ class ModuleErrorBoundary extends React.Component<
 
 
   function App() {
+    const volunteerOperationBusy = useVolunteerOperationBusy();
 
    const [user, setUser] =
   useState<User | null>(() => {
@@ -1130,9 +1139,52 @@ class ModuleErrorBoundary extends React.Component<
   });
 
 
-    const [page, setPage] =
+    const [page, setCurrentPage] = useState(() => {
+      const requestedPage = new URLSearchParams(
+        window.location.search
+      ).get('page');
+      return nav.some(([id]) => id === requestedPage)
+        ? requestedPage!
+        : 'dashboard';
+    });
+    useEffect(() => {
+      function restorePage() {
+        const requestedPage = new URLSearchParams(
+          window.location.search
+        ).get('page');
+        setCurrentPage(
+          nav.some(([id]) => id === requestedPage)
+            ? requestedPage!
+            : 'dashboard'
+        );
+      }
+      window.addEventListener('popstate', restorePage);
+      return () => {
+        window.removeEventListener('popstate', restorePage);
+      };
+    }, []);
+    function setPage(nextPage: string) {
+      if (nextPage === page) return;
+      if (!canLeaveVolunteerWorkspace()) return;
 
-      useState('dashboard');
+      if (!nav.some(([id]) => id === nextPage)) {
+        return;
+      }
+      const url = new URL(window.location.href);
+      if (nextPage === 'dashboard') {
+        url.searchParams.delete('page');
+      } else {
+        url.searchParams.set('page', nextPage);
+      }
+      if (nextPage !== page) {
+        url.searchParams.delete('section');
+        url.searchParams.delete('opportunity');
+      }
+      if (url.href !== window.location.href) {
+        if (!pushAdminHistory(url.href)) return;
+      }
+      setCurrentPage(nextPage);
+    }
 
 
 
@@ -1157,6 +1209,8 @@ class ModuleErrorBoundary extends React.Component<
 
 
     function logout() {
+      if (!canLeaveVolunteerWorkspace()) return;
+
 
       clearAdminSession();
 
@@ -1227,7 +1281,7 @@ class ModuleErrorBoundary extends React.Component<
                   }
 
                   key={id}
-
+                  disabled={volunteerOperationBusy}
                   onClick={() =>
 
                     setPage(id)
@@ -1274,6 +1328,7 @@ class ModuleErrorBoundary extends React.Component<
 
               type="button"
 
+              disabled={volunteerOperationBusy}
               onClick={logout}
 
             >
@@ -1416,6 +1471,8 @@ class ModuleErrorBoundary extends React.Component<
   }
 
 
+
+  initializeAdminNavigationHistory();
 
   createRoot(
 

@@ -1,3 +1,6 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -11,6 +14,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 interface Requirement {
@@ -53,9 +57,13 @@ interface Assignment {
 
 export default function Assignments({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const opportunityId = opportunities.some(
+    item => String(item.id) === selectedProgrammeId
+  )
+    ? selectedProgrammeId
+    : '';
 
   const [requirementId, setRequirementId] =
     useState('');
@@ -312,6 +320,7 @@ export default function Assignments({
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation('Duty assignment');
     mutationLock.current = true;
     setBusy(true);
     setError('');
@@ -340,6 +349,7 @@ export default function Assignments({
       setSelected([]);
     } finally {
       mutationLock.current = false;
+      releaseOperation();
       setBusy(false);
     }
   }
@@ -446,27 +456,28 @@ export default function Assignments({
           duties and shifts.
         </p>
 
-        <label>
-          Seva Opportunity
-
-          <select
-            value={opportunityId}
-            disabled={busy || loading}
-            onChange={event =>
-              setOpportunityId(event.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {opportunities.find(
+              item =>
+                String(item.id) === selectedProgrammeId
+            )?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
 
         <button
           type="button"

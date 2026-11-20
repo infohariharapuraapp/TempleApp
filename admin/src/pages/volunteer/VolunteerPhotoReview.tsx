@@ -1,3 +1,6 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -193,6 +196,7 @@ export default function VolunteerPhotoReview({
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation('Photograph review');
     lock.current = true;
     setError('');
 
@@ -208,6 +212,7 @@ export default function VolunteerPhotoReview({
       }
     } finally {
       lock.current = false;
+      releaseOperation();
     }
   }
 

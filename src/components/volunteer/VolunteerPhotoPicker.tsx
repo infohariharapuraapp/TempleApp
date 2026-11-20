@@ -64,6 +64,7 @@ export default function VolunteerPhotoPicker({
 
   const mounted = useRef(false);
   const lock = useRef(false);
+  const pendingPhoto = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -134,8 +135,8 @@ export default function VolunteerPhotoPicker({
         expiresAt: result.expires_at,
       });
 
+      pendingPhoto.current = false;
       setCandidate(null);
-
     } finally {
       if (mounted.current) {
         setUploading(false);
@@ -144,9 +145,17 @@ export default function VolunteerPhotoPicker({
   }
 
   async function choosePhoto(
-    source: 'camera' | 'gallery' | 'retry'
-  ) {
-    if (disabled || lock.current) return;
+    source: 'camera' | 'gallery' | 'retry' | 'save')  {
+    if (
+      lock.current ||
+      (
+        disabled &&
+        !(
+          pendingPhoto.current &&
+          (source === 'save' || source === 'retry')
+        )
+      )
+    ) return;
 
     lock.current = true;
 
@@ -155,7 +164,7 @@ export default function VolunteerPhotoPicker({
     onBusyChange(true);
 
     try {
-      if (source === 'retry') {
+      if (source === 'retry' || source === 'save') {
         if (candidate) {
           await upload(candidate);
         }
@@ -206,9 +215,8 @@ export default function VolunteerPhotoPicker({
 
       const asset = result.assets[0];
 
+      pendingPhoto.current = true;
       setCandidate(asset);
-
-      await upload(asset);
 
     } catch (err) {
       if (mounted.current) {
@@ -224,7 +232,7 @@ export default function VolunteerPhotoPicker({
 
       if (mounted.current) {
         setBusy(false);
-        onBusyChange(false);
+        onBusyChange(pendingPhoto.current);
       }
     }
   }
@@ -313,6 +321,33 @@ export default function VolunteerPhotoPicker({
         </Text>
       )}
 
+      {!!candidate && !error && (
+        <View style={styles.savePhotoPanel}>
+          <Text style={styles.previewHint}>
+            {t(
+              'volunteer.photoPreviewHint',
+              'Check your photograph before saving.'
+            )}
+          </Text>
+          <VolunteerButton
+            title={
+              uploading
+                ? t(
+                    'volunteer.uploadingPhoto',
+                    'Saving Photograph...'
+                  )
+                : t(
+                    'volunteer.saveSelectedPhoto',
+                    'Save Photo'
+                  )
+            }
+            disabled={busy}
+            onPress={() =>
+              void choosePhoto('save')
+            }
+          />
+        </View>
+      )}
       {!!candidate && !!error && (
         <>
           <VolunteerButton
@@ -320,7 +355,7 @@ export default function VolunteerPhotoPicker({
               'volunteer.retryPhotoUpload',
               'Retry Upload'
             )}
-            disabled={busy || disabled}
+            disabled={busy}
             onPress={() =>
               void choosePhoto('retry')
             }
@@ -332,15 +367,19 @@ export default function VolunteerPhotoPicker({
               'volunteer.discardPhoto',
               'Discard Failed Selection'
             )}
-            disabled={busy || disabled}
+            disabled={busy}
             onPress={() => {
+              if (lock.current) return;
+              pendingPhoto.current = false;
               setCandidate(null);
               setError('');
+              onBusyChange(false);
             }}
           />
         </>
       )}
 
+      {!candidate && (
       <View style={styles.buttons}>
         <View style={{ flex: 1 }}>
           <VolunteerButton
@@ -370,7 +409,7 @@ export default function VolunteerPhotoPicker({
           />
         </View>
       </View>
-
+      )}
       <Text style={styles.note}>
         {t(
           'volunteer.photoPrivacyNote',
@@ -430,6 +469,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  savePhotoPanel: {
+    gap: 10,
+    marginTop: 10,
+  },
+  previewHint: {
+    textAlign: 'center',
+    color: C.muted,
+    fontSize: 12,
+    lineHeight: 19,
+    marginBottom: 3,
+  },
   buttons: {
     flexDirection: 'row',
     gap: 10,

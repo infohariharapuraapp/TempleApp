@@ -48,9 +48,11 @@ export const VOLUNTEER_COLORS = {
 export function VolunteerScreen({
   title,
   children,
+  onBack,
 }: {
   title: string;
   children: React.ReactNode;
+  onBack?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -65,6 +67,10 @@ export function VolunteerScreen({
           accessibilityLabel={t('common.back', 'Back')}
           style={styles.backButton}
           onPress={() => {
+            if (onBack) {
+              onBack();
+              return;
+            }
             if (router.canGoBack()) {
               router.back();
             } else {

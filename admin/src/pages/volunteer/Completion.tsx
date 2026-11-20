@@ -1,3 +1,6 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -11,6 +14,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 type AttendanceMode =
@@ -152,9 +156,14 @@ function AttendanceInformation({ item }: { item: Member }) {
 }
 export default function Completion({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const selectedProgramme = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId = selectedProgramme
+    ? String(selectedProgramme.id)
+    : '';
 
   const [working, setWorking] = useState(false);
 
@@ -168,26 +177,25 @@ export default function Completion({
           successful volunteer service.
         </p>
 
-        <label>
-          Seva Opportunity
-          <select
-            value={opportunityId}
-            disabled={working}
-            onChange={e =>
-              setOpportunityId(e.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {selectedProgramme?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
       </div>
 
       {opportunityId && (
@@ -339,6 +347,7 @@ function CompletionManager({
   ) {
     if (lock.current || disabled) return;
 
+    const releaseOperation = beginVolunteerOperation('Service completion');
     lock.current = true;
     setBusy(true);
     onWorking(true);
@@ -365,6 +374,7 @@ function CompletionManager({
       }
     } finally {
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -446,6 +456,7 @@ function CompletionManager({
   async function viewDetails(id: number) {
     if (lock.current || disabled) return;
 
+    const releaseOperation = beginVolunteerOperation('Service completion');
     lock.current = true;
     setBusy(true);
     onWorking(true);
@@ -467,6 +478,7 @@ function CompletionManager({
       }
     } finally {
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);

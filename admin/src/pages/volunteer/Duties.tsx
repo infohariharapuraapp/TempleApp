@@ -1,3 +1,6 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -151,6 +154,7 @@ export default function Duties() {
   ) {
     if (uploadLock.current || disabled) return;
 
+    const releaseOperation = beginVolunteerOperation('Duty image upload');
     uploadLock.current = true;
     setUploading(true);
     manager.setError('');
@@ -169,6 +173,7 @@ export default function Duties() {
       manager.setError(getErrorMessage(error));
     } finally {
       uploadLock.current = false;
+      releaseOperation();
       setUploading(false);
     }
   }

@@ -13,6 +13,7 @@ export interface VolunteerResponse<T> {
 }
 
 export interface VolunteerOpportunity {
+  accommodation_enabled?: boolean;
   attendance_mode?: 'legacy' | 'simple' | 'detailed' | 'none';
   id: number;
   title: string;

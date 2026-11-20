@@ -177,6 +177,7 @@ const PUBLIC_SELECT = `
 
     o.required_volunteers,
     o.attendance_mode,
+    o.accommodation_enabled,
     o.allow_individual,
     o.allow_group,
     o.minimum_group_size,
@@ -192,6 +193,11 @@ const PUBLIC_SELECT = `
 // ========================================
 
 function validateOpportunity(body: any): string | null {
+  if (
+    typeof body.accommodation_enabled !== 'boolean'
+  ) {
+    return 'accommodation_enabled must be true or false';
+  }
   if (
     !['legacy', 'simple', 'detailed', 'none']
       .includes(body.attendance_mode)
@@ -465,6 +471,10 @@ export const createOpportunity = async (
         req.body?.maximum_group_size ?? 100,
       attendance_mode:
         req.body?.attendance_mode ?? 'legacy',
+      accommodation_enabled:
+        req.body?.accommodation_enabled === undefined
+          ? false
+          : req.body.accommodation_enabled,
     };
 
     const validation = validateOpportunity(body);
@@ -492,12 +502,13 @@ export const createOpportunity = async (
         is_published,
         registration_enabled,
         created_by,
-        attendance_mode
+        attendance_mode,
+        accommodation_enabled
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,
         $9,$10,$11,$12,$13,
-        FALSE,FALSE,$14,$15
+        FALSE,FALSE,$14,$15,$16
       )
       RETURNING *
       `,
@@ -522,6 +533,7 @@ export const createOpportunity = async (
 
         req.user!.userId,
         body.attendance_mode,
+        body.accommodation_enabled,
       ]
     );
 
@@ -554,6 +566,7 @@ const EDITABLE_FIELDS = [
   'minimum_group_size',
   'maximum_group_size',
   'attendance_mode',
+  'accommodation_enabled',
 ];
 
 export const updateOpportunity = async (
@@ -635,6 +648,32 @@ export const updateOpportunity = async (
       return badRequest(res, validation);
     }
 
+    // Accommodation cannot be disabled while
+    // existing allocation records are present.
+    // The opportunity row is already locked.
+    if (
+      current.accommodation_enabled === true &&
+      merged.accommodation_enabled === false
+    ) {
+      const existingAllocations =
+        await client.query(
+          `
+          SELECT id
+          FROM volunteer_accommodation
+          WHERE opportunity_id = $1
+          LIMIT 1
+          `,
+          [id]
+        );
+      if (existingAllocations.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message:
+            'Accommodation cannot be disabled because this programme has existing accommodation allocations',
+        });
+      }
+    }
     // Attendance mode cannot change after registration.
     if (
       merged.attendance_mode !== current.attendance_mode

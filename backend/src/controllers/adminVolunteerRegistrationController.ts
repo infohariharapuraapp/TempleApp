@@ -96,6 +96,7 @@ export const getAdminVolunteerRegistrations = async (
       req.query.registration_type;
 
     const search = req.query.search;
+    const photoStatus = req.query.photo_status;
 
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 25);
@@ -160,6 +161,59 @@ export const getAdminVolunteerRegistrations = async (
       );
     }
 
+    if (photoStatus !== undefined) {
+      if (
+        typeof photoStatus !== 'string' ||
+        ![
+          'missing',
+          'pending',
+          'correction_required',
+          'resubmitted',
+          'verified',
+          'all_verified',
+          'needs_review',
+        ].includes(photoStatus)
+      ) {
+        fail(400, 'Invalid photograph status');
+      }
+      if (photoStatus === 'all_verified') {
+        conditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM volunteer_members m
+            WHERE m.registration_id = r.id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM volunteer_members m
+            WHERE m.registration_id = r.id
+            AND COALESCE(m.photo_status, 'missing')
+              <> 'verified'
+          )
+        `);
+      } else if (photoStatus === 'needs_review') {
+        conditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM volunteer_members m
+            WHERE m.registration_id = r.id
+            AND COALESCE(m.photo_status, 'missing')
+              <> 'verified'
+          )
+        `);
+      } else {
+        values.push(photoStatus);
+        conditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM volunteer_members m
+            WHERE m.registration_id = r.id
+            AND COALESCE(m.photo_status, 'missing')
+              = $${values.length}
+          )
+        `);
+      }
+    }
     if (search !== undefined) {
       if (
         typeof search !== 'string' ||

@@ -19,6 +19,7 @@ import {
 } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   getVolunteerOpportunity,
@@ -405,7 +406,12 @@ export default function VolunteerDetailsScreen() {
 
           {/* REGISTRATION ACTION */}
 
-          <View style={styles.actionPanel}>
+          <LinearGradient
+            colors={['#FFFDF8', '#F7EBD7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.actionPanel}
+          >
             <Text style={styles.actionTitle}>
               {t(
                 'volunteer.readyToServe',
@@ -449,7 +455,7 @@ export default function VolunteerDetailsScreen() {
                 });
               }}
             />
-          </View>
+          </LinearGradient>
         </ScrollView>
       )}
     </VolunteerScreen>
@@ -467,6 +473,10 @@ const styles = StyleSheet.create({
   },
 
   card: {
+    shadowColor: '#38251C',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     overflow: 'hidden',
@@ -476,7 +486,7 @@ const styles = StyleSheet.create({
   },
 
   cardBody: {
-    padding: 18,
+    padding: 20,
   },
 
   title: {

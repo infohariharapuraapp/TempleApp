@@ -1,4 +1,10 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
+import {
+  useVolunteerUnsavedChanges,
+} from '../../lib/volunteerUnsavedChangesGuard';
 
 import {
   volunteerRequest,
@@ -16,6 +22,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 interface Member {
@@ -68,9 +75,14 @@ const emptyForm: Form = {
 
 export default function Certificates({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const selectedProgramme = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId = selectedProgramme
+    ? String(selectedProgramme.id)
+    : '';
 
   const [working, setWorking] = useState(false);
 
@@ -84,27 +96,25 @@ export default function Certificates({
           for completed volunteer service.
         </p>
 
-        <label>
-          Seva Opportunity
-
-          <select
-            value={opportunityId}
-            disabled={working}
-            onChange={e =>
-              setOpportunityId(e.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {selectedProgramme?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
       </div>
 
       {opportunityId && (
@@ -142,6 +152,9 @@ function CertificateManager({
 
   const [form, setForm] =
     useState<Form>({ ...emptyForm });
+  const formBaseline = useRef<Form>({
+    ...emptyForm,
+  });
 
   const [editing, setEditing] =
     useState<Certificate | null>(null);
@@ -168,6 +181,9 @@ function CertificateManager({
   const latestPdf = useRef('');
   const mounted = useRef(true);
   const lock = useRef(false);
+  const recoveryRequired = useRef(false);
+  const [mutationUncertain, setMutationUncertain] =
+    useState(false);
   const version = useRef(0);
 
   function closePreview() {
@@ -181,20 +197,20 @@ function CertificateManager({
   }
 
   function closeForm() {
+    formBaseline.current = { ...emptyForm };
     setShowForm(false);
     setEditing(null);
     setSelectedMembers([]);
     setForm({ ...emptyForm });
   }
 
-  async function load() {
+  async function load(discardForm = false) {
     const current = ++version.current;
 
     setLoading(true);
     setReady(false);
     setError('');
     setSelectedCards([]);
-    closeForm();
     closePreview();
 
     try {
@@ -221,6 +237,16 @@ function CertificateManager({
       setMembers(memberResponse.data);
       setCards(cardResponse.data);
       setReady(true);
+      if (recoveryRequired.current) {
+        recoveryRequired.current = false;
+        setMutationUncertain(false);
+        setSuccess(
+          'Records refreshed. Review the latest server records before submitting again.'
+        );
+      }
+      if (discardForm) {
+        closeForm();
+      }
     } catch (error) {
       if (
         mounted.current &&
@@ -253,7 +279,22 @@ function CertificateManager({
     };
   }, []);
 
-  const disabled = loading || busy || !ready;
+  const disabled =
+    loading ||
+    busy ||
+    !ready ||
+    mutationUncertain;
+  const formDirty =
+    showForm &&
+    (
+      JSON.stringify(form) !==
+        JSON.stringify(formBaseline.current) ||
+      (!editing && selectedMembers.length > 0)
+    );
+  useVolunteerUnsavedChanges(
+    'Certificate draft form',
+    formDirty || mutationUncertain
+  );
 
   const filteredMembers = members.filter(item =>
     [
@@ -298,7 +339,29 @@ function CertificateManager({
     }));
   }
 
+  function confirmDiscardForm(): boolean {
+    return (
+      !formDirty ||
+      window.confirm(
+        'Discard unsaved form changes?'
+      )
+    );
+  }
+  function refreshRecords() {
+    if (loading || busy || lock.current) return;
+    if (recoveryRequired.current) {
+      if (!window.confirm(
+        'The previous operation may have completed on the server. Refresh records to review the result? The current form will close only after a successful refresh.'
+      )) return;
+      void load(true);
+      return;
+    }
+    if (!confirmDiscardForm()) return;
+    void load(true);
+  }
   function startCreate() {
+    if (disabled || lock.current || showForm) return;
+    formBaseline.current = { ...emptyForm };
     closePreview();
     setEditing(null);
     setSelectedMembers([]);
@@ -310,12 +373,18 @@ function CertificateManager({
   }
 
   function startEdit(item: Certificate) {
+    if (
+      disabled ||
+      lock.current ||
+      showForm ||
+      item.status !== 'draft'
+    ) return;
     closePreview();
     setEditing(item);
     setSelectedMembers([]);
     setSelectedCards([]);
 
-    setForm({
+    const initialForm: Form = {
       certificate_title: item.certificate_title,
       certificate_message:
         item.certificate_message || '',
@@ -323,7 +392,10 @@ function CertificateManager({
         item.signatory_name || '',
       signatory_designation:
         item.signatory_designation || '',
-    });
+    };
+
+    formBaseline.current = { ...initialForm };
+    setForm(initialForm);
 
     setShowForm(true);
     setError('');
@@ -345,6 +417,8 @@ function CertificateManager({
   ) {
     if (lock.current || disabled) return;
 
+    if (recoveryRequired.current) return;
+    const releaseOperation = beginVolunteerOperation('Certificate management');
     lock.current = true;
     setBusy(true);
     onWorking(true);
@@ -363,14 +437,21 @@ function CertificateManager({
         response.message || 'Updated successfully'
       );
 
+      closeForm();
       await load();
     } catch (error) {
       if (mounted.current) {
-        setError(getErrorMessage(error));
+        recoveryRequired.current = true;
+        setMutationUncertain(true);
+        setError(
+          'The operation could not be confirmed. It may have completed on the server. Refresh and review the records before retrying. Details: ' +
+          getErrorMessage(error)
+        );
         setReady(false);
       }
     } finally {
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -380,7 +461,7 @@ function CertificateManager({
   }
 
   async function save() {
-    if (disabled) return;
+    if (disabled || lock.current || !showForm) return;
 
     if (
       !form.certificate_title.trim() ||
@@ -398,6 +479,11 @@ function CertificateManager({
       (
         !selectedMembers.length ||
         selectedMembers.length > 200 ||
+        !selectedMembers.every(id =>
+          filteredMembers.some(
+            member => member.member_id === id
+          )
+        ) ||
         !selectedMembers.every(id =>
           members.some(item =>
             item.member_id === id &&
@@ -518,6 +604,7 @@ function CertificateManager({
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation('Certificate management');
     lock.current = true;
 
     setBusy(true);
@@ -585,6 +672,7 @@ function CertificateManager({
     } finally {
       window.clearTimeout(timer);
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -599,14 +687,7 @@ function CertificateManager({
         <button
           type="button"
           disabled={loading || busy}
-          onClick={() => {
-            if (
-              !showForm ||
-              window.confirm('Discard unsaved changes?')
-            ) {
-              void load();
-            }
-          }}
+          onClick={refreshRecords}
         >
           {loading ? 'Loading...' : 'Refresh Records'}
         </button>
@@ -620,6 +701,50 @@ function CertificateManager({
           Create Certificate Drafts
         </button>
 
+        {mutationUncertain && (
+          <div
+            role="alert"
+            style={{
+              background: '#fff7ed',
+              border: '1px solid #fdba74',
+              borderRadius: 10,
+              padding: 14,
+              marginTop: 12,
+              color: '#9a3412',
+            }}
+          >
+            <strong>Server confirmation required</strong>
+            <p>
+              The previous operation may have completed.
+              Do not submit it again until you refresh
+              and review the latest records.
+            </p>
+            <button
+              type="button"
+              disabled={loading || busy}
+              onClick={refreshRecords}
+            >
+              {loading
+                ? 'Refreshing...'
+                : 'Refresh and Review Records'}
+            </button>
+          </div>
+        )}
+        {formDirty && (
+          <p
+            role="status"
+            style={{
+              color: '#92400e',
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: 8,
+              padding: '10px 12px',
+            }}
+          >
+            You have unsaved form changes.
+            Save before leaving this workspace.
+          </p>
+        )}
         {error && (
           <p role="alert" style={{ color: '#b91c1c' }}>
             {error}
@@ -701,13 +826,14 @@ function CertificateManager({
                       <input
                         placeholder="Search completed volunteers"
                         value={memberSearch}
-                        onChange={e =>
-                          setMemberSearch(e.target.value)
-                        }
+                        onChange={e => {
+                          setMemberSearch(e.target.value);
+                          setSelectedMembers([]);
+                        }}
                       />
 
                       <p>
-                        Selected: {selectedMembers.length}
+                        Selected: {selectedMembers.length} / 200
                       </p>
 
                       <button
@@ -897,9 +1023,10 @@ function CertificateManager({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(
-                        'Discard unsaved changes?'
-                      )) closeForm();
+                      if (busy || loading || lock.current) return;
+                      if (confirmDiscardForm()) {
+                        closeForm();
+                      }
                     }}
                   >
                     Cancel
@@ -953,12 +1080,18 @@ function CertificateManager({
             <input
               placeholder="Search certificates or volunteers"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => {
+                setSearch(e.target.value);
+                setSelectedCards([]);
+              }}
             />
 
             <select
               value={filter}
-              onChange={e => setFilter(e.target.value)}
+              onChange={e => {
+                setFilter(e.target.value);
+                setSelectedCards([]);
+              }}
             >
               <option value="">All Certificates</option>
               <option value="draft">Draft</option>
@@ -967,7 +1100,7 @@ function CertificateManager({
             </select>
 
             <p>
-              Selected for issuance: {selectedCards.length}
+              Selected for issuance: {selectedCards.length} / 200
             </p>
 
             <button
@@ -1001,7 +1134,25 @@ function CertificateManager({
                 showForm ||
                 !selectedCards.length
               }
-              onClick={() => void issue(selectedCards)}
+              onClick={() => {
+                if (disabled || showForm || lock.current) return;
+                const visibleIds = selectedCards.filter(id =>
+                  filteredCards.some(
+                    card =>
+                      card.id === id &&
+                      card.status === 'draft'
+                  )
+                );
+                if (visibleIds.length !== selectedCards.length) {
+                  setSelectedCards(visibleIds);
+                  setError(
+                    'Selection changed. Review the visible certificates before issuing.'
+                  );
+                  return;
+                }
+                if (!visibleIds.length) return;
+                void issue(visibleIds);
+              }}
             >
               {busy
                 ? 'Processing...'

@@ -1,4 +1,7 @@
 import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
+import {
   useCallback,
   useEffect,
   useRef,
@@ -92,6 +95,7 @@ type Filters = {
   opportunity_id: string;
   status: string;
   registration_type: string;
+  photo_status: string;
   search: string;
 };
 
@@ -99,6 +103,7 @@ const emptyFilters: Filters = {
   opportunity_id: '',
   status: '',
   registration_type: '',
+  photo_status: '',
   search: '',
 };
 
@@ -122,14 +127,22 @@ function statusText(value: string) {
 
 export default function Registrations({
   opportunities,
+  selectedProgrammeId,
 }: {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }) {
+  const selectedProgramme = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId = selectedProgramme
+    ? selectedProgrammeId
+    : '';
   const [filters, setFilters] =
-    useState<Filters>({ ...emptyFilters });
+    useState<Filters>({ ...emptyFilters, opportunity_id: opportunityId });
 
   const [applied, setApplied] =
-    useState<Filters>({ ...emptyFilters });
+    useState<Filters>({ ...emptyFilters, opportunity_id: opportunityId });
 
   const [page, setPage] =
     useState(1);
@@ -193,6 +206,16 @@ export default function Registrations({
 
   const load = useCallback(async () => {
     const version = ++listVersion.current;
+    if (!opportunityId) {
+      setItems([]);
+      setStats(null);
+      setTotal(0);
+      setTotalPages(0);
+      setLoading(false);
+      setError('');
+      setNeedsRefresh(false);
+      return false;
+    }
 
     setLoading(true);
     setError('');
@@ -208,9 +231,9 @@ export default function Registrations({
       }
     }
 
-    const statsQuery = applied.opportunity_id
-      ? `?opportunity_id=${applied.opportunity_id}`
-      : '';
+    params.set('opportunity_id', opportunityId);
+    const statsQuery =
+      `?opportunity_id=${encodeURIComponent(opportunityId)}`;
 
     try {
       const [list, statistics] =
@@ -269,7 +292,7 @@ export default function Registrations({
         setLoading(false);
       }
     }
-  }, [applied, page]);
+  }, [applied, page, opportunityId]);
 
   useEffect(() => {
     setItems([]);
@@ -357,7 +380,7 @@ export default function Registrations({
 
     closeDetails();
     setPage(1);
-    setApplied({ ...filters });
+    setApplied({ ...filters, opportunity_id: opportunityId });
   }
 
   async function refreshAll() {
@@ -393,6 +416,7 @@ export default function Registrations({
       );
     }
     const registrationId = detail.id;
+    const releaseOperation = beginVolunteerOperation('Registration management');
     mutationLock.current = true;
     setBusy(true);
     setError('');
@@ -424,6 +448,7 @@ export default function Registrations({
       throw error;
     } finally {
       mutationLock.current = false;
+      releaseOperation();
       if (mounted.current) {
         setBusy(false);
       }
@@ -459,6 +484,7 @@ export default function Registrations({
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation('Registration management');
     mutationLock.current = true;
 
     setBusy(true);
@@ -504,6 +530,7 @@ export default function Registrations({
       }
     } finally {
       mutationLock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -545,6 +572,18 @@ export default function Registrations({
     detailLoading ||
     needsRefresh;
 
+  if (!opportunityId) {
+    return (
+      <div className="panel">
+        <h3>Volunteer Registrations</h3>
+        <p>
+          Select a Seva programme from the
+          programme workspace above to review
+          its individual and group registrations.
+        </p>
+      </div>
+    );
+  }
   return (
     <>
       <div className="page-head">
@@ -629,32 +668,24 @@ export default function Registrations({
           }}
         >
           <div className="grid2">
-            <label>
-              Seva Opportunity
-
-              <select
-                value={filters.opportunity_id}
-                onChange={e =>
-                  setFilters(current => ({
-                    ...current,
-                    opportunity_id: e.target.value,
-                  }))
-                }
-              >
-                <option value="">
-                  All Opportunities
-                </option>
-
-                {opportunities.map(item => (
-                  <option
-                    key={item.id}
-                    value={item.id}
-                  >
-                    {item.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div
+              style={{
+                background: '#FFFDF8',
+                border: '1px solid #e7d9be',
+                borderRadius: 10,
+                padding: '12px 16px',
+              }}
+            >
+              <small>Selected Seva Programme</small>
+              <div style={{
+                color: '#6B1720',
+                fontWeight: 700,
+                marginTop: 5,
+              }}>
+                {selectedProgramme?.title ||
+                  'Choose a programme from the workspace above.'}
+              </div>
+            </div>
 
             <label>
               Registration Status
@@ -704,12 +735,51 @@ export default function Registrations({
               </select>
             </label>
 
+            <label className="vs-advanced-filter">
+              Photograph Verification
+              <select
+                value={filters.photo_status}
+                onChange={event =>
+                  setFilters(current => ({
+                    ...current,
+                    photo_status: event.target.value,
+                  }))
+                }
+              >
+                <option value="">All Photographs</option>
+                <option value="needs_review">
+                  At Least One Unverified
+                </option>
+                <option value="all_verified">
+                  All Members Verified
+                </option>
+                <option value="missing">
+                  Missing Photograph
+                </option>
+                <option value="pending">
+                  Pending Verification
+                </option>
+                <option value="correction_required">
+                  Correction Required
+                </option>
+                <option value="resubmitted">
+                  Resubmitted
+                </option>
+                <option value="verified">
+                  At Least One Verified
+                </option>
+              </select>
+              <small>
+                Includes applications with
+                matching volunteer photographs.
+              </small>
+            </label>
             <label>
               Search
 
               <input
                 maxLength={150}
-                placeholder="Name, mobile, group or code"
+                placeholder="Name, mobile, group or volunteer code"
                 value={filters.search}
                 onChange={e =>
                   setFilters(current => ({
@@ -733,8 +803,8 @@ export default function Registrations({
               type="button"
               onClick={() => {
                 closeDetails();
-                setFilters({ ...emptyFilters });
-                setApplied({ ...emptyFilters });
+                setFilters({ ...emptyFilters, opportunity_id: opportunityId });
+                setApplied({ ...emptyFilters, opportunity_id: opportunityId });
                 setPage(1);
               }}
             >
@@ -744,6 +814,58 @@ export default function Registrations({
         </fieldset>
       </form>
 
+      <section
+        className="vs-filter-summary"
+        aria-label="Registration filter results"
+        role="status"
+      >
+        <div className="vs-filter-summary-heading">
+          <div>
+            <span className="vs-filter-kicker">
+              REGISTRATION MANAGEMENT
+            </span>
+            <h3>Application Results</h3>
+            <p>
+              Review matching volunteer applications
+              and photograph verification status.
+            </p>
+          </div>
+          <div className="vs-filter-count">
+            <strong>
+              {loading || needsRefresh
+                ? '—'
+                : total}
+            </strong>
+            <span>Matching Applications</span>
+          </div>
+        </div>
+        {loading ? (
+          <p>Loading matching applications...</p>
+        ) : needsRefresh ? (
+          <p>Refresh to view current results.</p>
+        ) : (
+          <div className="vs-filter-chips">
+            <span>
+              Type: {applied.registration_type
+                ? statusText(applied.registration_type)
+                : 'All'}
+            </span>
+            <span>
+              Status: {applied.status
+                ? statusText(applied.status)
+                : 'All'}
+            </span>
+            <span>
+              Photograph: {applied.photo_status
+                ? statusText(applied.photo_status)
+                : 'All'}
+            </span>
+            {applied.search && (
+              <span>Search: {applied.search}</span>
+            )}
+          </div>
+        )}
+      </section>
       {detailLoading && (
         <div className="panel">
           Loading registration details…

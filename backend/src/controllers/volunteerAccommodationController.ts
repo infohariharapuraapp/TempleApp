@@ -198,23 +198,31 @@ function validateDates(
 
 async function lockOpportunity(
   client: PoolClient,
-  opportunityId: string
+  opportunityId: string,
+  requireAccommodationEnabled = true
 ) {
   const result = await client.query(
     `
-    SELECT id
-
+    SELECT
+      id,
+      accommodation_enabled
     FROM volunteer_opportunities
-
     WHERE id = $1
-
     FOR UPDATE
     `,
     [opportunityId]
   );
-
   if (!result.rows.length) {
     fail(404, 'Volunteer opportunity not found');
+  }
+  if (
+    requireAccommodationEnabled &&
+    result.rows[0].accommodation_enabled !== true
+  ) {
+    fail(
+      409,
+      'Accommodation is disabled for this programme'
+    );
   }
 }
 
@@ -382,11 +390,12 @@ export const getEligibleAccommodationMembers =
           ) AS visible_accommodation_count
 
         FROM volunteer_members m
-
         JOIN volunteer_registrations r
           ON r.id = m.registration_id
-
+        JOIN volunteer_opportunities o
+          ON o.id = m.opportunity_id
         WHERE m.opportunity_id = $1
+        AND o.accommodation_enabled = TRUE
 
         AND m.status = 'approved'
 
@@ -991,7 +1000,8 @@ export const updateVolunteerAccommodationVisibility =
 
         await lockOpportunity(
           client,
-          opportunityId
+          opportunityId,
+          visible
         );
 
         // ========================================
@@ -1240,6 +1250,8 @@ export const getMyVolunteerAccommodation =
           ON o.id = a.opportunity_id
 
         WHERE a.is_visible = TRUE
+
+        AND o.accommodation_enabled = TRUE
 
         AND (
           r.user_id = $1

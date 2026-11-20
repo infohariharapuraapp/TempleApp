@@ -1,4 +1,4 @@
-import { useState } from 'react';
+
 
 import Attendance from './Attendance';
 
@@ -8,11 +8,12 @@ import DailyAttendance, {
 
 export default function AttendanceManager({
   opportunities,
+  selectedProgrammeId,
 }: {
   opportunities: AttendanceOpportunity[];
+  selectedProgrammeId: string;
 }) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const opportunityId = selectedProgrammeId;
 
   const opportunity = opportunities.find(
     item => String(item.id) === opportunityId
@@ -33,35 +34,24 @@ export default function AttendanceManager({
       <div className="panel">
         <h2>Volunteer Attendance</h2>
 
-        <label>
-          Select Programme
-
-          <select
-            value={opportunityId}
-            onChange={event => {
-              if (
-                opportunityId &&
-                !window.confirm(
-                  'Switch programme? Save any pending changes first.'
-                )
-              ) {
-                return;
-              }
-
-              setOpportunityId(event.target.value);
-            }}
-          >
-            <option value="">
-              Select a programme
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            padding: '12px 16px',
+            border: '1px solid #e7d9be',
+            background: '#FFFDF8',
+            borderRadius: 10,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {opportunity?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
 
         {opportunity && (
           <p>
@@ -76,6 +66,7 @@ export default function AttendanceManager({
             <Attendance
               key={opportunity.id}
               opportunities={[opportunity]}
+              selectedProgrammeId={opportunityId}
             />
           )}
 

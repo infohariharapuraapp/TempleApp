@@ -1,3 +1,6 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -11,6 +14,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 interface Member {
@@ -74,9 +78,14 @@ interface Card {
 
 export default function IdCards({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const selectedProgramme = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId = selectedProgramme
+    ? String(selectedProgramme.id)
+    : '';
 
   return (
     <section>
@@ -88,29 +97,25 @@ export default function IdCards({
           digital service identity cards.
         </p>
 
-        <label>
-          Seva Opportunity
-
-          <select
-            value={opportunityId}
-            onChange={e =>
-              setOpportunityId(e.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option
-                key={item.id}
-                value={item.id}
-              >
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {selectedProgramme?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
       </div>
 
       {opportunityId && (
@@ -287,6 +292,7 @@ function CardManager({ opportunitiesMode,
       disabled
     ) return;
 
+    const releaseOperation = beginVolunteerOperation('Volunteer ID cards');
     lock.current = true;
 
     setBusy(true);
@@ -311,6 +317,7 @@ function CardManager({ opportunitiesMode,
       }
     } finally {
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);

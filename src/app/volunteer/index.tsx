@@ -19,6 +19,7 @@ import {
 } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   formatVolunteerDate,
@@ -170,7 +171,12 @@ export default function VolunteerHomeScreen() {
       >
         {/* DEVOTIONAL HERO */}
 
-        <View style={styles.hero}>
+        <LinearGradient
+  colors={['#441017', '#6B1720', '#8C3039']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={styles.hero}
+>
           <Text style={styles.eyebrow}>
             DIVYAKSHETRA HARIHARAPURA
           </Text>
@@ -194,7 +200,29 @@ export default function VolunteerHomeScreen() {
           </Text>
 
           <View style={styles.goldLine} />
-        </View>
+        </LinearGradient>
+        <TouchableOpacity
+          accessibilityRole="button"
+          activeOpacity={0.78}
+          onPress={() => router.push('/my-sevas')}
+          style={styles.journeyLink}
+        >
+          <View style={styles.journeyIcon}>
+            <Text style={styles.journeyIconText}>✓</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.journeyTitle}>
+              {t('bookingScreens.mySevas', 'My Sevas')}
+            </Text>
+            <Text style={styles.journeyDescription}>
+              {t(
+                'volunteer.mySevasDescription',
+                'Track your registrations and service progress.'
+              )}
+            </Text>
+          </View>
+          <Text style={styles.journeyArrow}>›</Text>
+        </TouchableOpacity>
 
         {/* OPPORTUNITY FILTERS */}
         <View style={{
@@ -502,6 +530,10 @@ const styles = StyleSheet.create({
   },
 
   card: {
+    shadowColor: '#38251C',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     backgroundColor: C.white,
     borderRadius: 20,
     borderWidth: 1,
@@ -512,7 +544,7 @@ const styles = StyleSheet.create({
   },
 
   cardBody: {
-    padding: 17,
+    padding: 20,
   },
 
   cardTitle: {
@@ -587,6 +619,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  journeyLink: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8DAC7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 22,
+    elevation: 2,
+    shadowColor: '#38251C',
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  journeyIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: '#F7EBD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  journeyIconText: {
+    color: C.maroon,
+    fontSize: 23,
+    fontWeight: '800',
+  },
+  journeyTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: C.maroon,
+  },
+  journeyDescription: {
+    fontSize: 12,
+    lineHeight: 19,
+    color: C.muted,
+    marginTop: 5,
+  },
+  journeyArrow: {
+    fontSize: 29,
+    color: C.maroon,
+  },
   footer: {
     textAlign: 'center',
     fontSize: 12,

@@ -29,6 +29,7 @@ export type VolunteerStatus =
   | 'cancelled';
 
 export interface VolunteerOpportunity {
+  accommodation_enabled?: boolean;
   attendance_mode?: VolunteerAttendanceMode;
   id: number;
   title: string;
@@ -124,6 +125,7 @@ export interface VolunteerRegistration {
 
 export interface MyVolunteerRegistration
   extends VolunteerRegistration {
+  accommodation_enabled?: boolean;
   attendance_mode?: VolunteerAttendanceMode;
   image_url: string | null;
 
@@ -410,6 +412,7 @@ export function getVolunteerError(
 
 export interface VolunteerRegistrationDetails {
   registration: {
+    accommodation_enabled?: boolean;
     id: number;
     registration_code: string;
     opportunity_id: number;

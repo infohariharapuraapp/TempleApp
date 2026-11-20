@@ -81,6 +81,7 @@ export const getMySevaDetails = async (
 
             o.title AS programme_name,
             o.attendance_mode,
+            o.accommodation_enabled,
             o.description,
             o.instructions,
             o.image_url,
@@ -550,13 +551,14 @@ export const getMySevaDetails = async (
             ac.instructions
 
           FROM volunteer_accommodation ac
-
           JOIN volunteer_members m
             ON m.id = ac.member_id
-
+            AND m.opportunity_id = ac.opportunity_id
+          JOIN volunteer_opportunities o
+            ON o.id = ac.opportunity_id
           WHERE ac.member_id =
             ANY($1::integer[])
-
+            AND o.accommodation_enabled = TRUE
             AND ac.is_visible = TRUE
 
             AND m.status IN (
@@ -861,10 +863,11 @@ export const getMySevaDetails = async (
                 || null
               : null,
 
-            accommodation: allowed
-              ? accommodationMap.get(member.id)
-                || []
-              : [],
+            accommodation:
+              allowed &&
+              registration.accommodation_enabled === true
+                ? accommodationMap.get(member.id) || []
+                : [],
 
             certificate: allowed
               ? certificateMap.get(member.id)?.[0]

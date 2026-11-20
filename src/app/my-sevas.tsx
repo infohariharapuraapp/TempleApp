@@ -18,6 +18,7 @@ import {
 } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   getMyVolunteerRegistrations,
@@ -227,7 +228,12 @@ export default function MySevasScreen() {
             />
           }
         >
-          <View style={styles.hero}>
+          <LinearGradient
+  colors={['#441017', '#6B1720', '#8C3039']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={styles.hero}
+>
             <Text style={styles.heroLabel}>
               {t(
                 'volunteer.myServiceJourney',
@@ -268,8 +274,7 @@ export default function MySevasScreen() {
                 value={completedCount}
               />
             </View>
-          </View>
-
+          </LinearGradient>
           <View style={styles.filters}>
             {filters.map(option => (
               <View
@@ -533,10 +538,16 @@ const styles = StyleSheet.create({
   },
 
   filter: {
-    width: '48%',
+    flexGrow: 1,
+    flexBasis: '44%',
+    minWidth: 125,
   },
 
   card: {
+    shadowColor: '#38251C',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
     backgroundColor: C.white,
     borderRadius: 20,
     overflow: 'hidden',
@@ -546,7 +557,7 @@ const styles = StyleSheet.create({
   },
 
   cardBody: {
-    padding: 18,
+    padding: 20,
   },
 
   title: {

@@ -6,6 +6,9 @@ import React, {
 
 import {
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +23,10 @@ import {
 } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   getVolunteerOpportunity,
@@ -41,6 +48,7 @@ import type {
 
 import {
   createEmptyMember,
+  isValidBirthDate,
   normalizeVolunteerMember,
   validateVolunteerMember,
   validateVolunteerRegistration,
@@ -243,6 +251,16 @@ export default function VolunteerRegisterScreen() {
   }, [id]);
 
   const member = members[memberIndex];
+  function handleRegistrationHeaderBack() {
+    if (photoLock.current || submitting) {
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/seva-registration');
+    }
+  }
   function handlePhotoBusy(busy: boolean) {
     photoLock.current = busy;
     setPhotoBusy(busy);
@@ -709,7 +727,7 @@ export default function VolunteerRegisterScreen() {
     .sort();
 
   return (
-    <VolunteerScreen
+    <VolunteerScreen onBack={handleRegistrationHeaderBack}
       title={t(
         'volunteer.register',
         'Volunteer Registration'
@@ -763,9 +781,21 @@ export default function VolunteerRegisterScreen() {
           onRetry={() => void load()}
         />
       ) : (
+        <KeyboardAvoidingView
+          style={styles.keyboardContainer}
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : 'height'
+          }
+          keyboardVerticalOffset={0}
+        >
         <ScrollView
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          style={styles.keyboardContainer}
           contentContainerStyle={styles.content}
         >
           <View style={styles.hero}>
@@ -924,14 +954,21 @@ export default function VolunteerRegisterScreen() {
               'email-address'
             )}
 
-            {field(
-              'date_of_birth',
-              t('volunteer.dateOfBirth') + ' *',
-              'YYYY-MM-DD',
-              'default',
-              false,
-              10
-            )}
+            <VolunteerBirthDateField
+              key={`${id}-${memberIndex}-dob`}
+              value={member.date_of_birth}
+              disabled={
+                submitting ||
+                uncertain ||
+                photoBusy ||
+                !registrationOpen
+              }
+              onChange={value =>
+                updateMember({
+                  date_of_birth: value,
+                })
+              }
+            />
 
             <Text style={styles.label}>
               {t("volunteer.gender")} *
@@ -1349,11 +1386,220 @@ export default function VolunteerRegisterScreen() {
             </Text>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </VolunteerScreen>
   );
 }
 
+// ========================================
+// VOLUNTEER DATE OF BIRTH
+// ========================================
+function VolunteerBirthDateField({
+  value,
+  disabled = false,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [showPicker, setShowPicker] =
+    useState(false);
+  const todayParts =
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+  const todayISO = ['year', 'month', 'day']
+    .map(type =>
+      todayParts.find(
+        part => part.type === type
+      )?.value
+    )
+    .join('-');
+  function parseLocalDate(input: string): Date {
+    const [year, month, day] =
+      input.split('-').map(Number);
+    const result = new Date(2000, 0, 1, 12);
+    result.setFullYear(
+      year,
+      month - 1,
+      day
+    );
+    return result;
+  }
+  function toISODate(date: Date): string {
+    const year = String(
+      date.getFullYear()
+    ).padStart(4, '0');
+    const month = String(
+      date.getMonth() + 1
+    ).padStart(2, '0');
+    const day = String(
+      date.getDate()
+    ).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  const maximumDate =
+    parseLocalDate(todayISO);
+  maximumDate.setHours(
+    23,
+    59,
+    59,
+    999
+  );
+  const selectedDate =
+    isValidBirthDate(value)
+      ? parseLocalDate(value)
+      : parseLocalDate(todayISO);
+  const [draftDate, setDraftDate] =
+    useState(selectedDate);
+  const displayValue =
+    isValidBirthDate(value)
+      ? value.split('-').reverse().join('-')
+      : '';
+  function saveDate(date: Date) {
+    if (disabled) return;
+    const formatted = toISODate(date);
+    if (isValidBirthDate(formatted)) {
+      onChange(formatted);
+    }
+  }
+  function openPicker() {
+    if (disabled) return;
+    Keyboard.dismiss();
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: selectedDate,
+        mode: 'date',
+        display: 'default',
+        maximumDate,
+        onChange: (event, date) => {
+          if (
+            event.type === 'set' &&
+            date
+          ) {
+            saveDate(date);
+          }
+        },
+      });
+      return;
+    }
+    setDraftDate(selectedDate);
+    setShowPicker(true);
+  }
+  return (
+    <View style={styles.dobField}>
+      <Text style={styles.label}>
+        {t('volunteer.dateOfBirth', 'Date of Birth')} *
+      </Text>
+      {Platform.OS === 'web' ? (
+        <TextInput
+          value={value}
+          editable={!disabled}
+          onChangeText={onChange}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={C.muted}
+          maxLength={10}
+          style={styles.dobWebInput}
+        />
+      ) : (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={
+            t(
+              'volunteer.dateOfBirth',
+              'Date of Birth'
+            ) + ': ' + (
+              displayValue || 'Select date'
+            )
+          }
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          activeOpacity={0.8}
+          onPress={openPicker}
+          style={[
+            styles.dobButton,
+            disabled && styles.dobDisabled,
+          ]}
+        >
+          <Text
+            style={[
+              styles.dobValue,
+              !displayValue &&
+                styles.dobPlaceholder,
+            ]}
+          >
+            {displayValue ||
+              t(
+                'volunteer.selectBirthDate',
+                'Select Date of Birth'
+              )}
+          </Text>
+          <View style={styles.dobIcon}>
+            <Ionicons
+              name="calendar-outline"
+              size={21}
+              color={C.maroon}
+            />
+          </View>
+        </TouchableOpacity>
+      )}
+      <Text style={styles.dobHint}>
+        {Platform.OS === 'web'
+          ? 'YYYY-MM-DD'
+          : t(
+              'volunteer.birthDateHint',
+              'DD-MM-YYYY - Tap to select date'
+            )}
+      </Text>
+      {Platform.OS === 'ios' &&
+        showPicker &&
+        !disabled && (
+          <View style={styles.dobPickerPanel}>
+            <DateTimePicker
+              value={draftDate}
+              mode="date"
+              display="spinner"
+              maximumDate={maximumDate}
+              onChange={(event, date) => {
+                if (
+                  event.type === 'set' &&
+                  date
+                ) {
+                  setDraftDate(date);
+                }
+              }}
+            />
+            <View style={styles.dobPickerActions}>
+              <View style={styles.dobActionItem}>
+                <VolunteerButton
+                  title={t('common.cancel', 'Cancel')}
+                  secondary
+                  onPress={() =>
+                    setShowPicker(false)
+                  }
+                />
+              </View>
+              <View style={styles.dobActionItem}>
+                <VolunteerButton
+                  title={t('common.done', 'Done')}
+                  onPress={() => {
+                    saveDate(draftDate);
+                    setShowPicker(false);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+    </View>
+  );
+}
 function Choice({
   label,
   selected,
@@ -1389,6 +1635,76 @@ function Choice({
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+  },
+  dobField: {
+    marginBottom: 15,
+  },
+  dobButton: {
+    minHeight: 55,
+    borderWidth: 1,
+    borderColor: '#E2D1B5',
+    borderRadius: 13,
+    backgroundColor: '#FFFDF8',
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dobDisabled: {
+    opacity: 0.5,
+  },
+  dobValue: {
+    flex: 1,
+    color: '#38251C',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  dobPlaceholder: {
+    color: '#85756A',
+    fontWeight: '400',
+  },
+  dobIcon: {
+    height: 36,
+    width: 36,
+    borderRadius: 10,
+    backgroundColor: '#F7EBD7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dobHint: {
+    color: '#85756A',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  dobPickerPanel: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EADFCC',
+    borderRadius: 15,
+    marginTop: 10,
+    padding: 12,
+  },
+  dobPickerActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  dobActionItem: {
+    flex: 1,
+  },
+  dobWebInput: {
+    minHeight: 55,
+    borderWidth: 1,
+    borderColor: '#E2D1B5',
+    borderRadius: 13,
+    backgroundColor: '#FFFDF8',
+    paddingHorizontal: 14,
+    color: '#38251C',
+    fontSize: 15,
+  },
   content: {
     padding: 16,
     paddingBottom: 45,

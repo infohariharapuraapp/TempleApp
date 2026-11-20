@@ -1,0 +1,684 @@
+.volunteer-dashboard {
+  --vs-maroon: #6b1720;
+  --vs-dark: #421017;
+  --vs-gold: #c69a3a;
+  --vs-ivory: #fffdf8;
+  --vs-border: #e9dfce;
+  --vs-muted: #64748b;
+  min-width: 0;
+}
+.volunteer-dashboard-hero {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 32px;
+  margin-bottom: 24px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right,
+      rgba(198,154,58,.25), transparent 55%),
+    linear-gradient(135deg,#421017,#801f2a);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(66,16,23,.14);
+}
+.volunteer-eyebrow {
+  color: #f1d28b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.volunteer-hero-copy h2 {
+  font-size: clamp(22px,3vw,32px);
+  margin: 10px 0;
+  color: #fff;
+}
+.volunteer-hero-copy p {
+  color: #f2e2df;
+  margin: 0;
+  line-height: 1.7;
+}
+.volunteer-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.volunteer-dashboard .volunteer-hero-actions button {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.3);
+  color: white;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.volunteer-dashboard .volunteer-hero-actions
+.volunteer-gold-button {
+  color: #421017;
+  background: linear-gradient(135deg,#f7e2ac,#d3ab51);
+  border-color: #e9ce91;
+  font-weight: 700;
+}
+.volunteer-workspace,
+.volunteer-current-stage,
+.volunteer-recruitment {
+  background: #fffdf8;
+  padding: 24px;
+  border: 1px solid var(--vs-border);
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+.volunteer-workspace-heading,
+.volunteer-recruitment-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.volunteer-section-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  color: #987022;
+  letter-spacing: 1.4px;
+}
+.volunteer-workspace h3,
+.volunteer-current-stage h3,
+.volunteer-recruitment h3,
+.volunteer-section-heading h3 {
+  color: var(--vs-maroon);
+  margin: 8px 0;
+}
+.volunteer-workspace p,
+.volunteer-current-stage p,
+.volunteer-recruitment p,
+.volunteer-section-heading p {
+  color: var(--vs-muted);
+  margin: 6px 0 18px;
+  line-height: 1.6;
+}
+.volunteer-dashboard .volunteer-programme-select {
+  background: white;
+  border: 1px solid #d9c7a8;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  width: 100%;
+  color: #421017;
+  font-weight: 600;
+}
+.volunteer-programme-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.volunteer-programme-meta span {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #f5ead7;
+  color: #795318;
+  font-size: 12px;
+  font-weight: 600;
+}
+.volunteer-workflow-nav {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit,minmax(125px,1fr));
+  gap: 8px;
+  margin: 0 0 24px;
+}
+.volunteer-dashboard .volunteer-workflow-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 12px;
+  min-height: 98px;
+  white-space: normal;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e7dfd3;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  transition:
+    background .2s,
+    border-color .2s,
+    box-shadow .2s;
+}
+.volunteer-dashboard .volunteer-workflow-tab.active {
+  background: var(--vs-maroon);
+  color: white;
+  border-color: var(--vs-maroon);
+  box-shadow: 0 5px 14px rgba(107,23,32,.16);
+}
+.volunteer-step-number {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--vs-maroon);
+  background: #f5ead7;
+}
+.volunteer-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.volunteer-dashboard-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit,minmax(155px,1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.volunteer-stat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--vs-border);
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(51,35,15,.04);
+}
+.volunteer-stat-card span {
+  color: var(--vs-muted);
+  font-size: 13px;
+}
+.volunteer-stat-card strong {
+  color: var(--vs-maroon);
+  font-size: 30px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.volunteer-recruitment-heading strong {
+  font-size: 28px;
+  color: var(--vs-maroon);
+}
+.volunteer-recruitment progress {
+  width: 100%;
+  height: 12px;
+  accent-color: var(--vs-maroon);
+  margin: 10px 0;
+}
+.volunteer-recruitment small {
+  color: #795318;
+}
+.volunteer-workflow-section {
+  margin: 28px 0;
+}
+.volunteer-selection-notice {
+  padding: 14px;
+  margin-bottom: 20px;
+  border: 1px solid #e5c98c;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #795318;
+}
+.volunteer-workflow-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit,minmax(270px,1fr));
+  gap: 20px;
+}
+.volunteer-workflow-card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid var(--vs-border);
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 5px 18px rgba(66,16,23,.04);
+  transition:
+    transform .2s ease,
+    box-shadow .2s ease,
+    border-color .2s ease;
+}
+.volunteer-workflow-card:hover {
+  transform: translateY(-3px);
+  border-color: #c69a3a;
+  box-shadow: 0 12px 25px rgba(66,16,23,.09);
+}
+.volunteer-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.volunteer-stage-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
+  background: #f7ebd7;
+  color: var(--vs-maroon);
+  font-size: 27px;
+}
+.volunteer-stage-label {
+  color: #987022;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.volunteer-workflow-card h3 {
+  color: var(--vs-maroon);
+  font-size: 18px;
+  margin: 20px 0 8px;
+}
+.volunteer-workflow-card p {
+  color: var(--vs-muted);
+  font-size: 14px;
+  line-height: 1.7;
+  flex: 1;
+  margin: 0 0 20px;
+}
+.volunteer-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.volunteer-dashboard .volunteer-card-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fffdf8;
+  color: var(--vs-maroon);
+  border: 1px solid var(--vs-border);
+  border-radius: 10px;
+  font-weight: 650;
+  width: 100%;
+  white-space: normal;
+}
+.volunteer-dashboard .volunteer-card-actions button:hover:not(:disabled) {
+  background: var(--vs-maroon);
+  color: white;
+  border-color: var(--vs-maroon);
+}
+.volunteer-stage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 20px;
+  background: var(--vs-ivory);
+  border: 1px solid var(--vs-border);
+  border-radius: 14px;
+  margin-top: 28px;
+}
+.volunteer-stage-footer small {
+  color: var(--vs-muted);
+}
+.volunteer-dashboard button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.volunteer-dashboard button:focus-visible,
+.volunteer-dashboard select:focus-visible {
+  outline: 3px solid #c69a3a;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .volunteer-dashboard-hero,
+  .volunteer-workspace,
+  .volunteer-current-stage,
+  .volunteer-recruitment {
+    padding: 20px;
+    border-radius: 14px;
+  }
+  .volunteer-workflow-nav {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .volunteer-dashboard .volunteer-workflow-tab {
+    min-width: 140px;
+  }
+  .volunteer-workflow-grid {
+    grid-template-columns: 1fr;
+  }
+  .volunteer-dashboard-stats {
+    grid-template-columns:
+      repeat(2,minmax(0,1fr));
+  }
+  .volunteer-stat-card {
+    padding: 16px;
+  }
+  .volunteer-stage-footer {
+    flex-direction: column;
+  }
+  .volunteer-stage-footer button {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .volunteer-workflow-card,
+  .volunteer-workflow-tab {
+    transition: none;
+  }
+  .volunteer-workflow-card:hover {
+    transform: none;
+  }
+}
+/* ========================================
+   VOLUNTEER ADVANCED FILTERS
+   ======================================== */
+.volunteer-dashboard .vs-filter-summary,
+.volunteer-dashboard .vs-availability-dashboard {
+  margin: 0 0 24px;
+  min-width: 0;
+  animation: vs-filter-enter .25s ease-out;
+}
+.volunteer-dashboard .vs-filter-summary {
+  padding: 24px;
+  background:
+    linear-gradient(
+      135deg,
+      #fffdf8,
+      #ffffff
+    );
+  border: 1px solid #e9dfce;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 18px rgba(66,16,23,.045);
+}
+.vs-filter-kicker {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  color: #987022;
+  margin-bottom: 8px;
+}
+.vs-filter-summary-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.vs-filter-summary-heading h3,
+.vs-availability-heading h3 {
+  margin: 6px 0;
+  color: #6b1720;
+  font-size: 22px;
+  font-weight: 750;
+}
+.vs-filter-summary-heading p,
+.vs-availability-heading p {
+  margin: 8px 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.vs-filter-count {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 155px;
+  padding: 18px 22px;
+  border-radius: 12px;
+  background: #f7ebd7;
+  color: #6b1720;
+}
+.vs-filter-count strong {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.vs-filter-count span {
+  font-size: 12px;
+  font-weight: 650;
+}
+.vs-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 20px;
+}
+.vs-filter-chips span {
+  padding: 8px 12px;
+  border: 1px solid #e9dfce;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b1720;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.vs-availability-heading {
+  padding: 24px;
+  border: 1px solid #e9dfce;
+  border-radius: 16px;
+  background: #fffdf8;
+  margin-bottom: 16px;
+}
+.vs-date-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 13px;
+  margin-top: 12px;
+  background: #f7ebd7;
+  border-radius: 8px;
+  color: #795318;
+  font-size: 12px;
+  font-weight: 650;
+}
+.vs-availability-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(4,minmax(0,1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.vs-availability-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid #e9dfce;
+  border-radius: 14px;
+  background: #ffffff;
+  min-width: 0;
+  box-shadow:
+    0 4px 12px rgba(66,16,23,.035);
+  transition:
+    transform .2s ease,
+    box-shadow .2s ease,
+    border-color .2s ease;
+}
+.vs-availability-stat:hover {
+  transform: translateY(-2px);
+  border-color: #c69a3a;
+  box-shadow:
+    0 8px 20px rgba(66,16,23,.07);
+}
+.vs-availability-stat span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.vs-availability-stat strong {
+  font-size: 30px;
+  color: #6b1720;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.vs-availability-stat small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.vs-stat-confirmed strong {
+  color: #15803d;
+}
+.vs-advanced-filter-panel {
+  padding: 22px;
+  border: 1px solid #e9dfce;
+  background: #ffffff;
+  border-radius: 16px;
+}
+.vs-filter-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.vs-filter-panel-heading h4 {
+  font-size: 17px;
+  font-weight: 750;
+  color: #6b1720;
+  margin: 0 0 6px;
+}
+.vs-filter-panel-heading small {
+  color: #64748b;
+}
+.volunteer-dashboard .vs-clear-filter {
+  background: #fffdf8;
+  border: 1px solid #dcc9a8;
+  border-radius: 9px;
+  color: #6b1720;
+  padding: 10px 16px;
+  font-weight: 650;
+  transition:
+    background .2s,
+    border-color .2s;
+}
+.volunteer-dashboard .vs-clear-filter:hover:not(:disabled) {
+  background: #f7ebd7;
+  border-color: #c69a3a;
+}
+.vs-filter-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2,minmax(0,1fr));
+  gap: 16px;
+}
+.vs-filter-grid label,
+.vs-advanced-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+  min-width: 0;
+}
+.volunteer-dashboard .vs-filter-grid select,
+.volunteer-dashboard .vs-advanced-filter select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #e2d7c5;
+  border-radius: 9px;
+  background: #fffdf8;
+  font-size: 14px;
+  color: #334155;
+  box-sizing: border-box;
+  transition:
+    border-color .2s,
+    box-shadow .2s;
+}
+.volunteer-dashboard .vs-filter-grid select:focus,
+.volunteer-dashboard .vs-advanced-filter select:focus {
+  border-color: #c69a3a;
+  box-shadow:
+    0 0 0 3px rgba(198,154,58,.12);
+}
+.vs-advanced-filter small {
+  font-weight: 400;
+  line-height: 1.6;
+  color: #64748b;
+}
+.vs-filter-result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 0 5px;
+  margin-top: 16px;
+  border-top: 1px solid #eee5d8;
+  font-size: 13px;
+  color: #64748b;
+}
+.vs-filter-result-bar strong {
+  color: #6b1720;
+  font-weight: 750;
+}
+.vs-selection-help {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.6;
+}
+@keyframes vs-filter-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1100px) {
+  .vs-availability-stats {
+    grid-template-columns:
+      repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width: 650px) {
+  .vs-filter-grid {
+    grid-template-columns: 1fr;
+  }
+  .vs-availability-stat {
+    padding: 15px;
+  }
+  .vs-availability-stat strong {
+    font-size: 25px;
+  }
+  .vs-filter-summary,
+  .vs-availability-heading,
+  .vs-advanced-filter-panel {
+    padding: 16px;
+  }
+  .vs-filter-count {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .vs-filter-panel-heading {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 360px) {
+  .vs-availability-stats {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .volunteer-dashboard .vs-filter-summary,
+  .volunteer-dashboard .vs-availability-dashboard,
+  .volunteer-dashboard .vs-availability-stat {
+    animation: none;
+    transition: none;
+  }
+  .vs-availability-stat:hover {
+    transform: none;
+  }
+}

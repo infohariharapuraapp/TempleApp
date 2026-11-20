@@ -1,4 +1,10 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
+import {
+  useVolunteerUnsavedChanges,
+} from '../../lib/volunteerUnsavedChangesGuard';
 
 import {
   volunteerRequest,
@@ -10,6 +16,7 @@ import {
 
 interface Props {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }
 
 interface Member {
@@ -83,9 +90,15 @@ function toISTTimestamp(value: string) {
 
 export default function Accommodation({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [opportunityId, setOpportunityId] =
-    useState('');
+  const selectedProgramme = opportunities.find(
+    item => String(item.id) === selectedProgrammeId
+  );
+  const opportunityId =
+    selectedProgramme?.accommodation_enabled === true
+      ? String(selectedProgramme.id)
+      : '';
 
   return (
     <section>
@@ -97,28 +110,36 @@ export default function Accommodation({
           confirmed stay details to volunteers.
         </p>
 
-        <label>
-          Seva Opportunity
-
-          <select
-            value={opportunityId}
-            onChange={e =>
-              setOpportunityId(e.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {selectedProgramme?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
       </div>
 
+      {selectedProgramme &&
+       selectedProgramme.accommodation_enabled !== true && (
+        <div className="panel">
+          <h3>Accommodation unavailable</h3>
+          <p>
+            Accommodation is not enabled for this programme.
+          </p>
+        </div>
+      )}
       {opportunityId && (
         <AccommodationManager
           key={opportunityId}
@@ -148,6 +169,9 @@ function AccommodationManager({
 
   const [form, setForm] =
     useState<Form>({ ...emptyForm });
+  const formBaseline = useRef<Form>({
+    ...emptyForm,
+  });
 
   const [editing, setEditing] =
     useState<AccommodationRecord | null>(null);
@@ -173,10 +197,13 @@ function AccommodationManager({
   const [success, setSuccess] = useState('');
 
   const lock = useRef(false);
+  const recoveryRequired = useRef(false);
+  const [mutationUncertain, setMutationUncertain] =
+    useState(false);
   const version = useRef(0);
   const mounted = useRef(true);
 
-  async function load() {
+  async function load(discardForm = false) {
     const requestVersion = ++version.current;
 
     setLoading(true);
@@ -209,11 +236,17 @@ function AccommodationManager({
       setMembers(memberResponse.data);
       setRecords(recordResponse.data);
       setReady(true);
+      if (recoveryRequired.current) {
+        recoveryRequired.current = false;
+        setMutationUncertain(false);
+        setSuccess(
+          'Records refreshed. Review the latest server records before submitting again.'
+        );
+      }
 
-      setSelected([]);
-      setEditing(null);
-      setShowForm(false);
-      setForm({ ...emptyForm });
+      if (discardForm) {
+        closeForm();
+      }
     } catch (error) {
       if (
         mounted.current &&
@@ -242,7 +275,22 @@ function AccommodationManager({
     };
   }, []);
 
-  const disabled = loading || busy || !ready;
+  const disabled =
+    loading ||
+    busy ||
+    !ready ||
+    mutationUncertain;
+  const formDirty =
+    showForm &&
+    (
+      JSON.stringify(form) !==
+        JSON.stringify(formBaseline.current) ||
+      (!editing && selected.length > 0)
+    );
+  useVolunteerUnsavedChanges(
+    'Accommodation form',
+    formDirty || mutationUncertain
+  );
 
   const filteredMembers = members.filter(member =>
     [
@@ -283,6 +331,15 @@ function AccommodationManager({
   }
 
   function toggleMember(id: number) {
+    if (
+      disabled ||
+      lock.current ||
+      !showForm ||
+      editing ||
+      !filteredMembers.some(
+        member => member.member_id === id
+      )
+    ) return;
     setSelected(current =>
       current.includes(id)
         ? current.filter(item => item !== id)
@@ -292,7 +349,29 @@ function AccommodationManager({
     );
   }
 
+  function confirmDiscardForm(): boolean {
+    return (
+      !formDirty ||
+      window.confirm(
+        'Discard unsaved form changes?'
+      )
+    );
+  }
+  function refreshRecords() {
+    if (loading || busy || lock.current) return;
+    if (recoveryRequired.current) {
+      if (!window.confirm(
+        'The previous operation may have completed on the server. Refresh records to review the result? The current form will close only after a successful refresh.'
+      )) return;
+      void load(true);
+      return;
+    }
+    if (!confirmDiscardForm()) return;
+    void load(true);
+  }
   function startCreate() {
+    if (disabled || lock.current || showForm) return;
+    formBaseline.current = { ...emptyForm };
     setEditing(null);
     setSelected([]);
     setForm({ ...emptyForm });
@@ -302,10 +381,16 @@ function AccommodationManager({
   }
 
   function startEdit(item: AccommodationRecord) {
+    if (
+      disabled ||
+      lock.current ||
+      showForm ||
+      !eligible(item.member_id)
+    ) return;
     setEditing(item);
     setSelected([]);
 
-    setForm({
+    const initialForm: Form = {
       accommodation_name:
         item.accommodation_name || '',
 
@@ -332,7 +417,10 @@ function AccommodationManager({
 
       instructions:
         item.instructions || '',
-    });
+    };
+
+    formBaseline.current = { ...initialForm };
+    setForm(initialForm);
 
     setShowForm(true);
     setError('');
@@ -340,6 +428,7 @@ function AccommodationManager({
   }
 
   function closeForm() {
+    formBaseline.current = { ...emptyForm };
     setShowForm(false);
     setEditing(null);
     setSelected([]);
@@ -363,6 +452,8 @@ function AccommodationManager({
       disabled
     ) return;
 
+    if (recoveryRequired.current) return;
+    const releaseOperation = beginVolunteerOperation('Accommodation management');
     lock.current = true;
 
     setBusy(true);
@@ -379,10 +470,16 @@ function AccommodationManager({
 
       setSuccess(response.message || message);
 
+      closeForm();
       await load();
     } catch (error) {
       if (mounted.current) {
-        setError(getErrorMessage(error));
+        recoveryRequired.current = true;
+        setMutationUncertain(true);
+        setError(
+          'The operation could not be confirmed. It may have completed on the server. Refresh and review the records before retrying. Details: ' +
+          getErrorMessage(error)
+        );
 
         // A timed-out request could have
         // completed on the backend.
@@ -390,6 +487,7 @@ function AccommodationManager({
       }
     } finally {
       lock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -398,6 +496,7 @@ function AccommodationManager({
   }
 
   async function save() {
+    if (disabled || lock.current || !showForm) return;
     if (!form.accommodation_name.trim()) {
       setError('Accommodation name is required.');
       return;
@@ -408,7 +507,12 @@ function AccommodationManager({
       (
         !selected.length ||
         selected.length > 500 ||
-        !selected.every(eligible)
+        !selected.every(id =>
+          eligible(id) &&
+          filteredMembers.some(
+            member => member.member_id === id
+          )
+        )
       )
     ) {
       setError(
@@ -512,6 +616,11 @@ function AccommodationManager({
   async function changeVisibility(
     item: AccommodationRecord
   ) {
+    if (
+      disabled ||
+      lock.current ||
+      showForm
+    ) return;
     const visible = !item.is_visible;
 
     if (visible && !eligible(item.member_id)) {
@@ -544,16 +653,7 @@ function AccommodationManager({
         <button
           type="button"
           disabled={loading || busy}
-          onClick={() => {
-            if (
-              !showForm ||
-              window.confirm(
-                'Discard unsaved accommodation details?'
-              )
-            ) {
-              void load();
-            }
-          }}
+          onClick={refreshRecords}
         >
           {loading
             ? 'Loading...'
@@ -569,6 +669,50 @@ function AccommodationManager({
           Allocate Accommodation
         </button>
 
+        {mutationUncertain && (
+          <div
+            role="alert"
+            style={{
+              background: '#fff7ed',
+              border: '1px solid #fdba74',
+              borderRadius: 10,
+              padding: 14,
+              marginTop: 12,
+              color: '#9a3412',
+            }}
+          >
+            <strong>Server confirmation required</strong>
+            <p>
+              The previous operation may have completed.
+              Do not submit it again until you refresh
+              and review the latest records.
+            </p>
+            <button
+              type="button"
+              disabled={loading || busy}
+              onClick={refreshRecords}
+            >
+              {loading
+                ? 'Refreshing...'
+                : 'Refresh and Review Records'}
+            </button>
+          </div>
+        )}
+        {formDirty && (
+          <p
+            role="status"
+            style={{
+              color: '#92400e',
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: 8,
+              padding: '10px 12px',
+            }}
+          >
+            You have unsaved form changes.
+            Save before leaving this workspace.
+          </p>
+        )}
         {error && (
           <p role="alert"
             style={{ color: '#b91c1c' }}>
@@ -648,13 +792,14 @@ function AccommodationManager({
                       <input
                         placeholder="Search volunteer, mobile or group"
                         value={search}
-                        onChange={e =>
-                          setSearch(e.target.value)
-                        }
+                        onChange={e => {
+                          setSearch(e.target.value);
+                          setSelected([]);
+                        }}
                       />
 
                       <p>
-                        Selected: {selected.length}
+                        Selected: {selected.length} / 500
                       </p>
 
                       <button
@@ -932,9 +1077,10 @@ function AccommodationManager({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(
-                        'Discard unsaved changes?'
-                      )) closeForm();
+                      if (busy || loading || lock.current) return;
+                      if (confirmDiscardForm()) {
+                        closeForm();
+                      }
                     }}
                   >
                     Cancel

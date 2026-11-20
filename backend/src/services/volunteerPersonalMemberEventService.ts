@@ -286,7 +286,9 @@ export async function queueVolunteerPersonalMemberEvent(
         )::bigint::text AS event_revision
 
       FROM volunteer_accommodation ac
-
+      JOIN volunteer_opportunities o
+        ON o.id = ac.opportunity_id
+        AND o.accommodation_enabled = TRUE
       JOIN volunteer_members m
 
         ON m.id = ac.member_id

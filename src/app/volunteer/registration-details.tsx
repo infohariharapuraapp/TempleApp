@@ -9,6 +9,7 @@ import React, {
 
 import {
   Alert,
+  BackHandler,
   Image,
   Linking,
   RefreshControl,
@@ -26,6 +27,7 @@ import {
 } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   getVolunteerRegistrationDetails,
@@ -204,6 +206,9 @@ export default function RegistrationDetailsScreen() {
 
   const version = useRef(0);
   const photoLock = useRef(false);
+  const journeyScroll = useRef<ScrollView>(null);
+  const sectionOffset = useRef(0);
+  const journeyOffset = useRef(0);
   const [photoBusy, setPhotoBusy] =
     useState(false);
   const [photoRefreshKey, setPhotoRefreshKey] =
@@ -247,6 +252,17 @@ export default function RegistrationDetailsScreen() {
         }
 
         setData(result);
+        // Return to Overview if accommodation
+        // has been disabled by the administrator.
+        if (
+          result.registration.accommodation_enabled === false
+        ) {
+          setSection(previous =>
+            previous === 'accommodation'
+              ? 'overview'
+              : previous
+          );
+        }
 
         setSelectedMemberId(previous => {
           const available =
@@ -293,7 +309,65 @@ export default function RegistrationDetailsScreen() {
     }, [load, i18n.language])
   );
 
+  function handleJourneyHeaderBack() {
+    if (photoLock.current || refreshing) {
+      return;
+    }
+    if (section !== 'overview') {
+      setSection('overview');
+      journeyScroll.current?.scrollTo({
+        y: Math.max(0, journeyOffset.current - 12),
+        animated: true,
+      });
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/my-sevas');
+    }
+  }
+  function openJourneySection(next: Section) {
+    if (photoLock.current || refreshing) return;
+    setSection(next);
+    journeyScroll.current?.scrollTo({
+      y: Math.max(
+        0,
+        next === 'overview'
+          ? journeyOffset.current - 12
+          : sectionOffset.current - 12
+      ),
+      animated: true,
+    });
+  }
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          if (photoLock.current) {
+            return true;
+          }
+          if (section !== 'overview') {
+            setSection('overview');
+            journeyScroll.current?.scrollTo({
+              y: Math.max(0, journeyOffset.current - 12),
+              animated: true,
+            });
+            return true;
+          }
+          return false;
+        }
+      );
+      return () => subscription.remove();
+    }, [section])
+  );
   const registration = data?.registration;
+  // Preserve compatibility with older API responses.
+  // Explicit false disables accommodation completely.
+  const accommodationAvailable =
+    !!registration &&
+    registration.accommodation_enabled !== false;
 
   const member =
     data?.members.find(
@@ -301,13 +375,289 @@ export default function RegistrationDetailsScreen() {
     ) ?? data?.members[0];
 
   const nextDuty = data?.next_duty;
+  const approved = [
+    'approved',
+    'assigned',
+    'in_progress',
+    'completed',
+  ].includes(registration?.status ?? '');
+  const serviceCompleted =
+    member?.status === 'completed';
+  const memberActive =
+    approved &&
+    (
+      member?.status === 'approved' ||
+      serviceCompleted
+    );
+  const certificateIssued =
+    member?.certificate?.status === 'issued';
+  const activeID =
+    member?.id_card?.status === 'active';
+  const photoNeedsAttention =
+    member?.photo_status === 'correction_required' ||
+    member?.photo_status === 'missing';
+  const legacyMode =
+    !member?.attendance_mode ||
+    member.attendance_mode === 'legacy';
+  const attendanceTitle =
+    member?.attendance_mode === 'none'
+      ? t(
+          'volunteer.dailyServiceProgress',
+          'Service Progress'
+        )
+      : t(
+          'volunteer.attendance',
+          'Attendance'
+        );
+  type JourneyStep = {
+    label: string;
+    detail: string;
+    state: 'done' | 'current' | 'waiting';
+    target: Section;
+  };
+  const journeySteps: JourneyStep[] = [
+    {
+      label: t(
+        'volunteer.journeySubmitted',
+        'Registration Submitted'
+      ),
+      detail: t(
+        'volunteer.journeyReceived',
+        'Your application has been received.'
+      ),
+      state: 'done',
+      target: 'overview',
+    },
+    {
+      label: t(
+        'volunteer.journeyApproval',
+        'Registration Approval'
+      ),
+      detail: memberActive
+        ? t('volunteer.approved', 'Approved')
+        : t(
+            'volunteer.journeyReview',
+            'Check the current approval status.'
+          ),
+      state: memberActive ? 'done' : 'current',
+      target: 'overview',
+    },
+    {
+      label: t(
+        'volunteer.sections.idcard',
+        'Digital ID Card'
+      ),
+      detail: activeID
+        ? t(
+            'volunteer.journeyIDAvailable',
+            'Your ID card is available.'
+          )
+        : t(
+            'volunteer.journeyIDPending',
+            'Check ID card issuance and validity.'
+          ),
+      state: activeID
+        ? 'done'
+        : memberActive && !serviceCompleted
+          ? 'current'
+          : 'waiting',
+      target: 'idcard',
+    },
+    {
+      label: t(
+        'volunteer.journeyPreparation',
+        'Reporting and Preparation'
+      ),
+      detail: t(
+        'volunteer.journeyReportingNote',
+        'Review reporting instructions and availability.'
+      ),
+      state: memberActive && activeID && !serviceCompleted
+        ? 'current'
+        : 'waiting',
+      target: 'reporting',
+    },
+    {
+      label: attendanceTitle,
+      detail: t(
+        'volunteer.journeyAttendanceNote',
+        'Review the service records updated by the temple.'
+      ),
+      state: 'waiting',
+      target: 'attendance',
+    },
+    {
+      label: t(
+        'volunteer.journeyCompletion',
+        'Service Completion'
+      ),
+      detail: serviceCompleted
+        ? t(
+            'volunteer.serviceCompleted',
+            'Service completed'
+          )
+        : t(
+            'volunteer.journeyCompletionPending',
+            'Awaiting service completion.'
+          ),
+      state: serviceCompleted ? 'done' : 'waiting',
+      target: 'attendance',
+    },
+    {
+      label: t(
+        'volunteer.sections.certificate',
+        'Certificate'
+      ),
+      detail: certificateIssued
+        ? t(
+            'volunteer.certificateIssued',
+            'Certificate issued'
+          )
+        : t(
+            'volunteer.journeyCertificatePending',
+            'Check certificate issuance after service.'
+          ),
+      state: certificateIssued
+        ? 'done'
+        : serviceCompleted
+          ? 'current'
+          : 'waiting',
+      target: 'certificate',
+    },
+  ];
+  let nextAction: {
+    title: string;
+    description: string;
+    target: Section;
+    button: string;
+  } = {
+    title: t(
+      'volunteer.journeyReviewRegistration',
+      'Review Registration'
+    ),
+    description: t(
+      'volunteer.journeyCheckStatus',
+      'Check the latest registration status.'
+    ),
+    target: 'overview',
+    button: t(
+      'volunteer.sections.overview',
+      'View Overview'
+    ),
+  };
+  if (registration?.status === 'pending') {
+    nextAction = {
+      title: t(
+        'volunteer.awaitingApproval',
+        'Awaiting Approval'
+      ),
+      description: t(
+        'volunteer.journeyWaitApproval',
+        'The temple administration will review your application.'
+      ),
+      target: 'overview',
+      button: t(
+        'volunteer.sections.overview',
+        'View Overview'
+      ),
+    };
+  } else if (memberActive && certificateIssued) {
+    nextAction = {
+      title: t(
+        'volunteer.certificateIssued',
+        'Your Certificate Is Available'
+      ),
+      description: t(
+        'volunteer.journeyDownloadNote',
+        'View and download your official service certificate.'
+      ),
+      target: 'certificate',
+      button: t(
+        'volunteer.journeyViewCertificate',
+        'View Certificate'
+      ),
+    };
+  } else if (memberActive && serviceCompleted) {
+    nextAction = {
+      title: t(
+        'volunteer.serviceCompleted',
+        'Service Completed'
+      ),
+      description: t(
+        'volunteer.journeyAwaitCertificate',
+        'Check whether your certificate has been issued.'
+      ),
+      target: 'certificate',
+      button: t(
+        'volunteer.journeyCheckCertificate',
+        'Check Certificate'
+      ),
+    };
+  } else if (memberActive && photoNeedsAttention) {
+    nextAction = {
+      title: t(
+        'volunteer.journeyPhotoAttention',
+        'Review Volunteer Photograph'
+      ),
+      description: t(
+        'volunteer.journeyPhotoNote',
+        'Check your photograph status and correction instructions.'
+      ),
+      target: 'overview',
+      button: t(
+        'volunteer.sections.overview',
+        'View Overview'
+      ),
+    };
+  } else if (memberActive && !activeID) {
+    nextAction = {
+      title: t(
+        'volunteer.journeyCheckID',
+        'Check Your Volunteer ID Card'
+      ),
+      description: t(
+        'volunteer.journeyCardPending',
+        'Review the issuance and current status of your ID card.'
+      ),
+      target: 'idcard',
+      button: t(
+        'volunteer.sections.idcard',
+        'View ID Card'
+      ),
+    };
+  } else if (memberActive) {
+    nextAction = {
+      title: t(
+        'volunteer.journeyCheckReporting',
+        'Check Your Reporting Instructions'
+      ),
+      description: legacyMode
+        ? t(
+            'volunteer.journeyDutyNote',
+            'Review reporting instructions and assigned duties before attending.'
+          )
+        : t(
+            'volunteer.journeyDailyNote',
+            'Review daily reporting instructions and confirm availability when requested.'
+          ),
+      target: 'reporting',
+      button: t(
+        'volunteer.sections.reporting',
+        'View Reporting'
+      ),
+    };
+  }
+  const completedSteps =
+    journeySteps.filter(
+      item => item.state === 'done'
+    ).length;
   async function refreshPhotoDetails() {
     await load(true);
     setPhotoRefreshKey(previous => previous + 1);
   }
 
   return (
-    <VolunteerScreen
+    <VolunteerScreen onBack={handleJourneyHeaderBack}
       title={t(
         'bookingScreens.registrationDetails',
         'Registration Details'
@@ -334,6 +684,7 @@ export default function RegistrationDetailsScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={journeyScroll}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
           refreshControl={
@@ -554,8 +905,188 @@ export default function RegistrationDetailsScreen() {
               onRefresh={refreshPhotoDetails}
             />
           )}
+          <View
+            onLayout={event => {
+              journeyOffset.current =
+                event.nativeEvent.layout.y;
+            }}
+          >
+            <View style={styles.journeyAction}>
+              <Text style={styles.journeyActionLabel}>
+                {t(
+                  'volunteer.journeyNextAction',
+                  'RECOMMENDED NEXT ACTION'
+                )}
+              </Text>
+              <Text style={styles.journeyActionTitle}>
+                {nextAction.title}
+              </Text>
+              <Text style={styles.description}>
+                {nextAction.description}
+              </Text>
+              <View style={styles.buttonGap}>
+                <VolunteerButton
+                  title={nextAction.button}
+                  disabled={photoBusy || refreshing}
+                  onPress={() => {
+                    if (
+                      photoNeedsAttention &&
+                      nextAction.target === 'overview'
+                    ) {
+                      if (photoLock.current || refreshing) return;
+                      setSection('overview');
+                      journeyScroll.current?.scrollTo({
+                        y: 0,
+                        animated: true,
+                      });
+                      return;
+                    }
+                    openJourneySection(nextAction.target);
+                  }}
+                />
+              </View>
+              {memberActive &&
+                !serviceCompleted &&
+                legacyMode && (
+                  <View style={styles.buttonGap}>
+                    <VolunteerButton
+                      title={t(
+                        'volunteer.sections.duties',
+                        'View Assigned Duties'
+                      )}
+                      secondary
+                      disabled={photoBusy || refreshing}
+                      onPress={() =>
+                        openJourneySection('duties')
+                      }
+                    />
+                  </View>
+                )}
+              {memberActive && (
+                <View style={styles.buttonGap}>
+                  <VolunteerButton
+                    title={attendanceTitle}
+                    secondary
+                    disabled={photoBusy || refreshing}
+                    onPress={() =>
+                      openJourneySection('attendance')
+                    }
+                  />
+                </View>
+              )}
+            </View>
+            {memberActive && !!member && (
+              <View style={styles.journeyPanel}>
+                <LinearGradient
+                  colors={[
+                    '#441017',
+                    '#6B1720',
+                    '#8C3039'
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.journeyHeader}
+                >
+                  <Text style={styles.journeyEyebrow}>
+                    {t(
+                      'volunteer.journeyLabel',
+                      'YOUR SEVA JOURNEY'
+                    )}
+                  </Text>
+                  <Text style={styles.journeyHeading}>
+                    {member.full_name}
+                  </Text>
+                  <Text style={styles.journeyHeaderText}>
+                    {t(
+                      'volunteer.journeyMilestones',
+                      'Milestones recorded'
+                    )}: {completedSteps}/{journeySteps.length}
+                  </Text>
+                  <View style={styles.journeyTrack}>
+                    <View
+                      style={[
+                        styles.journeyFill,
+                        {
+                          width: `${(
+                            completedSteps /
+                            journeySteps.length
+                          ) * 100}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </LinearGradient>
+                <View style={styles.journeyBody}>
+                  {journeySteps.map((step, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      accessibilityRole="button"
+                      accessibilityLabel={step.label}
+                      disabled={photoBusy || refreshing}
+                      activeOpacity={0.78}
+                      onPress={() =>
+                        openJourneySection(step.target)
+                      }
+                      style={styles.journeyRow}
+                    >
+                      <View style={styles.journeyRail}>
+                        {index !== journeySteps.length - 1 && (
+                          <View style={styles.journeyLine} />
+                        )}
+                        <View
+                          style={[
+                            styles.journeyCircle,
+                            step.state === 'done' &&
+                              styles.journeyCircleDone,
+                            step.state === 'current' &&
+                              styles.journeyCircleCurrent,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.journeyCircleText,
+                              step.state === 'done' && {
+                                color: '#FFFFFF',
+                              },
+                            ]}
+                          >
+                            {step.state === 'done'
+                              ? '\u2713'
+                              : index + 1}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.journeyRowContent}>
+                        <Text style={styles.journeyStepTitle}>
+                          {step.label}
+                        </Text>
+                        <Text style={styles.journeyStepDetail}>
+                          {step.detail}
+                        </Text>
+                      </View>
+                      <Text style={styles.journeyChevron}>
+                        {'\u203A'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+          <Text style={styles.sectionHeading}>
+            {t(
+              'volunteer.journeyServices',
+              'Your Seva Services'
+            )}
+          </Text>
           <View style={styles.navigationGrid}>
             {SECTIONS.filter(item => {
+      if (
+        item.id === 'accommodation' &&
+        !accommodationAvailable
+      ) {
+        return false;
+      }
       if (!member?.attendance_mode ||
           member.attendance_mode === 'legacy') {
         return true;
@@ -574,8 +1105,10 @@ export default function RegistrationDetailsScreen() {
                 accessibilityState={{
                   selected: section === item.id,
                 }}
+                disabled={photoBusy || refreshing}
+                activeOpacity={0.78}
                 onPress={() =>
-                  setSection(item.id)
+                  openJourneySection(item.id)
                 }
                 style={[
                   styles.navigationItem,
@@ -616,6 +1149,32 @@ export default function RegistrationDetailsScreen() {
             ))}
           </View>
 
+          <View
+            onLayout={event => {
+              sectionOffset.current =
+                event.nativeEvent.layout.y;
+            }}
+          >
+            {section !== 'overview' && (
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={photoBusy || refreshing}
+                activeOpacity={0.8}
+                onPress={() =>
+                  openJourneySection('overview')
+                }
+                style={styles.journeyBack}
+              >
+                <Text style={styles.journeyBackText}>
+                  {'\u2190 '}
+                  {t(
+                    'volunteer.journeyBackOverview',
+                    'Back to Seva Overview'
+                  )}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
           {section === 'reporting' && !!member && (
             <VolunteerReporting
               key={`${id}-${member.id}`}
@@ -743,7 +1302,9 @@ export default function RegistrationDetailsScreen() {
             />
           )}
 
-          {!!member && section === 'accommodation' && (
+          {!!member &&
+            accommodationAvailable &&
+            section === 'accommodation' && (
             <AccommodationSection member={member} />
           )}
 
@@ -1932,6 +2493,157 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
+  journeyPanel: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E8DAC7',
+    overflow: 'hidden',
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#38251C',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+  },
+  journeyHeader: {
+    padding: 21,
+  },
+  journeyEyebrow: {
+    color: '#F1D28B',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '800',
+  },
+  journeyHeading: {
+    color: '#FFFFFF',
+    fontSize: 23,
+    fontWeight: '800',
+    marginTop: 9,
+  },
+  journeyHeaderText: {
+    color: '#F7EBD7',
+    fontSize: 12,
+    marginTop: 9,
+  },
+  journeyTrack: {
+    height: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+    marginTop: 13,
+  },
+  journeyFill: {
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#E5B95E',
+  },
+  journeyBody: {
+    paddingHorizontal: 17,
+    paddingTop: 19,
+    paddingBottom: 6,
+  },
+  journeyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    minHeight: 76,
+    gap: 12,
+  },
+  journeyRail: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    width: 34,
+    position: 'relative',
+  },
+  journeyLine: {
+    position: 'absolute',
+    top: 32,
+    bottom: -2,
+    width: 2,
+    backgroundColor: '#E9DFD2',
+  },
+  journeyCircle: {
+    height: 32,
+    width: 32,
+    borderRadius: 16,
+    backgroundColor: '#F6F2EC',
+    borderWidth: 1,
+    borderColor: '#E5DACB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  journeyCircleDone: {
+    backgroundColor: '#28744B',
+    borderColor: '#28744B',
+  },
+  journeyCircleCurrent: {
+    backgroundColor: '#F7EBD7',
+    borderColor: '#C69A3A',
+    borderWidth: 2,
+  },
+  journeyCircleText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#6B1720',
+  },
+  journeyRowContent: {
+    flex: 1,
+    paddingBottom: 18,
+  },
+  journeyStepTitle: {
+    color: '#6B1720',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 21,
+  },
+  journeyStepDetail: {
+    color: '#8E8175',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  journeyChevron: {
+    color: '#6B1720',
+    fontSize: 23,
+    marginTop: 1,
+  },
+  journeyAction: {
+    backgroundColor: '#FFF6E5',
+    borderColor: '#E4CC9A',
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 19,
+    marginBottom: 20,
+  },
+  journeyActionLabel: {
+    color: '#956413',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  journeyActionTitle: {
+    color: '#6B1720',
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 26,
+    marginTop: 8,
+  },
+  journeyBack: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F7EBD7',
+    borderWidth: 1,
+    borderColor: '#E8DAC7',
+    padding: 12,
+    marginBottom: 16,
+  },
+  journeyBackText: {
+    color: '#6B1720',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   navigationGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

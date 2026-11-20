@@ -1,4 +1,7 @@
 import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
+import {
   useState,
   useEffect,
   useRef,
@@ -135,14 +138,32 @@ function canEdit(row: ReportingVolunteer) {
 
 export default function DailyReporting({
   opportunities,
+  selectedProgrammeId,
 }: {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 }) {
-
-  const [opportunityId, setOpportunityId] =
-    useState('');
-
-  const [date, setDate] = useState('');
+  const opportunityId = opportunities.some(
+    item => String(item.id) === selectedProgrammeId
+  )
+    ? selectedProgrammeId
+    : '';
+  const [date, setDate] = useState(() => {
+    const item = opportunities.find(
+      row => String(row.id) === opportunityId
+    );
+    if (!item) return '';
+    const start =
+      item.service_start_date.slice(0, 10);
+    const end =
+      item.service_end_date.slice(0, 10);
+    const today = todayIST();
+    return today < start
+      ? start
+      : today > end
+        ? end
+        : today;
+  });
 
   const [data, setData] =
     useState<ReportingData | null>(null);
@@ -158,6 +179,10 @@ export default function DailyReporting({
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [registrationType, setRegistrationType] =
+    useState('all');
+  const [memberRole, setMemberRole] =
+    useState('all');
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -275,40 +300,6 @@ export default function DailyReporting({
     setRequiresRefresh(false);
   }
 
-  function changeOpportunity(value: string) {
-
-    if (mutationLock.current) return;
-
-    resetRecords();
-
-    setOpportunityId(value);
-
-    const item = opportunities.find(
-      row => String(row.id) === value
-    );
-
-    if (!item) {
-      setDate('');
-      return;
-    }
-
-    const start =
-      item.service_start_date.slice(0, 10);
-
-    const end =
-      item.service_end_date.slice(0, 10);
-
-    const today = todayIST();
-
-    setDate(
-      today < start
-        ? start
-        : today > end
-          ? end
-          : today
-    );
-  }
-
   function changeDate(value: string) {
 
     if (mutationLock.current) return;
@@ -325,6 +316,30 @@ export default function DailyReporting({
   const rows = data?.volunteers || [];
 
   const filtered = rows.filter(row => {
+    if (
+      registrationType !== 'all' &&
+      row.registration_type !== registrationType
+    ) {
+      return false;
+    }
+    if (
+      memberRole === 'leader' &&
+      (
+        row.registration_type !== 'group' ||
+        !row.is_team_leader
+      )
+    ) {
+      return false;
+    }
+    if (
+      memberRole === 'member' &&
+      (
+        row.registration_type !== 'group' ||
+        row.is_team_leader
+      )
+    ) {
+      return false;
+    }
 
     if (
       filter !== 'all' &&
@@ -410,7 +425,7 @@ export default function DailyReporting({
 
     if (disabled || editing) return;
 
-    const ids = rows
+    const ids = filtered
       .filter(
         row =>
           row.registration_id === registrationId &&
@@ -438,6 +453,7 @@ export default function DailyReporting({
       return;
     }
 
+    const releaseOperation = beginVolunteerOperation('Daily reporting');
     mutationLock.current = true;
 
     setBusy(true);
@@ -473,6 +489,7 @@ export default function DailyReporting({
     } finally {
 
       mutationLock.current = false;
+      releaseOperation();
 
       if (mounted.current) {
         setBusy(false);
@@ -560,6 +577,19 @@ export default function DailyReporting({
       return;
     }
 
+    const validSelection = new Set(
+      selectable.map(row => row.service_date_id)
+    );
+    if (
+      selected.length > 500 ||
+      selected.some(id => !validSelection.has(id))
+    ) {
+      setSelected([]);
+      setError(
+        'Volunteer selection changed. Select matching volunteers again.'
+      );
+      return;
+    }
     if (!selected.length) {
 
       setError(
@@ -689,37 +719,22 @@ export default function DailyReporting({
 
         <div className="grid2">
 
-          <label>
-            Seva Opportunity
-
-            <select
-              value={opportunityId}
-              disabled={busy || loading}
-              onChange={event =>
-                changeOpportunity(
-                  event.target.value
-                )
-              }
-            >
-
-              <option value="">
-                Select opportunity
-              </option>
-
-              {opportunities.map(item => (
-
-                <option
-                  key={item.id}
-                  value={item.id}
-                >
-                  {item.title}
-                </option>
-
-              ))}
-
-            </select>
-
-          </label>
+          <div style={{
+              background: '#FFFDF8',
+              border: '1px solid #e7d9be',
+              padding: '12px 16px',
+              borderRadius: 10,
+            }}>
+              <small>Selected Seva Programme</small>
+              <div style={{
+                color: '#6B1720',
+                fontWeight: 700,
+                marginTop: 5,
+              }}>
+                {opportunity?.title ||
+                  'Choose a programme from the workspace above.'}
+              </div>
+            </div>
 
           <label>
             Service Date (IST)
@@ -1015,7 +1030,147 @@ export default function DailyReporting({
 
           <div className="panel">
 
-            <h3>Available Volunteers</h3>
+            <div className="vs-availability-dashboard">
+              <div className="vs-availability-heading">
+                <span className="vs-filter-kicker">
+                  SERVICE PREPARATION
+                </span>
+                <h3>Volunteer Availability</h3>
+                <p>
+                  Manage date-wise reporting,
+                  group volunteers and confirmations.
+                </p>
+                <span className="vs-date-pill">
+                  Service Date: {date}
+                </span>
+              </div>
+              <div className="vs-availability-stats">
+                <article className="vs-availability-stat">
+                  <span>Matching Volunteers</span>
+                  <strong>{filtered.length}</strong>
+                  <small>
+                    Of {rows.length} loaded volunteers
+                  </small>
+                </article>
+                <article className="vs-availability-stat">
+                  <span>Individual Volunteers</span>
+                  <strong>
+                    {filtered.filter(
+                      row =>
+                        row.registration_type === 'individual'
+                    ).length}
+                  </strong>
+                  <small>Individual registrations</small>
+                </article>
+                <article className="vs-availability-stat">
+                  <span>Group Volunteers</span>
+                  <strong>
+                    {filtered.filter(
+                      row =>
+                        row.registration_type === 'group'
+                    ).length}
+                  </strong>
+                  <small>Leaders and members</small>
+                </article>
+                <article className="vs-availability-stat vs-stat-confirmed">
+                  <span>Confirmed</span>
+                  <strong>
+                    {filtered.filter(
+                      row =>
+                        row.reporting_status === 'confirmed'
+                    ).length}
+                  </strong>
+                  <small>Reporting acknowledged</small>
+                </article>
+              </div>
+              <div className="vs-advanced-filter-panel">
+                <div className="vs-filter-panel-heading">
+                  <div>
+                    <h4>Advanced Filters</h4>
+                    <small>
+                      Find the volunteers you need.
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="vs-clear-filter"
+                    disabled={busy || loading}
+                    onClick={() => {
+                      setSearch('');
+                      setFilter('all');
+                      setRegistrationType('all');
+                      setMemberRole('all');
+                      setSelected([]);
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+                <div className="vs-filter-grid">
+                  <label>
+                    Registration Type
+                    <select
+                      disabled={busy || loading}
+                      value={registrationType}
+                      onChange={event => {
+                        setRegistrationType(event.target.value);
+                        setMemberRole('all');
+                        setSelected([]);
+                      }}
+                    >
+                      <option value="all">
+                        All Registration Types
+                      </option>
+                      <option value="individual">
+                        Individual
+                      </option>
+                      <option value="group">
+                        Group
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    Volunteer Role
+                    <select
+                      disabled={
+                        busy ||
+                        loading ||
+                        registrationType === 'individual'
+                      }
+                      value={memberRole}
+                      onChange={event => {
+                        setMemberRole(event.target.value);
+                        setSelected([]);
+                      }}
+                    >
+                      <option value="all">
+                        All Volunteers
+                      </option>
+                      <option value="leader">
+                        Group Leaders
+                      </option>
+                      <option value="member">
+                        Group Members
+                      </option>
+                    </select>
+                  </label>
+                </div>
+                <div className="vs-filter-result-bar">
+                  <span>
+                    Showing {filtered.length}
+                    {' of '}{rows.length} volunteers
+                  </span>
+                  <strong>
+                    {selected.length} selected
+                  </strong>
+                </div>
+                <small className="vs-selection-help">
+                  Changing filters clears the current
+                  selection. Group selection includes
+                  only visible, eligible volunteers.
+                </small>
+              </div>
+            </div>
 
             <div className="grid2">
 
@@ -1025,9 +1180,11 @@ export default function DailyReporting({
                 <input
                   value={search}
                   placeholder="Name, mobile, group or code"
-                  onChange={event =>
-                    setSearch(event.target.value)
-                  }
+                  disabled={busy || loading}
+                  onChange={event => {
+                    setSearch(event.target.value);
+                    setSelected([]);
+                  }}
                 />
 
               </label>
@@ -1037,9 +1194,11 @@ export default function DailyReporting({
 
                 <select
                   value={filter}
-                  onChange={event =>
-                    setFilter(event.target.value)
-                  }
+                  disabled={busy || loading}
+                  onChange={event => {
+                    setFilter(event.target.value);
+                    setSelected([]);
+                  }}
                 >
 
                   <option value="all">
@@ -1097,7 +1256,7 @@ export default function DailyReporting({
 
             <small>
               Maximum 500 volunteers per allocation.
-              Selection is retained across search filters.
+              Selection resets whenever search or filters change.
             </small>
 
           </div>

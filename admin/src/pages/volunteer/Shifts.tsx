@@ -31,13 +31,14 @@ type Shift = ShiftForm & {
 
 type Props = {
   opportunities: VolunteerOpportunity[];
+  selectedProgrammeId: string;
 };
 
 export default function Shifts({
   opportunities,
+  selectedProgrammeId,
 }: Props) {
-  const [selectedId, setSelectedId] =
-    useState('');
+  const selectedId = selectedProgrammeId;
 
   const opportunity = opportunities.find(
     item => String(item.id) === selectedId
@@ -56,29 +57,28 @@ export default function Shifts({
       </div>
 
       <div className="panel">
-        <label>
-          Select Seva Opportunity
-
-          <select
-            value={selectedId}
-            onChange={e =>
-              setSelectedId(e.target.value)
-            }
-          >
-            <option value="">
-              Select opportunity
-            </option>
-
-            {opportunities.map(item => (
-              <option
-                key={item.id}
-                value={item.id}
-              >
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div
+          style={{
+            background: '#FFFDF8',
+            border: '1px solid #e7d9be',
+            borderRadius: 10,
+            padding: '12px 16px',
+            marginTop: 12,
+          }}
+        >
+          <small>Selected Seva Programme</small>
+          <div style={{
+            color: '#6B1720',
+            fontWeight: 700,
+            marginTop: 5,
+          }}>
+            {opportunities.find(
+              item =>
+                String(item.id) === selectedProgrammeId
+            )?.title ||
+              'Choose a programme from the workspace above.'}
+          </div>
+        </div>
       </div>
 
       {opportunity ? (

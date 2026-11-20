@@ -1,4 +1,16 @@
+import {
+  beginVolunteerOperation,
+} from '../../lib/volunteerOperationGuard';
 import { useEffect, useRef, useState } from 'react';
+import {
+  captureAttendanceDrafts,
+  reconcileAttendanceDrafts,
+  type AttendanceDraftSnapshot,
+  type AttendanceDraftConflict,
+} from '../../lib/volunteerAttendanceDrafts';
+import {
+  useVolunteerUnsavedChanges,
+} from '../../lib/volunteerUnsavedChangesGuard';
 
 import {
   volunteerRequest,
@@ -99,6 +111,55 @@ function toDraft(row: AttendanceRow): Draft {
   };
 }
 
+function matchesAttendanceValues(
+  row: AttendanceRow,
+  draft: Draft,
+  mode: AttendanceMode | undefined,
+  date: string
+): boolean {
+  const useTimes =
+    mode === 'detailed' &&
+    draft.attendance_status === 'present';
+  function sameTimestamp(
+    actual: string | null,
+    time: string
+  ): boolean {
+    const expected = useTimes
+      ? toTimestamp(date, time)
+      : null;
+    if (expected === null) {
+      return actual === null;
+    }
+    if (!actual) return false;
+    const actualTime = Date.parse(actual);
+    const expectedTime = Date.parse(expected);
+    return (
+      Number.isFinite(actualTime) &&
+      Number.isFinite(expectedTime) &&
+      actualTime === expectedTime
+    );
+  }
+  return (
+    row.attendance_status === draft.attendance_status &&
+    (row.remarks || '') === draft.remarks.trim() &&
+    sameTimestamp(row.check_in_at, draft.check_in) &&
+    sameTimestamp(row.check_out_at, draft.check_out)
+  );
+}
+function attendanceBaseline(row: AttendanceRow): string {
+  return JSON.stringify([
+    row.service_date_id,
+    row.service_date,
+    row.member_id,
+    row.member_status,
+    row.revision,
+    row.is_finalized,
+    row.attendance_status,
+    row.check_in_at,
+    row.check_out_at,
+    row.remarks,
+  ]);
+}
 function toTimestamp(date: string, time: string) {
   return time
     ? `${date}T${time}:00+05:30`
@@ -143,13 +204,24 @@ export default function DailyAttendance({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [draftConflicts, setDraftConflicts] =
+    useState<AttendanceDraftConflict<Draft>[]>([]);
   const version = useRef(0);
+  const pendingRefreshDrafts =
+    useRef<AttendanceDraftSnapshot<Draft>[] | null>(null);
+  const [refreshRequired, setRefreshRequired] =
+    useState(false);
+  const uncertainOutcome = useRef(false);
+  const [mutationUncertain, setMutationUncertain] =
+    useState(false);
   const locked = useRef(false);
 
   const base =
     `/opportunities/${opportunity.id}/daily-attendance`;
 
-  async function load() {
+  async function load(
+    snapshots: AttendanceDraftSnapshot<Draft>[] = []
+  ) {
     const current = ++version.current;
 
     setLoading(true);
@@ -179,19 +251,65 @@ export default function DailyAttendance({
 
       setRows(data.volunteers);
 
-      const next: Record<number, Draft> = {};
-
-      for (const row of data.volunteers) {
-        next[row.service_date_id] = toDraft(row);
+      const result = reconcileAttendanceDrafts(
+        data.volunteers,
+        snapshots,
+        row => row.service_date_id,
+        toDraft,
+        attendanceBaseline,
+        row =>
+          row.member_status === 'approved' &&
+          !row.is_finalized &&
+          date <= todayIST(),
+        uncertainOutcome.current
+          ? (row, draft) =>
+              matchesAttendanceValues(
+                row,
+                draft,
+                mode,
+                date
+              )
+          : undefined
+      );
+      if (uncertainOutcome.current) {
+        setSuccess(
+          'Server records refreshed. ' +
+          `${result.matchedCount} draft(s) match server values. ` +
+          `${result.restoredCount} unsaved draft(s) restored. ` +
+          `${result.conflicts.length} new conflict(s) require review.`
+        );
       }
-
-      setDrafts(next);
+      setDrafts(result.drafts);
+      setDraftConflicts(previous => {
+        const combined = new Map(
+          previous.map(conflict => [
+            conflict.id,
+            conflict,
+          ])
+        );
+        for (const conflict of result.conflicts) {
+          combined.set(conflict.id, conflict);
+        }
+        return Array.from(combined.values());
+      });
+      pendingRefreshDrafts.current = null;
+      uncertainOutcome.current = false;
+      setMutationUncertain(false);
+      setRefreshRequired(false);
       setReady(true);
     } catch (err) {
       if (current === version.current) {
-        setError(getErrorMessage(err));
-        setRows([]);
-        setDrafts({});
+        setError(
+          pendingRefreshDrafts.current !== null
+            ? (
+                uncertainOutcome.current
+                  ? 'The previous operation remains unconfirmed. Refresh again before making changes. '
+                  : 'Attendance was saved, but refreshing the server records failed. Refresh again to recover the remaining drafts. '
+              ) +
+              getErrorMessage(err)
+            : getErrorMessage(err)
+        );
+        setReady(false);
       }
     } finally {
       if (current === version.current) {
@@ -201,6 +319,14 @@ export default function DailyAttendance({
   }
 
   useEffect(() => {
+    pendingRefreshDrafts.current = null;
+    uncertainOutcome.current = false;
+    setMutationUncertain(false);
+    setRefreshRequired(false);
+    setRows([]);
+    setDrafts({});
+    setDraftConflicts([]);
+    setSelected([]);
     void load();
 
     return () => {
@@ -214,13 +340,27 @@ export default function DailyAttendance({
     ) !== JSON.stringify(toDraft(row));
   }
 
-  const hasUnsaved = rows.some(dirty);
+  const dirtyCount = rows.filter(dirty).length;
+  const hasUnsaved =
+    dirtyCount > 0 ||
+    draftConflicts.length > 0 ||
+    refreshRequired;
+  useVolunteerUnsavedChanges(
+    mode === 'detailed'
+      ? 'Detailed daily attendance'
+      : 'Simple daily attendance',
+    hasUnsaved
+  );
 
   function canEdit(row: AttendanceRow) {
     return (
+      !draftConflicts.some(
+        conflict => conflict.id === row.service_date_id
+      ) &&
       ready &&
       !loading &&
       !busy &&
+      !refreshRequired &&
       date <= todayIST() &&
       row.member_status === 'approved' &&
       !row.is_finalized
@@ -253,10 +393,20 @@ export default function DailyAttendance({
 
   async function mutate(
     action: () => Promise<unknown>,
-    message: string
+    message: string,
+    snapshots: AttendanceDraftSnapshot<Draft>[] = []
   ) {
-    if (locked.current || !ready) return;
+    if (locked.current || busy || loading || !ready || refreshRequired) return;
 
+    const allSnapshots = captureAttendanceDrafts(
+      rows,
+      drafts,
+      new Set<number>(),
+      row => row.service_date_id,
+      dirty,
+      attendanceBaseline
+    );
+    const releaseOperation = beginVolunteerOperation('Daily attendance');
     locked.current = true;
 
     setBusy(true);
@@ -268,12 +418,26 @@ export default function DailyAttendance({
 
       setSuccess(message);
 
-      await load();
+      uncertainOutcome.current = false;
+      setMutationUncertain(false);
+      pendingRefreshDrafts.current = snapshots;
+      setRefreshRequired(true);
+      await load(snapshots);
     } catch (err) {
-      setError(getErrorMessage(err));
+      pendingRefreshDrafts.current = allSnapshots;
+      uncertainOutcome.current = true;
+      setMutationUncertain(true);
+      setRefreshRequired(true);
       setReady(false);
+      setSelected([]);
+      setError(
+        'The attendance operation could not be confirmed. ' +
+        'Refresh server records before retrying. ' +
+        getErrorMessage(err)
+      );
     } finally {
       locked.current = false;
+      releaseOperation();
       setBusy(false);
     }
   }
@@ -338,21 +502,17 @@ export default function DailyAttendance({
         };
       });
 
-      const remainingUnsaved = rows.some(
-        row =>
-          dirty(row) &&
-          !items.some(
-            item =>
-              item.service_date_id === row.service_date_id
-          )
+      const ids = new Set(
+        items.map(row => row.service_date_id)
       );
-
-      if (remainingUnsaved) {
-        setError(
-          'Save all modified records together to avoid losing unsaved changes.'
-        );
-        return;
-      }
+      const snapshots = captureAttendanceDrafts(
+        rows,
+        drafts,
+        ids,
+        row => row.service_date_id,
+        dirty,
+        attendanceBaseline
+      );
 
       await mutate(
         () =>
@@ -360,13 +520,31 @@ export default function DailyAttendance({
             base,
             jsonRequest('POST', { records })
           ),
-        'Attendance saved successfully.'
+        'Attendance saved successfully.',
+        snapshots
       );
     } catch (err) {
       setError(getErrorMessage(err));
     }
   }
 
+  async function refreshAttendance() {
+    if (
+      locked.current ||
+      busy ||
+      loading
+    ) return;
+    const snapshots = pendingRefreshDrafts.current ?? captureAttendanceDrafts(
+      rows,
+      drafts,
+      new Set<number>(),
+      row => row.service_date_id,
+      dirty,
+      attendanceBaseline
+    );
+    setSuccess('');
+    await load(snapshots);
+  }
   function canFinalize(row: AttendanceRow) {
     return (
       canEdit(row) &&
@@ -471,11 +649,52 @@ export default function DailyAttendance({
     );
   });
 
-  const chosen = rows.filter(row =>
-    selected.includes(row.service_date_id)
+  const chosen = visible.filter(row =>
+    selected.includes(row.service_date_id) &&
+    canEdit(row)
   );
+  const visibleSelectedIds = chosen.map(
+    row => row.service_date_id
+  );
+  const selectionKey = visibleSelectedIds.join(',');
+  useEffect(() => {
+    setSelected(previous => {
+      const next = previous.filter(id =>
+        visibleSelectedIds.includes(id)
+      );
+      return next.length === previous.length
+        ? previous
+        : next;
+    });
+  }, [selectionKey]);
 
   const editableVisible = visible.filter(canEdit);
+  const modifiedRows = rows.filter(dirty);
+  const hiddenModifiedCount = modifiedRows.filter(
+    row => !visible.some(
+      item => item.service_date_id === row.service_date_id
+    )
+  ).length;
+  const canSaveAll =
+    ready &&
+    !busy &&
+    !loading &&
+    !refreshRequired &&
+    modifiedRows.length > 0 &&
+    modifiedRows.length <= 500 &&
+    modifiedRows.every(canEdit);
+  async function saveAllChanges() {
+    if (locked.current || !canSaveAll) return;
+    if (
+      hiddenModifiedCount > 0 &&
+      !window.confirm(
+        `Save ${modifiedRows.length} modified attendance record(s), including ${hiddenModifiedCount} hidden by the current filters?`
+      )
+    ) {
+      return;
+    }
+    await save(modifiedRows);
+  }
 
   const stats = {
     total: rows.length,
@@ -515,16 +734,41 @@ export default function DailyAttendance({
               max={end}
               value={date}
               onChange={event => {
+                const nextDate = event.target.value;
                 if (
-                  hasUnsaved &&
-                  !window.confirm('Discard unsaved changes?')
+                  busy ||
+                  loading ||
+                  locked.current ||
+                  nextDate === date
                 ) {
                   return;
                 }
-
+                if (
+                  !nextDate ||
+                  !/^\d{4}-\d{2}-\d{2}$/.test(nextDate) ||
+                  nextDate < start ||
+                  nextDate > end
+                ) {
+                  setError(
+                    'Select a date within the programme service period.'
+                  );
+                  return;
+                }
+                if (
+                  hasUnsaved &&
+                  !window.confirm(
+                    'Changing the service date will discard unsaved attendance changes. Continue?'
+                  )
+                ) {
+                  return;
+                }
                 setReady(false);
                 setSuccess('');
-                setDate(event.target.value);
+                setError('');
+                setRows([]);
+                setDrafts({});
+                setSelected([]);
+                setDate(nextDate);
               }}
             />
           </label>
@@ -534,9 +778,10 @@ export default function DailyAttendance({
             <input
               value={search}
               placeholder="Name, member code, mobile or group"
-              onChange={event =>
-                setSearch(event.target.value)
-              }
+              onChange={event => {
+                setSearch(event.target.value);
+                setSelected([]);
+              }}
             />
           </label>
 
@@ -544,9 +789,10 @@ export default function DailyAttendance({
             Attendance Status
             <select
               value={statusFilter}
-              onChange={event =>
-                setStatusFilter(event.target.value)
-              }
+              onChange={event => {
+                setStatusFilter(event.target.value);
+                setSelected([]);
+              }}
             >
               <option value="">All statuses</option>
               <option value="not_marked">Not marked</option>
@@ -559,19 +805,160 @@ export default function DailyAttendance({
 
         <button
           type="button"
-          onClick={() => {
-            if (
-              !hasUnsaved ||
-              window.confirm('Discard unsaved changes?')
-            ) {
-              void load();
-            }
-          }}
+          onClick={() => void refreshAttendance()}
         >
           Refresh Attendance
         </button>
       </fieldset>
 
+      {refreshRequired && !loading && (
+        <div
+          className="panel"
+          role="alert"
+          style={{
+            background: '#FFF8E8',
+            border: '1px solid #E5C98C',
+            color: '#795318',
+            marginBottom: 16,
+          }}
+        >
+          <strong>
+            {mutationUncertain
+              ? 'Attendance outcome unconfirmed'
+              : 'Attendance saved — refresh required'}
+          </strong>
+          <p>
+            {mutationUncertain
+              ? 'The previous operation may or may not have reached the server. Refresh to inspect the latest records and recover compatible drafts.'
+              : 'The server accepted your save. Refresh attendance to verify the latest records and restore compatible remaining drafts.'}
+          </p>
+          <p>
+            Do not submit the same attendance again.
+            Editing remains disabled until refresh succeeds.
+          </p>
+          <button
+            type="button"
+            disabled={busy || loading}
+            onClick={() => void refreshAttendance()}
+          >
+            Retry Refresh
+          </button>
+        </div>
+      )}
+      {draftConflicts.length > 0 && (
+        <div
+          className="panel"
+          role="alert"
+          style={{
+            background: '#FFF8E8',
+            border: '1px solid #E5C98C',
+            color: '#795318',
+          }}
+        >
+          <h3>Attendance changes require review</h3>
+          <p>
+            Some records have changed or become
+            unavailable. Your unsaved values have
+            been retained for review.
+          </p>
+          {draftConflicts.map(conflict => {
+            const row = rows.find(
+              item => item.service_date_id === conflict.id
+            );
+            return (
+              <div
+                key={conflict.id}
+                style={{
+                  padding: 12,
+                  marginBottom: 10,
+                  border: '1px solid #E5C98C',
+                  borderRadius: 8,
+                }}
+              >
+                <strong>
+                  {row?.full_name ||
+                    `Service record #${conflict.id}`}
+                </strong>
+                <p>
+                  Reason: {
+                    conflict.reason === 'record_missing'
+                      ? 'Record no longer available'
+                      : conflict.reason === 'record_locked'
+                        ? 'Record is locked'
+                        : 'Server record changed'
+                  }
+                </p>
+                <p>
+                  Server attendance:
+                  {' '}{row?.attendance_status || 'Unavailable'}
+                </p>
+                <p>
+                  Unsaved attendance:
+                  {' '}{conflict.draft.attendance_status}
+                </p>
+                {mode === 'detailed' && (
+                  <>
+                    <p>
+                      Unsaved check-in:
+                      {' '}{conflict.draft.check_in || 'None'}
+                    </p>
+                    <p>
+                      Unsaved check-out:
+                      {' '}{conflict.draft.check_out || 'None'}
+                    </p>
+                  </>
+                )}
+                <p style={{ whiteSpace: 'pre-wrap' }}>
+                  Unsaved remarks:
+                  {' '}{conflict.draft.remarks || 'None'}
+                </p>
+                <button
+                  type="button"
+                  disabled={busy || loading || !ready || refreshRequired}
+                  onClick={() => {
+                    if (!window.confirm(
+                      'Discard this unsaved draft and keep the server record?'
+                    )) return;
+                    setDraftConflicts(previous =>
+                      previous.filter(
+                        item => item.id !== conflict.id
+                      )
+                    );
+                  }}
+                >
+                  Discard Draft / Keep Server Record
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {dirtyCount > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '12px 16px',
+            margin: '16px 0',
+            border: '1px solid #e5c98c',
+            borderRadius: 10,
+            background: '#FFF8E8',
+            color: '#795318',
+          }}
+        >
+          <strong>
+            Unsaved attendance changes
+          </strong>
+          <div style={{
+            fontSize: 13,
+            marginTop: 4,
+          }}>
+            {dirtyCount} modified volunteer record(s).
+            Refresh preserves compatible unsaved drafts.
+            Save your changes before leaving this workspace.
+          </div>
+        </div>
+      )}
       {error && (
         <p style={{ color: COLORS.red }}>
           {error}
@@ -621,7 +1008,7 @@ export default function DailyAttendance({
             ))}
           </div>
 
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy || loading || !ready || refreshRequired}>
             <div
               className="actions"
               style={{ flexWrap: 'wrap', gap: 8 }}
@@ -677,12 +1064,10 @@ export default function DailyAttendance({
               <button
                 className="primary"
                 type="button"
-                disabled={!hasUnsaved}
-                onClick={() =>
-                  void save(rows.filter(dirty))
-                }
+                disabled={!canSaveAll}
+                onClick={() => void saveAllChanges()}
               >
-                Save All Changes
+                Save All Changes ({modifiedRows.length})
               </button>
 
               <button
@@ -699,9 +1084,27 @@ export default function DailyAttendance({
             </div>
 
             <p>
-              {selected.length} selected
-              {hasUnsaved && ' · Unsaved changes'}
+              {chosen.length} selected
+              {' · '}{modifiedRows.length} modified
+              {hiddenModifiedCount > 0 &&
+                ` · ${hiddenModifiedCount} hidden by filters`}
+              {draftConflicts.length > 0 &&
+                ` · ${draftConflicts.length} unresolved conflict(s)`}
             </p>
+            {hiddenModifiedCount > 0 && (
+              <p role="status" style={{ color: '#795318' }}>
+                Save All Changes includes modified volunteers
+                hidden by the current search and filters.
+                Confirmation is required before saving them.
+              </p>
+            )}
+            {modifiedRows.length > 500 && (
+              <p role="alert" style={{ color: COLORS.red }}>
+                More than 500 records have been modified.
+                Save individual records until 500 or fewer
+                modified records remain.
+              </p>
+            )}
 
             <div style={{ overflowX: 'auto' }}>
               <table>
