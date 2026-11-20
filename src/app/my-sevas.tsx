@@ -367,13 +367,15 @@ export default function MySevasScreen() {
                       value={item.total_members}
                     />
 
-                    <VolunteerInfo
-                      label={t(
-                        'volunteer.assignedDuties',
-                        'Assigned Duties'
-                      )}
-                      value={item.total_assignments}
-                    />
+                    {(item.attendance_mode ?? 'legacy') === 'legacy' && (
+                      <VolunteerInfo
+                        label={t(
+                          'volunteer.assignedDuties',
+                          'Assigned Duties'
+                        )}
+                        value={item.total_assignments}
+                      />
+                    )}
 
                     <VolunteerInfo
                       label={t(

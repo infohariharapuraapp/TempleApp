@@ -425,10 +425,12 @@ export default function RegistrationDetailsScreen() {
               value={data.stats.total_members}
             />
 
-            <Stat
-              label={volunteerI18n.t('volunteer.duties')}
-              value={data.stats.total_assignments}
-            />
+            {(member?.attendance_mode ?? 'legacy') === 'legacy' && (
+              <Stat
+                label={volunteerI18n.t('volunteer.duties')}
+                value={data.stats.total_assignments}
+              />
+            )}
 
             <Stat
               label={volunteerI18n.t('volunteer.certificates')}

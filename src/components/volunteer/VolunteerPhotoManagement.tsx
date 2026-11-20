@@ -276,6 +276,16 @@ export default function VolunteerPhotoManagement({
     return null;
   }
 
+  // Hide completed photograph processing after ID card issuance.
+  // Keep correction and replacement workflows available.
+  if (
+    status === 'verified' &&
+    !!member.id_card &&
+    !busy &&
+    !uncertain
+  ) {
+    return null;
+  }
   const statusLabels = {
     missing: t(
       'volunteer.photoMissing',
@@ -548,12 +558,14 @@ export default function VolunteerPhotoManagement({
         </View>
       )}
 
-      <Text style={styles.note}>
-        {t(
-          'volunteer.photoApprovalUnaffected',
-          'Photograph submission does not change your existing registration approval status.'
-        )}
-      </Text>
+      {status !== 'verified' && (
+        <Text style={styles.note}>
+          {t(
+            'volunteer.photoApprovalUnaffected',
+            'Photograph submission does not change your existing registration approval status.'
+          )}
+        </Text>
+      )}
     </View>
   );
 }

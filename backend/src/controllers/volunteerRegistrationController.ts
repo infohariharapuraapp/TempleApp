@@ -992,6 +992,7 @@ export const getMyVolunteerRegistrations = async (
         r.completed_at,
 
         o.title AS opportunity_title,
+        o.attendance_mode,
         o.image_url,
 
         o.service_start_date::text

@@ -124,6 +124,7 @@ export interface VolunteerRegistration {
 
 export interface MyVolunteerRegistration
   extends VolunteerRegistration {
+  attendance_mode?: VolunteerAttendanceMode;
   image_url: string | null;
 
   service_start_date: string;
