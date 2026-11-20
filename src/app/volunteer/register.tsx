@@ -54,13 +54,16 @@ import {
   VolunteerError,
 } from '@/components/volunteer/VolunteerUI';
 
+import VolunteerPhotoPicker, {
+  type VolunteerPhotoSelection,
+} from '@/components/volunteer/VolunteerPhotoPicker';
 import { ApiError } from '@/services/api';
 
 type RegistrationType = 'individual' | 'group';
 
 type TextField = Exclude<
   keyof VolunteerMemberInput,
-  'gender' | 'is_team_leader' | 'shift_ids' | 'service_dates'
+  'gender' | 'is_team_leader' | 'shift_ids' | 'service_dates' | 'photo_upload_id'
 >;
 
 let submissionRunning = false;
@@ -136,6 +139,11 @@ export default function VolunteerRegisterScreen() {
   const [registeredCode, setRegisteredCode] =
     useState('');
 
+  const [photos, setPhotos] =
+    useState<Record<string, VolunteerPhotoSelection>>({});
+  const [photoBusy, setPhotoBusy] =
+    useState(false);
+  const photoLock = useRef(false);
   const [consent, setConsent] =
     useState(false);
 
@@ -235,6 +243,49 @@ export default function VolunteerRegisterScreen() {
   }, [id]);
 
   const member = members[memberIndex];
+  function handlePhotoBusy(busy: boolean) {
+    photoLock.current = busy;
+    setPhotoBusy(busy);
+  }
+  function handlePhotoChange(
+    photo: VolunteerPhotoSelection
+  ) {
+    if (
+      !mounted.current ||
+      submissionRunning ||
+      uncertain
+    ) {
+      return;
+    }
+    setPhotos(previous => ({
+      ...previous,
+      [photo.uploadId]: photo,
+    }));
+    setMembers(previous =>
+      previous.map((item, index) =>
+        index === memberIndex
+          ? {
+              ...item,
+              photo_upload_id: photo.uploadId,
+            }
+          : item
+      )
+    );
+    setConsent(false);
+    setFormError('');
+  }
+  function hasValidPhoto(
+    item: VolunteerMemberInput
+  ): boolean {
+    if (!item.photo_upload_id) return false;
+    const photo = photos[item.photo_upload_id];
+    return Boolean(
+      photo &&
+      Date.parse(photo.expiresAt) > Date.now() + 60000
+    );
+  }
+  const uploadedPhotoCount =
+    members.filter(hasValidPhoto).length;
 
   function updateMember(
     changes: Partial<VolunteerMemberInput>
@@ -254,6 +305,7 @@ export default function VolunteerRegisterScreen() {
   }
 
   function switchType(next: RegistrationType) {
+    if (photoLock.current) return;
     if (
       next === type ||
       submitting ||
@@ -290,6 +342,7 @@ export default function VolunteerRegisterScreen() {
   }
 
   function selectMember(index: number) {
+    if (photoLock.current) return;
     setMemberIndex(index);
     setFormError('');
 
@@ -300,6 +353,16 @@ export default function VolunteerRegisterScreen() {
   }
 
   function addMember() {
+    if (photoLock.current) return;
+    if (!member || !hasValidPhoto(member)) {
+      setFormError(
+        t(
+          'volunteer.photoRequired',
+          'Upload a valid photograph for this member before adding another member.'
+        )
+      );
+      return;
+    }
     if (
       !opportunity ||
       submitting ||
@@ -334,6 +397,7 @@ export default function VolunteerRegisterScreen() {
   }
 
   function removeMember() {
+    if (photoLock.current) return;
     if (
       members.length <= 1 ||
       submitting ||
@@ -454,6 +518,16 @@ export default function VolunteerRegisterScreen() {
   }
 
   async function submit() {
+    if (photoLock.current) return;
+    const invalidPhotoIndex =
+      members.findIndex(item => !hasValidPhoto(item));
+    if (invalidPhotoIndex !== -1) {
+      selectMember(invalidPhotoIndex);
+      setFormError(
+        `Member ${invalidPhotoIndex + 1}: Upload a valid passport-size photograph before submitting.`
+      );
+      return;
+    }
     if (
       !opportunity ||
       submissionRunning ||
@@ -465,6 +539,7 @@ export default function VolunteerRegisterScreen() {
     }
 
     const payload: VolunteerRegistrationInput = {
+      photo_required: true,
       opportunity_id: id,
       registration_type: type,
 
@@ -602,7 +677,7 @@ export default function VolunteerRegisterScreen() {
           value={String(member?.[key] ?? '')}
           placeholder={placeholder}
           placeholderTextColor={C.muted}
-          editable={!submitting && !uncertain}
+          editable={!submitting && !uncertain && !photoBusy}
           keyboardType={keyboardType}
           multiline={multiline}
           maxLength={maxLength}
@@ -729,7 +804,7 @@ export default function VolunteerRegisterScreen() {
                 <Choice
                   label={t('volunteer.individual')}
                   selected={type === 'individual'}
-                  disabled={submitting || uncertain}
+                  disabled={submitting || uncertain || photoBusy}
                   onPress={() =>
                     switchType('individual')
                   }
@@ -740,7 +815,7 @@ export default function VolunteerRegisterScreen() {
                 <Choice
                   label={t('volunteer.group')}
                   selected={type === 'group'}
-                  disabled={submitting || uncertain}
+                  disabled={submitting || uncertain || photoBusy}
                   onPress={() =>
                     switchType('group')
                   }
@@ -764,7 +839,7 @@ export default function VolunteerRegisterScreen() {
                   style={styles.input}
                   value={groupName}
                   maxLength={255}
-                  editable={!submitting && !uncertain}
+                  editable={!submitting && !uncertain && !photoBusy}
                   placeholder={t('volunteer.enterGroupName')}
                   placeholderTextColor={C.muted}
                   onChangeText={value => {
@@ -786,7 +861,7 @@ export default function VolunteerRegisterScreen() {
                         (item.is_team_leader ? ' ★' : '')
                       }
                       selected={index === memberIndex}
-                      disabled={submitting || uncertain}
+                      disabled={submitting || uncertain || photoBusy}
                       onPress={() => selectMember(index)}
                     />
                   ))}
@@ -810,11 +885,27 @@ export default function VolunteerRegisterScreen() {
                     : t('volunteer.setGroupLeader')
                 }
                 selected={member.is_team_leader}
-                disabled={submitting || uncertain}
+                disabled={submitting || uncertain || photoBusy}
                 onPress={selectLeader}
               />
             )}
 
+            <VolunteerPhotoPicker
+              key={`${id}-${memberIndex}`}
+              opportunityId={id}
+              value={
+                member.photo_upload_id
+                  ? photos[member.photo_upload_id]
+                  : undefined
+              }
+              disabled={
+                submitting ||
+                uncertain ||
+                !registrationOpen
+              }
+              onBusyChange={handlePhotoBusy}
+              onChange={handlePhotoChange}
+            />
             {field('full_name', t('volunteer.fullName') + ' *')}
 
             {field(
@@ -855,7 +946,7 @@ export default function VolunteerRegisterScreen() {
                       t(`volunteer.${gender}`)
                     }
                     selected={member.gender === gender}
-                    disabled={submitting || uncertain}
+                    disabled={submitting || uncertain || photoBusy}
                     onPress={() =>
                       updateMember({ gender })
                     }
@@ -935,9 +1026,9 @@ export default function VolunteerRegisterScreen() {
                       accessibilityRole="checkbox"
                       accessibilityState={{
                         checked: selected,
-                        disabled: submitting || uncertain,
+                        disabled: submitting || uncertain || photoBusy,
                       }}
-                      disabled={submitting || uncertain}
+                      disabled={submitting || uncertain || photoBusy}
                       onPress={() => toggleShift(shift.id)}
                       style={{
                         padding: 14,
@@ -1019,7 +1110,7 @@ export default function VolunteerRegisterScreen() {
                         'Select All'
                       )}
                       secondary
-                      disabled={submitting || uncertain}
+                      disabled={submitting || uncertain || photoBusy}
                       onPress={() =>
                         updateMember({
                           shift_ids: [],
@@ -1035,7 +1126,7 @@ export default function VolunteerRegisterScreen() {
                         'Clear All'
                       )}
                       secondary
-                      disabled={submitting || uncertain}
+                      disabled={submitting || uncertain || photoBusy}
                       onPress={() =>
                         updateMember({
                           shift_ids: [],
@@ -1060,9 +1151,9 @@ export default function VolunteerRegisterScreen() {
                         accessibilityRole="checkbox"
                         accessibilityState={{
                           checked: selected,
-                          disabled: submitting || uncertain,
+                          disabled: submitting || uncertain || photoBusy,
                         }}
-                        disabled={submitting || uncertain}
+                        disabled={submitting || uncertain || photoBusy}
                         onPress={() =>
                           toggleServiceDate(date)
                         }
@@ -1133,6 +1224,7 @@ export default function VolunteerRegisterScreen() {
                 disabled={
                   submitting ||
                   uncertain ||
+                  photoBusy ||
                   members.length >= Math.min(
                     500,
                     opportunity.maximum_group_size
@@ -1143,7 +1235,7 @@ export default function VolunteerRegisterScreen() {
 
               {members.length > 1 && (
                 <TouchableOpacity
-                  disabled={submitting || uncertain}
+                  disabled={submitting || uncertain || photoBusy}
                   onPress={removeMember}
                 >
                   <Text style={styles.remove}>
@@ -1166,6 +1258,22 @@ export default function VolunteerRegisterScreen() {
             <Text style={styles.description}>
               Total volunteers: {members.length}
             </Text>
+            <Text style={{
+              color:
+                uploadedPhotoCount === members.length
+                  ? C.green
+                  : C.red,
+              fontWeight: '700',
+              fontSize: 13,
+              marginBottom: 10,
+            }}>
+              {t(
+                'volunteer.photosUploaded',
+                'Photographs uploaded'
+              )}
+              {': '}
+              {uploadedPhotoCount} / {members.length}
+            </Text>
 
             <Text style={styles.label}>
               {t('volunteer.remarksOptional')}
@@ -1176,7 +1284,7 @@ export default function VolunteerRegisterScreen() {
               value={remarks}
               multiline
               maxLength={5000}
-              editable={!submitting && !uncertain}
+              editable={!submitting && !uncertain && !photoBusy}
               placeholder={t('volunteer.additionalInformation')}
               placeholderTextColor={C.muted}
               onChangeText={value => {
@@ -1188,7 +1296,7 @@ export default function VolunteerRegisterScreen() {
             <TouchableOpacity
               accessibilityRole="checkbox"
               accessibilityState={{ checked: consent }}
-              disabled={submitting || uncertain}
+              disabled={submitting || uncertain || photoBusy}
               style={styles.consent}
               onPress={() => setConsent(!consent)}
             >
@@ -1224,6 +1332,8 @@ export default function VolunteerRegisterScreen() {
                 }
                 disabled={
                   submitting ||
+                  photoBusy ||
+                  uploadedPhotoCount !== members.length ||
                   !registrationOpen ||
                   (isLegacy
                     ? availableShifts.length === 0

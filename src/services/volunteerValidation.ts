@@ -10,6 +10,7 @@ import type {
 export function createEmptyMember(): VolunteerMemberInput {
   return {
     full_name: '',
+    photo_upload_id: undefined,
     mobile: '',
     email: '',
     date_of_birth: '',
@@ -166,6 +167,16 @@ export function validateVolunteerMember(
     }
   }
 
+  if (
+    !m.photo_upload_id ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      .test(m.photo_upload_id)
+  ) {
+    return i18n.t(
+      'volunteer.photoRequired',
+      'Upload a clear passport-size photograph.'
+    );
+  }
   if (availableDates !== undefined) {
     const selectedDates =
       m.service_dates ?? [];
@@ -325,6 +336,7 @@ export function validateVolunteerRegistration(
   }
 
   const identities = new Set<string>();
+  const photoIds = new Set<string>();
 
   for (let index = 0; index < input.members.length; index++) {
     const member = normalizeVolunteerMember(
@@ -341,6 +353,11 @@ export function validateVolunteerRegistration(
       return `Member ${index + 1}: ${error}`;
     }
 
+    const photoId = member.photo_upload_id!;
+    if (photoIds.has(photoId)) {
+      return `Member ${index + 1}: Upload a separate photograph for each volunteer.`;
+    }
+    photoIds.add(photoId);
     const identity = [
       member.full_name.toLowerCase(),
       member.mobile,

@@ -1,4 +1,7 @@
 import {
+  isVolunteerPhotoEvent,
+  validateVolunteerPhotoEvent,
+} from './volunteerPhotoEventService';import {
   validateVolunteerReportingEvent,
 } from './volunteerReportingNotificationService';
 import { pool } from '../db';
@@ -2533,6 +2536,10 @@ export async function validateVolunteerNotificationEvent(
   job: VolunteerNotificationJob
 ): Promise<VolunteerDeliveryContent | null> {
 
+  // Photograph notifications.
+  if (isVolunteerPhotoEvent(job.event_type)) {
+    return validateVolunteerPhotoEvent(job);
+  }
   // Date-based reporting notifications.
   if (
     job.event_type === 'reporting_sent' ||

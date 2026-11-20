@@ -218,6 +218,16 @@ function normalizeMember(member: any) {
     fail(400, 'Invalid team leader value');
   }
 
+  const photoUploadId = member.photo_upload_id;
+  if (
+    photoUploadId !== undefined &&
+    (
+      typeof photoUploadId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(photoUploadId)
+    )
+  ) {
+    fail(400, `Invalid photograph reference for ${fullName}`);
+  }
   let serviceDates: string[] = [];
   let shiftIds: number[] = [];
   if (member.service_dates !== undefined) {
@@ -304,6 +314,10 @@ function normalizeMember(member: any) {
     is_team_leader:
       member.is_team_leader === true,
 
+    photo_upload_id:
+      typeof photoUploadId === 'string'
+        ? photoUploadId.toLowerCase()
+        : null,
     shift_ids: shiftIds,
     service_dates: serviceDates,
   };
@@ -356,6 +370,33 @@ export const createVolunteerRegistration = async (
     ) as ReturnType<typeof normalizeMember>[];
 
     const totalMembers = members.length;
+    const requirePhotos =
+      process.env.VOLUNTEER_PHOTO_REQUIRED === 'true' ||
+      body.photo_required === true ||
+      members.some(member => member.photo_upload_id !== null);
+    if (requirePhotos) {
+      const missingPhoto = members.find(
+        member => !member.photo_upload_id
+      );
+      if (missingPhoto) {
+        fail(
+          400,
+          `Photograph is required for ${missingPhoto.full_name}`
+        );
+      }
+    }
+    const photoUploadIds = members
+      .map(member => member.photo_upload_id)
+      .filter(id => id !== null);
+    if (
+      new Set(photoUploadIds).size !==
+      photoUploadIds.length
+    ) {
+      fail(
+        400,
+        'Each volunteer must upload a separate photograph'
+      );
+    }
     const usesServiceDates = members.some(
       member => member.service_dates.length > 0
     );
@@ -423,6 +464,12 @@ export const createVolunteerRegistration = async (
 
     try {
       await client.query('BEGIN');
+      await client.query(
+        "SET LOCAL lock_timeout = '5s'"
+      );
+      await client.query(
+        "SET LOCAL statement_timeout = '15s'"
+      );
 
       // Lock the opportunity to coordinate registration
       // with admin opening, closing and shift changes.
@@ -631,6 +678,33 @@ export const createVolunteerRegistration = async (
       // Group registrations have multiple members.
 
       for (const member of members) {
+        let photoUrl: string | null = null;
+        if (member.photo_upload_id) {
+          const photoResult = await client.query(
+            `
+            UPDATE volunteer_photo_uploads
+            SET consumed_at = clock_timestamp()
+            WHERE id = $1::uuid
+              AND user_id = $2
+              AND opportunity_id = $3
+              AND consumed_at IS NULL
+              AND expires_at > clock_timestamp()
+            RETURNING photo_url
+            `,
+            [
+              member.photo_upload_id,
+              userId,
+              opportunityId,
+            ]
+          );
+          if (photoResult.rows.length !== 1) {
+            fail(
+              409,
+              `Photograph for ${member.full_name} is expired or unavailable. Please upload it again.`
+            );
+          }
+          photoUrl = photoResult.rows[0].photo_url;
+        }
         const isLeader =
           registrationType === 'group' &&
           member.is_team_leader;
@@ -665,14 +739,30 @@ export const createVolunteerRegistration = async (
             profession,
             area_of_interest,
             is_team_leader,
-            status
+            status,
+            photo_url,
+            photo_status,
+            photo_uploaded_at,
+            photo_revision
           )
-
           VALUES (
             $1,$2,$3,$4,$5,$6,$7,
             $8,$9,$10,$11,$12,$13,
             $14,$15,$16,$17,$18,$19,
-            $20,$21,'pending'
+            $20,$21,'pending',
+            $22::text,
+            CASE
+              WHEN $22::text IS NULL THEN 'missing'
+              ELSE 'pending'
+            END,
+            CASE
+              WHEN $22::text IS NULL THEN NULL
+              ELSE NOW()
+            END,
+            CASE
+              WHEN $22::text IS NULL THEN 0
+              ELSE 1
+            END
           )
 
           RETURNING
@@ -704,6 +794,7 @@ export const createVolunteerRegistration = async (
             member.profession,
             member.area_of_interest,
             isLeader,
+            photoUrl,
           ]
         );
 
@@ -752,6 +843,8 @@ export const createVolunteerRegistration = async (
         }
         createdMembers.push({
           ...createdMember,
+          photo_status: photoUrl ? 'pending' : 'missing',
+          photo_revision: photoUrl ? 1 : 0,
           shift_ids: member.shift_ids,
           service_dates: savedServiceDates,
         });

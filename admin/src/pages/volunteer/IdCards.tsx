@@ -18,6 +18,8 @@ interface Member {
   full_name: string;
   member_code: string;
   photo_url: string | null;
+  photo_status: string;
+  photo_revision: number;
   group_name: string | null;
   registration_type: string;
   existing_card_id: number | null;
@@ -28,6 +30,29 @@ interface Member {
   can_issue: boolean;
 }
 
+function isPhotoVerified(member: Member): boolean {
+  return (
+    member.photo_status === 'verified' &&
+    Number.isInteger(member.photo_revision) &&
+    member.photo_revision > 0
+  );
+}
+function photoStatusLabel(status: string): string {
+  switch (status) {
+    case 'missing':
+      return 'Photograph required';
+    case 'pending':
+      return 'Awaiting verification';
+    case 'correction_required':
+      return 'Correction required';
+    case 'resubmitted':
+      return 'Awaiting re-verification';
+    case 'verified':
+      return 'Verified';
+    default:
+      return 'Verification required';
+  }
+}
 interface Card {
   id: number;
   member_id: number;
@@ -91,17 +116,17 @@ export default function IdCards({
       {opportunityId && (
         <CardManager
           key={opportunityId}
-          opportunityId={opportunityId}
+          opportunityId={opportunityId} opportunitiesMode={opportunities.find(item => String(item.id) === opportunityId)?.attendance_mode ?? "legacy"}
         />
       )}
     </section>
   );
 }
 
-function CardManager({
+function CardManager({ opportunitiesMode,
   opportunityId,
 }: {
-  opportunityId: string;
+  opportunityId: string; opportunitiesMode: string;
 }) {
   const base =
     `/opportunities/${opportunityId}/id-cards`;
@@ -301,7 +326,8 @@ function CardManager({
       !selected.every(id =>
         members.some(member =>
           member.member_id === id &&
-          member.can_issue
+          member.can_issue &&
+          isPhotoVerified(member)
         )
       )
     ) {
@@ -322,6 +348,16 @@ function CardManager({
       {
         member_ids: selected,
         photos_verified: true,
+        photo_revisions: Object.fromEntries(
+          members
+            .filter(member =>
+              selected.includes(member.member_id)
+            )
+            .map(member => [
+              String(member.member_id),
+              member.photo_revision,
+            ])
+        ),
       },
       'ID cards issued successfully'
     );
@@ -376,11 +412,21 @@ function CardManager({
       return;
     }
 
+    const member = members.find(
+      item => item.member_id === refreshCard.member_id
+    );
+    if (!member || !isPhotoVerified(member)) {
+      setError(
+        'Verify the volunteer photograph in Registrations before refreshing the ID card.'
+      );
+      return;
+    }
     await mutate(
       `${base}/${refreshCard.id}/refresh`,
       'PATCH',
       {
         photo_verified: true,
+        photo_revision: member.photo_revision,
         confirm_reactivation: reactivate,
       },
       'ID card refreshed successfully'
@@ -425,6 +471,14 @@ function CardManager({
         <>
           <div className="panel">
             <h3>ID Card Summary</h3>
+            <p style={{
+              fontSize: 13,
+              color: '#6B1720',
+            }}>
+              Photographs use temporary secure links.
+              If a photograph becomes unavailable,
+              use Refresh Records to reload it.
+            </p>
 
             <div style={{
               display: 'grid',
@@ -458,6 +512,17 @@ function CardManager({
 
           <div className="panel">
             <h3>Issue Volunteer ID Cards</h3>
+            <p style={{
+              color: '#6B1720',
+              background: '#FFFDF8',
+              border: '1px solid #E8D8B8',
+              borderRadius: 8,
+              padding: 12,
+            }}>
+              Only volunteers with verified photographs
+              can receive ID cards. Review photographs
+              in the Registrations section.
+            </p>
 
             <fieldset
               disabled={disabled}
@@ -504,12 +569,13 @@ function CardManager({
                       <tr key={item.member_id}>
                         <td>
                           <input
-                            type="checkbox"
+                            type="checkbox" style={{ width: 18, height: 18, minWidth: 18, padding: 0, margin: 0, flexShrink: 0, accentColor: "#6B1720" }}
                             checked={selected.includes(
                               item.member_id
                             )}
                             disabled={
                               !item.can_issue ||
+                              !isPhotoVerified(item) ||
                               (
                                 selected.length >= 500 &&
                                 !selected.includes(
@@ -531,6 +597,15 @@ function CardManager({
                               rel="noopener noreferrer"
                             >
                               <img
+                                onError={event => {
+                                  event.currentTarget.style.display = 'none';
+                                  setError(
+                                    'Photograph unavailable or expired. Use Refresh Records to reload securely.'
+                                  );
+                                }}
+                                onLoad={event => {
+                                  event.currentTarget.style.display = '';
+                                }}
                                 src={item.photo_url}
                                 alt={item.full_name}
                                 referrerPolicy="no-referrer"
@@ -543,13 +618,13 @@ function CardManager({
                               />
                             </a>
                           ) : (
-                            <small>No photo</small>
+                            <small>Photo unavailable</small>
                           )}
                         </td>
 
                         <td>
                           <strong>{item.full_name}</strong>
-                          <div>{item.member_code}</div>
+                          <div style={{ fontSize: 11, overflowWrap: "anywhere", maxWidth: 220, marginTop: 4 }}>{item.member_code}</div>
                           <small>
                             {item.group_name ||
                               item.registration_type}
@@ -568,7 +643,7 @@ function CardManager({
                           )}
 
                           <div>
-                            {item.total_assignments} duties
+                            {item.total_assignments} {opportunitiesMode === "legacy" ? (item.total_assignments === 1 ? "duty" : "duties") : (item.total_assignments === 1 ? "service day" : "service days")}
                           </div>
                         </td>
 
@@ -577,7 +652,7 @@ function CardManager({
                             ? 'Already issued'
                             : item.can_issue
                               ? 'Eligible'
-                              : 'Photograph required'}
+                              : photoStatusLabel(item.photo_status)}
                         </td>
                       </tr>
                     ))}
@@ -593,9 +668,9 @@ function CardManager({
                 </table>
               </div>
 
-              <label style={{ marginTop: 16 }}>
+              <label style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
                 <input
-                  type="checkbox"
+                  type="checkbox" style={{ width: 18, height: 18, minWidth: 18, padding: 0, margin: 0, flexShrink: 0, accentColor: "#6B1720" }}
                   checked={verified}
                   disabled={!selected.length}
                   onChange={e =>
@@ -603,8 +678,8 @@ function CardManager({
                   }
                 />
 
-                I have personally verified the
-                photographs of all selected volunteers.
+                I confirm ID card issuance for volunteers
+                with administrator-verified photographs.
               </label>
 
               <button
@@ -651,6 +726,15 @@ function CardManager({
                 <div style={{ padding: 20 }}>
                   {preview.photo_url && (
                     <img
+                                onError={event => {
+                                  event.currentTarget.style.display = 'none';
+                                  setError(
+                                    'Photograph unavailable or expired. Use Refresh Records to reload securely.'
+                                  );
+                                }}
+                                onLoad={event => {
+                                  event.currentTarget.style.display = '';
+                                }}
                       src={preview.photo_url}
                       alt={preview.full_name}
                       referrerPolicy="no-referrer"
@@ -744,6 +828,15 @@ function CardManager({
                     rel="noopener noreferrer"
                   >
                     <img
+                                onError={event => {
+                                  event.currentTarget.style.display = 'none';
+                                  setError(
+                                    'Photograph unavailable or expired. Use Refresh Records to reload securely.'
+                                  );
+                                }}
+                                onLoad={event => {
+                                  event.currentTarget.style.display = '';
+                                }} referrerPolicy="no-referrer"
                       src={member.photo_url}
                       alt={member.full_name}
                       style={{
@@ -767,11 +860,11 @@ function CardManager({
               >
                 <label>
                   <input
-                    type="checkbox"
+                    type="checkbox" style={{ width: 18, height: 18, minWidth: 18, padding: 0, margin: 0, flexShrink: 0, accentColor: "#6B1720" }}
                     checked={refreshVerified}
                     disabled={!members.some(m =>
                       m.member_id === refreshCard.member_id &&
-                      Boolean(m.photo_url)
+                      isPhotoVerified(m)
                     )}
                     onChange={e =>
                       setRefreshVerified(e.target.checked)
@@ -784,7 +877,7 @@ function CardManager({
                 {refreshCard.stored_status === 'revoked' && (
                   <label>
                     <input
-                      type="checkbox"
+                      type="checkbox" style={{ width: 18, height: 18, minWidth: 18, padding: 0, margin: 0, flexShrink: 0, accentColor: "#6B1720" }}
                       checked={reactivate}
                       onChange={e =>
                         setReactivate(e.target.checked)
@@ -919,7 +1012,7 @@ function CardManager({
                             disabled ||
                             !members.some(m =>
                               m.member_id === card.member_id &&
-                              Boolean(m.photo_url)
+                              isPhotoVerified(m)
                             )
                           }
                           onClick={() => {

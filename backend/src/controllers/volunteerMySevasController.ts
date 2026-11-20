@@ -1,3 +1,6 @@
+import {
+  withVolunteerPhotoAccess,
+} from '../services/volunteerPhotoAccessService';
 import { CARD_SELECT } from './volunteerIdCardController';
 import {
   DAILY_SERVICE_SUMMARY_SQL,
@@ -148,6 +151,37 @@ export const getMySevaDetails = async (
             m.full_name,
             m.gender,
             m.photo_url,
+            m.photo_status,
+            m.photo_revision,
+            m.photo_review_comment,
+            m.photo_uploaded_at,
+            m.photo_reviewed_at,
+            (
+              r.status IN (
+                'pending',
+                'approved',
+                'assigned',
+                'in_progress'
+              )
+              AND m.status IN (
+                'pending',
+                'approved'
+              )
+              AND m.photo_status IN (
+                'missing',
+                'correction_required'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM volunteer_id_cards pc
+                WHERE pc.member_id = m.id
+                  AND pc.opportunity_id = m.opportunity_id
+                  AND pc.status = 'active'
+                  AND pc.valid_until >=
+                    (clock_timestamp()
+                      AT TIME ZONE 'Asia/Kolkata')::date
+              )
+            ) AS can_resubmit_photo,
             m.is_team_leader,
             m.status,
             m.created_at
@@ -635,7 +669,9 @@ export const getMySevaDetails = async (
 
       const idCardMap =
         groupByMember(
-          idCardResult.rows
+          idCardResult.rows.map(
+            row => withVolunteerPhotoAccess(row)
+          )
         );
 
       const accommodationMap =
@@ -781,7 +817,7 @@ export const getMySevaDetails = async (
                 }
               : null;
           return {
-            ...member,
+            ...withVolunteerPhotoAccess(member),
             attendance_mode: attendanceMode,
             service_dates: selectedDates.map(
               item => item.service_date

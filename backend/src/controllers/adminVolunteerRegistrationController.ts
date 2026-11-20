@@ -605,7 +605,10 @@ u.phone AS registered_by_phone,
 
       data: {
         ...registrationResult.rows[0],
-        members: memberResult.rows,
+        members: memberResult.rows.map(member => ({
+          ...member,
+          photo_url: null,
+        })),
       },
     });
   } catch (error) {
@@ -662,7 +665,20 @@ export const reviewVolunteerRegistration = async (
 
     try {
       await client.query('BEGIN');
-
+      const opportunity = await client.query(
+        `
+        SELECT o.id
+        FROM volunteer_opportunities o
+        JOIN volunteer_registrations r
+          ON r.opportunity_id = o.id
+        WHERE r.id = $1
+        FOR UPDATE OF o
+        `,
+        [id]
+      );
+      if (!opportunity.rows.length) {
+        fail(404, 'Registration not found');
+      }
       const existing = await client.query(
         `
         SELECT
@@ -700,8 +716,11 @@ export const reviewVolunteerRegistration = async (
         SELECT
           id,
           status,
-          is_team_leader
-
+          is_team_leader,
+          full_name,
+          photo_url,
+          photo_status,
+          photo_revision
         FROM volunteer_members
 
         WHERE registration_id = $1
@@ -732,6 +751,28 @@ export const reviewVolunteerRegistration = async (
         );
       }
 
+      if (action === 'approve') {
+        const requirePhotos =
+          process.env.VOLUNTEER_PHOTO_REQUIRED === 'true' ||
+          members.rows.some(
+            member =>
+              Number(member.photo_revision) > 0 ||
+              member.photo_status !== 'missing'
+          );
+        if (requirePhotos) {
+          const unverified = members.rows.find(
+            member =>
+              member.photo_status !== 'verified' ||
+              !member.photo_url?.trim()
+          );
+          if (unverified) {
+            fail(
+              409,
+              `Verify the photograph of ${unverified.full_name} before approving this registration`
+            );
+          }
+        }
+      }
       const newStatus =
         action === 'approve'
           ? 'approved'

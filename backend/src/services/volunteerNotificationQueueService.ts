@@ -26,7 +26,10 @@ export type VolunteerNotificationEvent =
   | 'certificate_revoked'
   | 'reporting_sent'
   | 'reporting_updated'
-  | 'reporting_cancelled';
+  | 'reporting_cancelled'
+  | 'photo_correction_required'
+  | 'photo_verified'
+  | 'photo_resubmitted';
 
 export type NotificationTarget =
   | 'all'

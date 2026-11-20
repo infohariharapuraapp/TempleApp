@@ -2,6 +2,7 @@ import volunteerI18n from '@/localization/i18n';
 import {
   apiRequest,
   ApiError,
+  API_BASE_URL,
 } from '@/services/api';
 
 import { getToken } from '@/services/authStorage';
@@ -60,6 +61,7 @@ export interface VolunteerShift {
 }
 
 export interface VolunteerMemberInput {
+  photo_upload_id?: string;
   full_name: string;
   mobile: string;
   email?: string;
@@ -88,6 +90,7 @@ export interface VolunteerMemberInput {
 }
 
 export interface VolunteerRegistrationInput {
+  photo_required?: boolean;
   opportunity_id: number;
 
   registration_type:
@@ -527,7 +530,19 @@ export interface VolunteerDailyServiceSummary {
   service_end_date: string | null;
   is_completed: boolean;
 }
+export type VolunteerPhotoStatus =
+  | 'missing'
+  | 'pending'
+  | 'correction_required'
+  | 'resubmitted'
+  | 'verified';
 export interface VolunteerSevaMember {
+  photo_status?: VolunteerPhotoStatus;
+  photo_revision?: number;
+  photo_review_comment?: string | null;
+  photo_uploaded_at?: string | null;
+  photo_reviewed_at?: string | null;
+  can_resubmit_photo?: boolean;
   attendance_mode?: VolunteerAttendanceMode;
   service_dates?: string[];
   daily_attendance?: VolunteerDailyAttendance[];
@@ -765,4 +780,164 @@ export async function confirmVolunteerReporting(
       body: { revision },
     }
   );
+}
+export interface VolunteerPhotoUploadResult {
+  upload_id: string;
+  expires_at: string;
+}
+export async function uploadVolunteerPhoto(
+  opportunityId: number,
+  photo: {
+    uri: string;
+    mimeType: string;
+    fileSize?: number;
+  }
+): Promise<VolunteerPhotoUploadResult> {
+  if (
+    !Number.isSafeInteger(opportunityId) ||
+    opportunityId <= 0
+  ) {
+    throw new ApiError('Invalid opportunity.');
+  }
+  const extensions: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+  };
+  const extension = extensions[photo.mimeType];
+  if (!extension) {
+    throw new ApiError(
+      'Only JPG, PNG and WebP photographs are supported.'
+    );
+  }
+  if (
+    photo.fileSize !== undefined &&
+    photo.fileSize > 5 * 1024 * 1024
+  ) {
+    throw new ApiError(
+      'Photograph must not exceed 5 MB.'
+    );
+  }
+  const token = await getVolunteerToken();
+  const formData = new FormData();
+  formData.append(
+    'opportunity_id',
+    String(opportunityId)
+  );
+  formData.append(
+    'image',
+    {
+      uri: photo.uri,
+      type: photo.mimeType,
+      name: `volunteer-photo.${extension}`,
+    } as unknown as Blob
+  );
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    60000
+  );
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/volunteer/photos/upload`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        body: formData,
+        signal: controller.signal,
+      }
+    );
+    const result = await response
+      .json()
+      .catch(() => null);
+    if (!response.ok || result?.success !== true) {
+      throw new ApiError(
+        result?.message ||
+          'Unable to upload photograph.',
+        response.status
+      );
+    }
+    const data = result.data;
+    if (
+      typeof data?.upload_id !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        .test(data.upload_id) ||
+      typeof data.expires_at !== 'string' ||
+      !(Date.parse(data.expires_at) > Date.now())
+    ) {
+      throw new ApiError(
+        'Invalid photograph upload response.'
+      );
+    }
+    return {
+      upload_id: data.upload_id,
+      expires_at: data.expires_at,
+    };
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiError(
+        'Photograph upload timed out. Please retry.',
+        408
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+export interface VolunteerPhotoResubmissionResult {
+  id: number;
+  photo_status: VolunteerPhotoStatus;
+  photo_revision: number;
+  photo_uploaded_at: string;
+}
+export async function resubmitVolunteerPhoto(
+  registrationId: number,
+  memberId: number,
+  uploadId: string,
+  revision: number
+): Promise<VolunteerPhotoResubmissionResult> {
+  if (
+    !Number.isSafeInteger(registrationId) ||
+    registrationId <= 0 ||
+    registrationId > 2147483647 ||
+    !Number.isSafeInteger(memberId) ||
+    memberId <= 0 ||
+    memberId > 2147483647 ||
+    !Number.isSafeInteger(revision) ||
+    revision < 0 ||
+    revision >= 2147483647 ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uploadId)
+  ) {
+    throw new ApiError(
+      'Invalid photograph submission.'
+    );
+  }
+  const data =
+    await volunteerRequest<VolunteerPhotoResubmissionResult>(
+      `/my-registrations/${registrationId}/members/${memberId}/photo`,
+      {
+        method: 'POST',
+        authenticated: true,
+        body: {
+          photo_upload_id: uploadId,
+          photo_revision: revision,
+        },
+      }
+    );
+  if (
+    data.id !== memberId ||
+    data.photo_revision !== revision + 1 ||
+    !['pending', 'resubmitted'].includes(
+      data.photo_status
+    )
+  ) {
+    throw new ApiError(
+      'Unable to confirm photograph submission. Refresh My Sevas.'
+    );
+  }
+  return data;
 }

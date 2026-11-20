@@ -1,4 +1,6 @@
 import {
+  resubmitVolunteerPhoto,
+} from '../controllers/volunteerPhotoResubmissionController';import {
   getMyReporting,
   confirmMyReporting,
 } from '../controllers/volunteerReportingController';
@@ -10,6 +12,12 @@ import { Router } from 'express';
 import {
   authenticateToken,
 } from '../middleware/authMiddleware';
+
+
+import {
+  uploadVolunteerPhoto,
+} from '../controllers/volunteerPhotoController';
+
 
 import {
   getAvailableOpportunities,
@@ -152,5 +160,24 @@ router.post(
   '/reporting/:reportingId/confirm',
   authenticateToken,
   confirmMyReporting
+);
+
+// ========================================
+// VOLUNTEER PHOTOGRAPH UPLOAD
+// ========================================
+
+router.post(
+  '/photos/upload',
+  authenticateToken,
+  uploadVolunteerPhoto
+);
+
+// ========================================
+// VOLUNTEER PHOTOGRAPH RESUBMISSION
+// ========================================
+router.post(
+  '/my-registrations/:registrationId/members/:memberId/photo',
+  authenticateToken,
+  resubmitVolunteerPhoto
 );
 export default router;

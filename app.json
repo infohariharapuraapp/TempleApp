@@ -70,6 +70,14 @@
       "expo-localization",
       "expo-asset",
       "expo-image",
+      [
+  "expo-image-picker",
+  {
+    "photosPermission": "Allow Divyakshetra Hariharapura to select your volunteer photograph for ID card generation.",
+    "cameraPermission": "Allow Divyakshetra Hariharapura to capture your volunteer photograph.",
+    "microphonePermission": false
+  }
+],
       "expo-web-browser"
     ],
     "experiments": {

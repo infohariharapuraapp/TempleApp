@@ -1,4 +1,7 @@
 import {
+  cleanupExpiredVolunteerPhotos,
+} from './volunteerPhotoCleanupService';
+import {
   processVolunteerNotificationQueue,
 } from './volunteerNotificationWorker';
 
@@ -188,7 +191,14 @@ async function processVolunteerReceipts(): Promise<void> {
 // ========================================
 
 async function processVolunteerCleanup(): Promise<void> {
-  await cleanupTerminalVolunteerNotificationJobs();
+  await runTask(
+    'Terminal notification cleanup',
+    cleanupTerminalVolunteerNotificationJobs
+  );
+  await runTask(
+    'Expired volunteer photograph cleanup',
+    cleanupExpiredVolunteerPhotos
+  );
 }
 
 // ========================================

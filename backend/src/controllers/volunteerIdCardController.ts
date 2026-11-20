@@ -1,3 +1,6 @@
+import {
+  withVolunteerPhotoAccess,
+} from '../services/volunteerPhotoAccessService';
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { pool } from '../db';
@@ -271,6 +274,8 @@ async function getEligibleMember(
       m.id,
       m.full_name,
       m.photo_url,
+      m.photo_status,
+      m.photo_revision,
       m.status,
       m.registration_id,
 
@@ -315,7 +320,12 @@ async function getEligibleMember(
     );
   }
 
-  if (!member.photo_url) {
+  if (
+    typeof member.photo_url !== 'string' ||
+    !member.photo_url.trim() ||
+    member.photo_status !== 'verified' ||
+    !validNumberId(member.photo_revision)
+  ) {
     fail(
       409,
       `${member.full_name} requires a verified volunteer photo`
@@ -393,6 +403,8 @@ export const getEligibleIdCardMembers = async (
         m.full_name,
         m.member_code,
         m.photo_url,
+        m.photo_status,
+        m.photo_revision,
         m.gender,
         m.is_team_leader,
         r.registration_code,
@@ -429,13 +441,17 @@ export const getEligibleIdCardMembers = async (
       [opportunityId]
     );
 
+    res.set('Cache-Control', 'private, no-store');
     return res.json({
       success: true,
       data: result.rows.map(row => ({
-        ...row,
+        ...withVolunteerPhotoAccess(row),
 
         can_issue:
-          !!row.photo_url &&
+          typeof row.photo_url === 'string' &&
+          !!row.photo_url.trim() &&
+          row.photo_status === 'verified' &&
+          validNumberId(row.photo_revision) &&
           !row.existing_card_id,
       })),
     });
@@ -540,9 +556,10 @@ export const getVolunteerIdCards = async (
       ]
     );
 
+    res.set('Cache-Control', 'private, no-store');
     return res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(row => withVolunteerPhotoAccess(row)),
     });
   } catch (error) {
     return handleError(res, error);
@@ -591,9 +608,10 @@ export const getVolunteerIdCardById = async (
       fail(404, 'ID card not found');
     }
 
+    res.set('Cache-Control', 'private, no-store');
     return res.json({
       success: true,
-      data: result.rows[0],
+      data: withVolunteerPhotoAccess(result.rows[0]),
     });
   } catch (error) {
     return handleError(res, error);
@@ -662,6 +680,20 @@ export const issueVolunteerIdCards = async (
       );
 
       const issued: any[] = [];
+      const revisions = body.photo_revisions;
+      if (
+        !revisions ||
+        typeof revisions !== 'object' ||
+        Array.isArray(revisions) ||
+        !memberIds.every((id: number) =>
+          validNumberId(revisions[String(id)])
+        )
+      ) {
+        fail(
+          400,
+          'Photograph revisions are required. Refresh eligible members.'
+        );
+      }
 
       for (const memberId of memberIds) {
         const member = await getEligibleMember(
@@ -669,7 +701,15 @@ export const issueVolunteerIdCards = async (
           opportunityId,
           memberId
         );
-
+        if (
+          member.photo_revision !==
+          revisions[String(memberId)]
+        ) {
+          fail(
+            409,
+            'Volunteer photograph changed. Refresh records before issuing ID cards.'
+          );
+        }
         const existing = await client.query(
           `
           SELECT id
@@ -764,13 +804,14 @@ export const issueVolunteerIdCards = async (
 
       await client.query('COMMIT');
 
-      return res.status(201).json({
+      res.set('Cache-Control', 'private, no-store');
+    return res.status(201).json({
         success: true,
 
         message:
           `${issued.length} volunteer ID card(s) issued successfully`,
 
-        data: issued,
+        data: issued.map(row => withVolunteerPhotoAccess(row)),
       });
     } catch (error) {
       await client.query('ROLLBACK')
@@ -929,10 +970,11 @@ if (!notificationSummary.eligible) {
 
 await client.query('COMMIT');
 
-      return res.json({
+      res.set('Cache-Control', 'private, no-store');
+    return res.json({
         success: true,
         message: 'Volunteer ID card revoked',
-        data: result.rows[0],
+        data: withVolunteerPhotoAccess(result.rows[0]),
       });
     } catch (error) {
       await client.query('ROLLBACK')
@@ -1034,7 +1076,15 @@ export const refreshVolunteerIdCard = async (
         opportunityId,
         currentCard.member_id
       );
-
+      if (
+        !validNumberId(req.body?.photo_revision) ||
+        member.photo_revision !== req.body.photo_revision
+      ) {
+        fail(
+          409,
+          'Volunteer photograph changed. Refresh records before updating the ID card.'
+        );
+      }
       await client.query(
         `
         UPDATE volunteer_id_cards
@@ -1090,13 +1140,14 @@ export const refreshVolunteerIdCard = async (
 
       await client.query('COMMIT');
 
-      return res.json({
+      res.set('Cache-Control', 'private, no-store');
+    return res.json({
         success: true,
 
         message:
           'Volunteer ID card updated successfully',
 
-        data: result.rows[0],
+        data: withVolunteerPhotoAccess(result.rows[0]),
       });
     } catch (error) {
       await client.query('ROLLBACK')
@@ -1180,9 +1231,10 @@ export const getMyVolunteerIdCards = async (
       [userId]
     );
 
+    res.set('Cache-Control', 'private, no-store');
     return res.json({
       success: true,
-      data: result.rows,
+      data: result.rows.map(row => withVolunteerPhotoAccess(row)),
     });
   } catch (error) {
     return handleError(res, error);

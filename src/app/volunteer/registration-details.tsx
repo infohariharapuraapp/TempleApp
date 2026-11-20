@@ -1,3 +1,4 @@
+import VolunteerPhotoManagement from '@/components/volunteer/VolunteerPhotoManagement';
 import VolunteerDailyService from '@/components/volunteer/VolunteerDailyService';
 import volunteerI18n from '@/localization/i18n';
 import React, {
@@ -202,6 +203,15 @@ export default function RegistrationDetailsScreen() {
     useState<Section>('overview');
 
   const version = useRef(0);
+  const photoLock = useRef(false);
+  const [photoBusy, setPhotoBusy] =
+    useState(false);
+  const [photoRefreshKey, setPhotoRefreshKey] =
+    useState(0);
+  function handlePhotoBusy(busy: boolean) {
+    photoLock.current = busy;
+    setPhotoBusy(busy);
+  }
 
   const load = useCallback(
     async (refresh = false) => {
@@ -273,10 +283,12 @@ export default function RegistrationDetailsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      photoLock.current = false;
+      setPhotoBusy(false);
       void load();
-
       return () => {
         version.current++;
+        photoLock.current = false;
       };
     }, [load, i18n.language])
   );
@@ -289,6 +301,10 @@ export default function RegistrationDetailsScreen() {
     ) ?? data?.members[0];
 
   const nextDuty = data?.next_duty;
+  async function refreshPhotoDetails() {
+    await load(true);
+    setPhotoRefreshKey(previous => previous + 1);
+  }
 
   return (
     <VolunteerScreen
@@ -323,7 +339,12 @@ export default function RegistrationDetailsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => void load(true)}
+              onRefresh={() => {
+                if (!photoLock.current) {
+                  void load(true);
+                }
+              }}
+              enabled={!photoBusy}
               colors={[C.maroon]}
               tintColor={C.maroon}
             />
@@ -466,9 +487,12 @@ export default function RegistrationDetailsScreen() {
                       selected:
                         member?.id === item.id,
                     }}
-                    onPress={() =>
-                      setSelectedMemberId(item.id)
-                    }
+                    disabled={photoBusy || refreshing}
+                    onPress={() => {
+                      if (!photoLock.current) {
+                        setSelectedMemberId(item.id);
+                      }
+                    }}
                     style={[
                       styles.memberOption,
                       member?.id === item.id &&
@@ -517,6 +541,17 @@ export default function RegistrationDetailsScreen() {
             </View>
           )}
 
+          {!!member && (
+            <VolunteerPhotoManagement
+              key={`${id}-${member.id}-${member.photo_revision ?? 0}-${member.photo_status ?? 'unknown'}-${photoRefreshKey}`}
+              registrationId={id}
+              opportunityId={registration.opportunity_id}
+              member={member}
+              disabled={refreshing}
+              onBusyChange={handlePhotoBusy}
+              onRefresh={refreshPhotoDetails}
+            />
+          )}
           <View style={styles.navigationGrid}>
             {SECTIONS.filter(item => {
       if (!member?.attendance_mode ||
@@ -695,7 +730,15 @@ export default function RegistrationDetailsScreen() {
           )}
 
           {!!member && section === 'idcard' && (
-            <IDCardSection member={member} />
+            <IDCardSection
+              member={member}
+              refreshing={refreshing}
+              onRefresh={() => {
+                if (!photoLock.current && !refreshing) {
+                  void load(true);
+                }
+              }}
+            />
           )}
 
           {!!member && section === 'accommodation' && (
@@ -1000,8 +1043,12 @@ function DutyCard({
 
 function IDCardSection({
   member,
+  refreshing,
+  onRefresh,
 }: {
   member: VolunteerSevaMember;
+  refreshing: boolean;
+  onRefresh: () => void;
 }) {
   const card = member.id_card;
 
@@ -1033,6 +1080,33 @@ function IDCardSection({
             style={styles.idPhoto}
             fallback="👤"
           />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Refresh ID card photograph"
+            disabled={refreshing}
+            onPress={onRefresh}
+            style={{
+              paddingVertical: 9,
+              paddingHorizontal: 14,
+              marginTop: 8,
+              marginBottom: 6,
+              borderWidth: 1,
+              borderColor: C.border,
+              borderRadius: 8,
+              opacity: refreshing ? 0.5 : 1,
+            }}
+          >
+            <Text style={{
+              color: C.maroon,
+              fontSize: 12,
+              fontWeight: '700',
+              textAlign: 'center',
+            }}>
+              {refreshing
+                ? 'Refreshing...'
+                : 'Refresh ID Card'}
+            </Text>
+          </TouchableOpacity>
 
           <Text style={styles.idName}>
             {member.full_name}

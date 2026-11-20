@@ -112,6 +112,10 @@ import {
   revokeVolunteerCertificate,
 } from '../controllers/volunteerCertificateController';
 
+import {
+  reviewVolunteerPhoto,
+  getAdminVolunteerPhoto,
+} from '../controllers/adminVolunteerPhotoController';
 const router = Router();
 
 // ========================================
@@ -512,5 +516,16 @@ router.post(
 router.patch(
   '/opportunities/:opportunityId/daily-attendance/:serviceDateId/reopen',
   reopenDailyAttendance
+);
+// ========================================
+// VOLUNTEER PHOTOGRAPH REVIEW
+// ========================================
+router.patch(
+  '/registrations/:registrationId/members/:memberId/photo-review',
+  reviewVolunteerPhoto
+);
+router.get(
+  '/registrations/:registrationId/members/:memberId/photo',
+  getAdminVolunteerPhoto
 );
 export default router;

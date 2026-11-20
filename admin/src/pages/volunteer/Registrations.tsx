@@ -5,6 +5,7 @@ import {
   useState,
 } from 'react';
 
+import VolunteerPhotoReview from './VolunteerPhotoReview';
 import type { FormEvent } from 'react';
 
 import {
@@ -46,6 +47,11 @@ type Member = {
   date_of_birth: string | null;
   gender: string | null;
   photo_url: string | null;
+  photo_status?: 'missing' | 'pending' | 'correction_required' | 'resubmitted' | 'verified';
+  photo_revision?: number;
+  photo_review_comment?: string | null;
+  photo_uploaded_at?: string | null;
+  photo_reviewed_at?: string | null;
   country: string | null;
   pincode: string | null;
   state: string | null;
@@ -369,6 +375,60 @@ export default function Registrations({
     }
   }
 
+  async function reviewMemberPhoto(
+    memberId: number,
+    photoAction: 'verify' | 'request_correction',
+    comment: string,
+    revision: number
+  ) {
+    if (
+      !detail ||
+      mutationLock.current ||
+      loading ||
+      detailLoading ||
+      needsRefresh
+    ) {
+      throw new Error(
+        'Refresh registration details before reviewing.'
+      );
+    }
+    const registrationId = detail.id;
+    mutationLock.current = true;
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await volunteerRequest(
+        `/registrations/${registrationId}/members/${memberId}/photo-review`,
+        jsonRequest('PATCH', {
+          action: photoAction,
+          comment: comment.trim() || null,
+          photo_revision: revision,
+        })
+      );
+      if (!mounted.current) return;
+      setSuccess(
+        response.message ||
+        'Photograph reviewed successfully.'
+      );
+      const refreshed =
+        await openDetails(registrationId);
+      if (!refreshed) {
+        setNeedsRefresh(true);
+      }
+    } catch (error) {
+      if (mounted.current) {
+        setError(getErrorMessage(error));
+        setNeedsRefresh(true);
+      }
+      throw error;
+    } finally {
+      mutationLock.current = false;
+      if (mounted.current) {
+        setBusy(false);
+      }
+    }
+  }
   async function review(event: FormEvent) {
     event.preventDefault();
 
@@ -464,6 +524,21 @@ export default function Registrations({
     setPage(next);
   }
 
+  const photoReviewRequired =
+    detail?.members.some(
+      member =>
+        (member.photo_revision ?? 0) > 0 ||
+        (
+          member.photo_status !== undefined &&
+          member.photo_status !== 'missing'
+        )
+    ) ?? false;
+  const unverifiedPhotoCount =
+    photoReviewRequired
+      ? detail?.members.filter(
+          member => member.photo_status !== 'verified'
+        ).length ?? 0
+      : 0;
   const disabled =
     loading ||
     busy ||
@@ -753,18 +828,7 @@ export default function Registrations({
                 gap: 16,
                 alignItems: 'center',
               }}>
-                {member.photo_url?.startsWith('https://') && (
-                  <img
-                    src={member.photo_url}
-                    alt="Volunteer"
-                    style={{
-                      width: 75,
-                      height: 90,
-                      objectFit: 'cover',
-                      borderRadius: 8,
-                    }}
-                  />
-                )}
+
 
                 <div>
                   <h3>{member.full_name}</h3>
@@ -815,6 +879,33 @@ export default function Registrations({
                 ))}
               </div>
 
+              <VolunteerPhotoReview
+                registrationId={detail.id}
+                memberId={member.id}
+                memberName={member.full_name}
+                photoStatus={
+                  member.photo_status ||
+                  (member.photo_url ? 'pending' : 'missing')
+                }
+                photoRevision={member.photo_revision ?? 0}
+                reviewComment={member.photo_review_comment}
+                canReview={
+                  ['pending', 'approved', 'assigned', 'in_progress']
+                    .includes(detail.status) &&
+                  ['pending', 'approved']
+                    .includes(member.status) &&
+                  (member.photo_revision ?? 0) > 0
+                }
+                disabled={disabled}
+                onReview={(photoAction, comment, revision) =>
+                  reviewMemberPhoto(
+                    member.id,
+                    photoAction,
+                    comment,
+                    revision
+                  )
+                }
+              />
               <h4>Selected Service Dates</h4>
               {member.service_dates === undefined ? (
                 <p>
@@ -916,6 +1007,33 @@ export default function Registrations({
               onSubmit={review}
             >
               <h3>Review Application</h3>
+              {unverifiedPhotoCount > 0 && (
+                <div
+                  role="status"
+                  style={{
+                    padding: 14,
+                    margin: '12px 0',
+                    borderRadius: 8,
+                    background: '#FFF4E5',
+                    color: '#92400E',
+                    border: '1px solid #EAC78B',
+                  }}
+                >
+                  <strong>
+                    Photograph verification required
+                  </strong>
+                  <p>
+                    {unverifiedPhotoCount} volunteer(s)
+                    require photograph verification
+                    before registration approval.
+                  </p>
+                  <small>
+                    Request photograph correction
+                    instead of rejecting the application
+                    when only the photograph is unclear.
+                  </small>
+                </div>
+              )}
 
               <p>
                 Approval or rejection applies
@@ -949,7 +1067,10 @@ export default function Registrations({
                       Select action
                     </option>
 
-                    <option value="approve">
+                    <option
+                      value="approve"
+                      disabled={unverifiedPhotoCount > 0}
+                    >
                       Approve Registration
                     </option>
 
@@ -991,7 +1112,14 @@ export default function Registrations({
                 <button
                   type="submit"
                   className="primary"
-                  disabled={!action || disabled}
+                  disabled={
+                    !action ||
+                    disabled ||
+                    (
+                      action === 'approve' &&
+                      unverifiedPhotoCount > 0
+                    )
+                  }
                 >
                   {busy
                     ? 'Processing…'
