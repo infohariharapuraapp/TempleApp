@@ -82,6 +82,7 @@ export async function cleanupExpiredVolunteerPhotos() {
         !url.pathname.startsWith(prefix) ||
         url.pathname
           .slice(prefix.length)
+          .replace(/^s--[A-Za-z0-9_-]+--\//, '')
           .replace(/^v\d+\//, '') !== expectedPath
       ) {
         await client.query('ROLLBACK');

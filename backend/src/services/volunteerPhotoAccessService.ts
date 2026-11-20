@@ -30,6 +30,7 @@ export function createVolunteerPhotoAccessUrl(
 
     const path = url.pathname
       .slice(prefix.length)
+      .replace(/^s--[A-Za-z0-9_-]+--\//, '')
       .replace(/^v\d+\//, '');
 
     const match = path.match(

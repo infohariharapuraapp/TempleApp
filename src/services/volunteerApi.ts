@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 import volunteerI18n from '@/localization/i18n';
 import {
   apiRequest,
@@ -824,13 +826,26 @@ export async function uploadVolunteerPhoto(
     'opportunity_id',
     String(opportunityId)
   );
+  const imageFile = new File(photo.uri);
+  if (!imageFile.exists) {
+    throw new ApiError(
+      'Photograph file is unavailable. Please select it again.'
+    );
+  }
+  if (imageFile.size <= 0) {
+    throw new ApiError(
+      'Photograph file is empty. Please select another photograph.'
+    );
+  }
+  if (imageFile.size > 5 * 1024 * 1024) {
+    throw new ApiError(
+      'Photograph must not exceed 5 MB.'
+    );
+  }
   formData.append(
     'image',
-    {
-      uri: photo.uri,
-      type: photo.mimeType,
-      name: `volunteer-photo.${extension}`,
-    } as unknown as Blob
+    imageFile,
+    `volunteer-photo.${extension}`
   );
   const controller = new AbortController();
   const timer = setTimeout(
@@ -838,7 +853,7 @@ export async function uploadVolunteerPhoto(
     60000
   );
   try {
-    const response = await fetch(
+    const response = await expoFetch(
       `${API_BASE_URL}/volunteer/photos/upload`,
       {
         method: 'POST',
