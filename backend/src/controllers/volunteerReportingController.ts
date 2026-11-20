@@ -920,6 +920,33 @@ export async function getMyReporting(
     const registrationId =
       parseId(req.params.registrationId);
 
+    // Verify registration ownership or linked membership
+    // independently of reporting availability.
+    const access = await pool.query(
+      `
+      SELECT r.id
+      FROM volunteer_registrations r
+      WHERE r.id = $1
+        AND (
+          r.user_id = $2
+          OR EXISTS (
+            SELECT 1
+            FROM volunteer_members m
+            WHERE m.registration_id = r.id
+              AND m.user_id = $2
+          )
+        )
+      LIMIT 1
+      `,
+      [registrationId, userId]
+    );
+    if (!access.rows.length) {
+      throw new ReportingError(
+        404,
+        'Seva registration not found'
+      );
+    }
+
     const result = await pool.query(
       `
       SELECT
