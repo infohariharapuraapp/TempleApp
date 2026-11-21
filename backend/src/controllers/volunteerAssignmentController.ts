@@ -301,7 +301,32 @@ async function validateMember(
     );
   }
 
-  // Verify selected availability.
+  // CLOSED SERVICE DATE VALIDATION
+  // Prevent assignment or reassignment after withdrawal.
+  const serviceDateCheck = await client.query(
+    `
+    SELECT id, status
+    FROM volunteer_service_dates
+    WHERE member_id = $1
+      AND opportunity_id = $2
+      AND service_date = $3::date
+    FOR UPDATE
+    `,
+    [
+      memberId,
+      opportunityId,
+      requirement.service_date,
+    ]
+  );
+  if (
+    !serviceDateCheck.rows.length ||
+    serviceDateCheck.rows[0].status !== 'active'
+  ) {
+    fail(
+      409,
+      'Volunteer is not available for this service date'
+    );
+  }  // Verify selected availability.
 
   const availability = await client.query(
     `

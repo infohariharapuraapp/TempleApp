@@ -215,6 +215,7 @@ async function lockServiceDate(
     `
     SELECT
       sd.id AS service_date_id,
+      sd.status AS service_date_status,
       sd.service_date::text AS service_date,
       m.id AS member_id,
       m.status AS member_status,
@@ -238,7 +239,12 @@ async function lockServiceDate(
 
   const row = result.rows[0];
 
-  if (!row) {
+  if (row && row.service_date_status !== 'active') {
+    fail(
+      409,
+      'This service date is closed. Attendance changes are not allowed.'
+    );
+  }  if (!row) {
     fail(404, 'Volunteer service date not found');
   }
 

@@ -31,6 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   getVolunteerRegistrationDetails,
+  getMyVolunteerReporting,
   getVolunteerError,
   formatVolunteerDate,
   formatVolunteerDateTime,
@@ -45,6 +46,7 @@ import {
 
 import type {
   VolunteerRegistrationDetails,
+  VolunteerDailyReporting,
   VolunteerSevaMember,
   VolunteerDutyAssignment,
 } from '@/services/volunteerApi';
@@ -204,6 +206,8 @@ export default function RegistrationDetailsScreen() {
   const [section, setSection] =
     useState<Section>('overview');
 
+  const [journeyReporting, setJourneyReporting] =
+    useState<VolunteerDailyReporting[] | null>(null);
   const version = useRef(0);
   const photoLock = useRef(false);
   const journeyScroll = useRef<ScrollView>(null);
@@ -244,14 +248,18 @@ export default function RegistrationDetailsScreen() {
           );
         }
 
-        const result =
-          await getVolunteerRegistrationDetails(id);
+        const [result, reportingResult] =
+          await Promise.all([
+            getVolunteerRegistrationDetails(id),
+            getMyVolunteerReporting(id).catch(() => null),
+          ]);
 
         if (requestVersion !== version.current) {
           return;
         }
 
         setData(result);
+        setJourneyReporting(reportingResult);
         // Return to Overview if accommodation
         // has been disabled by the administrator.
         if (
@@ -280,7 +288,7 @@ export default function RegistrationDetailsScreen() {
         }
 
         setData(null);
-
+        setJourneyReporting(null);
         setLoginRequired(
           err instanceof ApiError &&
           err.status === 401
@@ -391,14 +399,58 @@ export default function RegistrationDetailsScreen() {
     );
   const certificateIssued =
     member?.certificate?.status === 'issued';
-  const activeID =
-    member?.id_card?.status === 'active';
+  // Issuance is independent of the validity period.
+  // Future-validity cards count as issued.
+  const idCardIssued =
+    memberActive &&
+    !!member?.id_card?.issued_at &&
+    member.id_card.status !== 'revoked';
   const photoNeedsAttention =
     member?.photo_status === 'correction_required' ||
     member?.photo_status === 'missing';
   const legacyMode =
     !member?.attendance_mode ||
     member.attendance_mode === 'legacy';
+  const memberReporting =
+    journeyReporting?.filter(
+      item => item.member_id === member?.id
+    ) ?? [];
+  const activeAssignments =
+    member?.assignments ?? [];
+  const applicableReporting =
+    memberReporting.filter(
+      item => item.reporting_status !== 'cancelled'
+    );
+  const reportingCompleted =
+    memberActive &&
+    (
+      legacyMode
+        ? activeAssignments.length > 0
+        : applicableReporting.length > 0 &&
+          applicableReporting.every(
+            item => item.reporting_status === 'confirmed'
+          )
+    );
+  const dailySummary = member?.daily_service_summary;
+  const legacySummary = member?.attendance_summary;
+  const attendanceCompleted =
+    memberActive &&
+    (
+      member?.attendance_mode === 'none'
+        ? serviceCompleted
+        : legacyMode
+          ? !!legacySummary &&
+            activeAssignments.length > 0 &&
+            activeAssignments.every(
+              item => item.attendance_finalized
+            ) &&
+            legacySummary.present > 0
+          : !!dailySummary &&
+            dailySummary.total_selected_dates > 0 &&
+            dailySummary.finalized_dates ===
+              dailySummary.total_selected_dates &&
+            (dailySummary.present ?? 0) > 0
+    );
   const attendanceTitle =
     member?.attendance_mode === 'none'
       ? t(
@@ -447,16 +499,13 @@ export default function RegistrationDetailsScreen() {
         'volunteer.sections.idcard',
         'Digital ID Card'
       ),
-      detail: activeID
-        ? t(
-            'volunteer.journeyIDAvailable',
-            'Your ID card is available.'
-          )
+      detail: idCardIssued
+        ? `${t('volunteer.sections.idcard', 'Digital ID Card')} - ${readableStatus(member?.id_card?.status)}`
         : t(
             'volunteer.journeyIDPending',
             'Check ID card issuance and validity.'
           ),
-      state: activeID
+      state: idCardIssued
         ? 'done'
         : memberActive && !serviceCompleted
           ? 'current'
@@ -468,22 +517,50 @@ export default function RegistrationDetailsScreen() {
         'volunteer.journeyPreparation',
         'Reporting and Preparation'
       ),
-      detail: t(
-        'volunteer.journeyReportingNote',
-        'Review reporting instructions and availability.'
-      ),
-      state: memberActive && activeID && !serviceCompleted
-        ? 'current'
-        : 'waiting',
-      target: 'reporting',
+      detail: reportingCompleted
+        ? legacyMode
+          ? t(
+              'volunteer.assignedDuties',
+              'Duties assigned'
+            )
+          : t(
+              'volunteer.availabilityConfirmed',
+              'Availability Confirmed'
+            )
+        : t(
+            'volunteer.journeyReportingNote',
+            'Review reporting instructions and availability.'
+          ),
+      state: reportingCompleted
+        ? 'done'
+        : memberActive && idCardIssued && !serviceCompleted
+          ? 'current'
+          : 'waiting',
+      target: legacyMode ? 'duties' : 'reporting',
     },
     {
       label: attendanceTitle,
-      detail: t(
-        'volunteer.journeyAttendanceNote',
-        'Review the service records updated by the temple.'
-      ),
-      state: 'waiting',
+      detail: attendanceCompleted
+        ? member?.attendance_mode === 'none'
+          ? t(
+              'volunteer.dailyCompletionVerified',
+              'Your service has been verified by the temple administration.'
+            )
+          : t(
+              'volunteer.finalizedAttendance',
+              'Attendance finalized'
+            )
+        : t(
+            'volunteer.journeyAttendanceNote',
+            'Review the service records updated by the temple.'
+          ),
+      state: attendanceCompleted
+        ? 'done'
+        : memberActive &&
+          reportingCompleted &&
+          !serviceCompleted
+          ? 'current'
+          : 'waiting',
       target: 'attendance',
     },
     {
@@ -609,7 +686,7 @@ export default function RegistrationDetailsScreen() {
         'View Overview'
       ),
     };
-  } else if (memberActive && !activeID) {
+  } else if (memberActive && !idCardIssued) {
     nextAction = {
       title: t(
         'volunteer.journeyCheckID',
@@ -624,6 +701,29 @@ export default function RegistrationDetailsScreen() {
         'volunteer.sections.idcard',
         'View ID Card'
       ),
+    };
+  } else if (memberActive && attendanceCompleted) {
+    nextAction = {
+      title: t(
+        'volunteer.journeyCompletion',
+        'Service Completion'
+      ),
+      description: t(
+        'volunteer.journeyCompletionPending',
+        'Awaiting service completion.'
+      ),
+      target: 'attendance',
+      button: attendanceTitle,
+    };
+  } else if (memberActive && reportingCompleted) {
+    nextAction = {
+      title: attendanceTitle,
+      description: t(
+        'volunteer.journeyAttendanceNote',
+        'Review the service records updated by the temple.'
+      ),
+      target: 'attendance',
+      button: attendanceTitle,
     };
   } else if (memberActive) {
     nextAction = {
@@ -640,11 +740,16 @@ export default function RegistrationDetailsScreen() {
             'volunteer.journeyDailyNote',
             'Review daily reporting instructions and confirm availability when requested.'
           ),
-      target: 'reporting',
-      button: t(
-        'volunteer.sections.reporting',
-        'View Reporting'
-      ),
+      target: legacyMode ? 'duties' : 'reporting',
+      button: legacyMode
+        ? t(
+            'volunteer.sections.duties',
+            'View Assigned Duties'
+          )
+        : t(
+            'volunteer.sections.reporting',
+            'View Reporting'
+          ),
     };
   }
   const completedSteps =
@@ -1182,6 +1287,7 @@ export default function RegistrationDetailsScreen() {
               memberId={member.id}
               programmeName={registration.programme_name}
               registrationStatus={registration.status}
+              onReportingChanged={() => void load(true)}
             />
           )}
           {section === 'overview' && (

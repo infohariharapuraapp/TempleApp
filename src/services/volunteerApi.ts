@@ -728,6 +728,8 @@ export interface VolunteerDailyReporting {
   revision: number | null;
   responded_at: string | null;
   can_confirm: boolean;
+  attendance_status: 'not_marked' | 'present' | 'absent' | 'excused';
+  attendance_finalized: boolean;
 }
 export async function getMyVolunteerReporting(
   registrationId: number
@@ -787,7 +789,54 @@ export async function confirmVolunteerReporting(
     }
   );
 }
-export interface VolunteerPhotoUploadResult {
+export async function markVolunteerCoordinatorContacted(
+  reportingId: number,
+  revision: number
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(reportingId) ||
+    reportingId <= 0 ||
+    reportingId > 2147483647 ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0 ||
+    revision > 2147483647
+  ) {
+    throw new ApiError(
+      'Invalid coordinator contact reporting details.'
+    );
+  }
+  await volunteerRequest<unknown>(
+    `/reporting/${reportingId}/contacted-coordinator`,
+    {
+      method: 'POST',
+      authenticated: true,
+      body: { revision },
+    }
+  );
+}export async function withdrawVolunteerReporting(
+  reportingId: number,
+  revision: number
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(reportingId) ||
+    reportingId <= 0 ||
+    reportingId > 2147483647 ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0
+  ) {
+    throw new ApiError(
+      'Invalid reporting withdrawal.'
+    );
+  }
+  await volunteerRequest<unknown>(
+    `/reporting/${reportingId}/withdraw`,
+    {
+      method: 'POST',
+      authenticated: true,
+      body: { revision },
+    }
+  );
+}export interface VolunteerPhotoUploadResult {
   upload_id: string;
   expires_at: string;
 }
@@ -959,4 +1008,42 @@ export async function resubmitVolunteerPhoto(
     );
   }
   return data;
+}
+export async function requestVolunteerReportingTime(
+  reportingId: number,
+  revision: number,
+  requestedReportingTime: string,
+  volunteerMessage?: string
+): Promise<void> {
+  if (
+    !Number.isSafeInteger(reportingId) ||
+    reportingId <= 0 ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0
+  ) {
+    throw new Error('Invalid reporting details');
+  }
+  if (
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(requestedReportingTime)
+  ) {
+    throw new Error('Enter a valid reporting time in HH:MM format');
+  }
+  if (
+    volunteerMessage !== undefined &&
+    volunteerMessage.length > 1000
+  ) {
+    throw new Error('Message must not exceed 1000 characters');
+  }
+  await volunteerRequest(
+    `/reporting/${reportingId}/request-time`,
+    {
+      method: 'POST',
+      authenticated: true,
+      body: {
+        revision,
+        requested_reporting_time: requestedReportingTime,
+        volunteer_message: volunteerMessage?.trim() || null,
+      },
+    }
+  );
 }

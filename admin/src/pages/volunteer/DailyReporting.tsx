@@ -82,6 +82,7 @@ const statusLabels: Record<string, string> = {
   not_sent: 'Not Sent',
   awaiting_response: 'Awaiting Confirmation',
   confirmed: 'Confirmed',
+  coordinator_contacted: 'Contacted Coordinator',
   cancelled: 'Cancelled',
 };
 
@@ -89,6 +90,7 @@ const statusColors: Record<string, string> = {
   not_sent: '#64748b',
   awaiting_response: '#b45309',
   confirmed: '#15803d',
+  coordinator_contacted: '#2563eb',
   cancelled: '#b91c1c',
 };
 
@@ -127,6 +129,7 @@ function canEdit(row: ReportingVolunteer) {
     [
       'awaiting_response',
       'confirmed',
+      'coordinator_contacted',
       'cancelled',
     ].includes(row.reporting_status)
   );
@@ -554,7 +557,7 @@ export default function DailyReporting({
 
       if (
         !window.confirm(
-          `Update reporting for ${editing.full_name}? Availability confirmation will be reset.`
+          `Update reporting for ${editing.full_name}? If reporting details changed, the volunteer will need to confirm again.`
         )
       ) {
         return;

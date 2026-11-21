@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+﻿import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
 import { pool } from '../db';
 
@@ -27,6 +27,8 @@ export type VolunteerNotificationEvent =
   | 'reporting_sent'
   | 'reporting_updated'
   | 'reporting_cancelled'
+  | 'reporting_contact_requested'
+  | 'reporting_withdrawn'
   | 'photo_correction_required'
   | 'photo_verified'
   | 'photo_resubmitted';

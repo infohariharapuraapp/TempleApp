@@ -1462,6 +1462,43 @@ function VolunteerBirthDateField({
     isValidBirthDate(value)
       ? value.split('-').reverse().join('-')
       : '';
+  const [manualDay, setManualDay] = useState(
+    value ? value.slice(8, 10) : ''
+  );
+  const [manualMonth, setManualMonth] = useState(
+    value ? value.slice(5, 7) : ''
+  );
+  const [manualYear, setManualYear] = useState(
+    value ? value.slice(0, 4) : ''
+  );
+  useEffect(() => {
+    if (isValidBirthDate(value)) {
+      setManualDay(value.slice(8, 10));
+      setManualMonth(value.slice(5, 7));
+      setManualYear(value.slice(0, 4));
+    }
+  }, [value]);
+  function updateManualDate(
+    day: string,
+    month: string,
+    year: string
+  ) {
+    if (disabled) return;
+    if (
+      day.length === 2 &&
+      month.length === 2 &&
+      year.length === 4
+    ) {
+      const iso = `${year}-${month}-${day}`;
+      if (isValidBirthDate(iso)) {
+        onChange(iso);
+      } else {
+        onChange('');
+      }
+    } else {
+      onChange('');
+    }
+  }
   function saveDate(date: Date) {
     if (disabled) return;
     const formatted = toISODate(date);
@@ -1497,6 +1534,50 @@ function VolunteerBirthDateField({
       <Text style={styles.label}>
         {t('volunteer.dateOfBirth', 'Date of Birth')} *
       </Text>
+      <View style={styles.dobManualRow}>
+        <TextInput
+          style={styles.dobManualInput}
+          placeholder="DD"
+          placeholderTextColor={C.muted}
+          keyboardType="number-pad"
+          maxLength={2}
+          editable={!disabled}
+          value={manualDay}
+          onChangeText={text => {
+            const day = text.replace(/\D/g, '');
+            setManualDay(day);
+            updateManualDate(day, manualMonth, manualYear);
+          }}
+        />
+        <TextInput
+          style={styles.dobManualInput}
+          placeholder="MM"
+          placeholderTextColor={C.muted}
+          keyboardType="number-pad"
+          maxLength={2}
+          editable={!disabled}
+          value={manualMonth}
+          onChangeText={text => {
+            const month = text.replace(/\D/g, '');
+            setManualMonth(month);
+            updateManualDate(manualDay, month, manualYear);
+          }}
+        />
+        <TextInput
+          style={styles.dobManualInput}
+          placeholder="YYYY"
+          placeholderTextColor={C.muted}
+          keyboardType="number-pad"
+          maxLength={4}
+          editable={!disabled}
+          value={manualYear}
+          onChangeText={text => {
+            const year = text.replace(/\D/g, '');
+            setManualYear(year);
+            updateManualDate(manualDay, manualMonth, year);
+          }}
+        />
+      </View>
       {Platform.OS === 'web' ? (
         <TextInput
           value={value}
@@ -1637,6 +1718,24 @@ function Choice({
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
+  },
+  dobManualRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  dobManualInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: '#E2D1B5',
+    borderRadius: 12,
+    backgroundColor: '#FFFDF8',
+    paddingHorizontal: 10,
+    color: '#38251C',
+    fontSize: 15,
+    textAlign: 'center',
   },
   dobField: {
     marginBottom: 15,

@@ -11,7 +11,9 @@ import {
   queueVolunteerReportingEvent,
 } from '../services/volunteerReportingNotificationService';
 
-type AuthenticatedRequest = Request & {
+import {
+  queueVolunteerPersonalDutyEvent,
+} from '../services/volunteerPersonalDutyEventService';type AuthenticatedRequest = Request & {
   user?: {
     userId?: number;
   };
@@ -272,6 +274,10 @@ export async function getDailyReporting(
       SELECT
         sd.id AS service_date_id,
 
+        sd.status AS service_date_status,
+
+        sd.closure_reason,
+
         sd.service_date::text
           AS service_date,
 
@@ -475,6 +481,8 @@ export async function sendDailyReporting(
 
           WHERE sd.id = ANY($1::integer[])
 
+            AND sd.status = 'active'
+
             AND sd.opportunity_id = $2
 
             AND sd.service_date = $3::date
@@ -670,6 +678,11 @@ export async function updateDailyReporting(
             vr.status,
             vr.revision,
             vr.service_date_id,
+            vr.reporting_time::text AS current_reporting_time,
+            vr.reporting_location AS current_reporting_location,
+            vr.coordinator_name AS current_coordinator_name,
+            vr.coordinator_phone AS current_coordinator_phone,
+            vr.special_instructions AS current_special_instructions,
 
             sd.service_date::text
               AS service_date
@@ -690,6 +703,8 @@ export async function updateDailyReporting(
               sd.opportunity_id
 
           WHERE vr.id = $1
+
+            AND sd.status = 'active'
 
             AND m.status = 'approved'
 
@@ -729,6 +744,7 @@ export async function updateDailyReporting(
           ![
             'awaiting_response',
             'confirmed',
+            'coordinator_contacted',
             'cancelled',
           ].includes(current.status)
         ) {
@@ -763,6 +779,20 @@ export async function updateDailyReporting(
           );
         }
 
+        if (action === 'update' && details) {
+          const unchanged =
+            String(current.current_reporting_time ?? '').slice(0, 5) === details.time.slice(0, 5) &&
+            current.current_reporting_location === details.location &&
+            current.current_coordinator_name === details.coordinator &&
+            current.current_coordinator_phone === details.phone &&
+            (current.current_special_instructions ?? null) === details.instructions;
+          if (unchanged) {
+            return {
+              unchanged: true,
+              notifications_queued: 0,
+            };
+          }
+        }
         if (
           action === 'cancel' &&
           current.status === 'cancelled'
@@ -952,6 +982,10 @@ export async function getMyReporting(
       SELECT
         sd.id AS service_date_id,
 
+        sd.status AS service_date_status,
+
+        sd.closure_reason,
+
         sd.service_date::text
           AS service_date,
 
@@ -975,6 +1009,14 @@ export async function getMyReporting(
         vr.special_instructions,
         vr.revision,
         vr.responded_at,
+        COALESCE(
+          da.attendance_status,
+          'not_marked'
+        ) AS attendance_status,
+        COALESCE(
+          da.is_finalized,
+          FALSE
+        ) AS attendance_finalized,
 
         COALESCE(
 
@@ -982,6 +1024,8 @@ export async function getMyReporting(
             'awaiting_response',
             'confirmed'
           )
+
+          AND sd.status = 'active'
 
           AND m.status = 'approved'
 
@@ -1015,7 +1059,8 @@ export async function getMyReporting(
           sd.opportunity_id
 
       LEFT JOIN volunteer_reporting vr
-        ON vr.service_date_id = sd.id
+        ON vr.service_date_id = sd.id       LEFT JOIN volunteer_daily_attendance da
+         ON da.service_date_id = sd.id
 
       WHERE r.id = $1
 
@@ -1119,6 +1164,8 @@ export async function confirmMyReporting(
 
           WHERE vr.id = $1
 
+            AND sd.status = 'active'
+
             AND (
               r.user_id = $2
               OR m.user_id = $2
@@ -1215,6 +1262,597 @@ export async function confirmMyReporting(
 
   } catch (error) {
 
+    return handleError(res, error);
+  }
+}
+
+// ========================================
+// DEVOTEE: WITHDRAW FROM ONE SERVICE DATE
+// ========================================
+export async function withdrawMyReporting(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    const userId = getUserId(req);
+    const reportingId = parseId(req.params.reportingId);
+    const revision = parseId(req.body?.revision);
+    const result = await transaction(async client => {
+      // LOCK OPPORTUNITY BEFORE SERVICE DATE
+      // Resolve ownership first without acquiring row locks.
+      const opportunityLookup = await client.query(
+        `
+        SELECT sd.opportunity_id
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        `,
+        [reportingId, userId]
+      );
+      if (!opportunityLookup.rows.length) {
+        throw new ReportingError(
+          404,
+          'Reporting record not found'
+        );
+      }
+      const opportunityId =
+        Number(opportunityLookup.rows[0].opportunity_id);
+      const opportunityLock = await client.query(
+        `
+        SELECT id
+        FROM volunteer_opportunities
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [opportunityId]
+      );
+      if (!opportunityLock.rows.length) {
+        throw new ReportingError(
+          404,
+          'Seva opportunity not found'
+        );
+      }      const current = await client.query(
+        `
+        SELECT
+          vr.id AS reporting_id,
+          vr.revision,
+          vr.status AS reporting_status,
+          sd.id AS service_date_id,
+          sd.opportunity_id,
+          sd.member_id,
+          sd.service_date::text AS service_date,
+          sd.status AS service_date_status
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+          AND m.opportunity_id = sd.opportunity_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+          AND r.opportunity_id = sd.opportunity_id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        FOR UPDATE OF sd, m, r, vr
+        `,
+        [reportingId, userId]
+      );
+      if (!current.rows.length) {
+        throw new ReportingError(404, 'Reporting record not found');
+      }
+      const row = current.rows[0];
+      if (Number(row.revision) !== revision) {
+        throw new ReportingError(
+          409,
+          'Reporting details have changed. Please refresh.'
+        );
+      }
+      if (row.service_date_status !== 'active') {
+        throw new ReportingError(
+          409,
+          'This service date is already closed'
+        );
+      }
+      if (
+        !['awaiting_response', 'confirmed', 'custom_requested',
+          'revised_pending', 'coordinator_contacted'].includes(row.reporting_status)
+      ) {
+        throw new ReportingError(
+          409,
+          'Withdrawal is not available for this reporting status'
+        );
+      }
+      const dailyAttendance = await client.query(
+        `
+        SELECT id
+        FROM volunteer_daily_attendance
+        WHERE service_date_id = $1
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [row.service_date_id]
+      );
+      if (dailyAttendance.rows.length) {
+        throw new ReportingError(
+          409,
+          'Attendance already exists. Please contact the coordinator.'
+        );
+      }
+      const assignments = await client.query(
+        `
+        SELECT
+          a.id,
+          a.status,
+          (
+            (s.service_date + s.start_time)
+            AT TIME ZONE 'Asia/Kolkata'
+          ) > clock_timestamp() AS is_future
+        FROM volunteer_assignments a
+        JOIN volunteer_shifts s
+          ON s.id = a.shift_id
+          AND s.opportunity_id = a.opportunity_id
+        WHERE a.member_id = $1
+          AND a.opportunity_id = $2
+          AND s.service_date = $3::date
+        ORDER BY a.id
+        FOR UPDATE OF a
+        `,
+        [
+          row.member_id,
+          row.opportunity_id,
+          row.service_date
+        ]
+      );
+      for (const assignment of assignments.rows) {
+        if (
+          ['in_progress', 'completed'].includes(assignment.status)
+        ) {
+          throw new ReportingError(
+            409,
+            'A duty has already started or completed. Contact the coordinator.'
+          );
+        }
+        if (
+          assignment.status === 'assigned' &&
+          !assignment.is_future
+        ) {
+          throw new ReportingError(
+            409,
+            'An assigned duty has already started. Contact the coordinator.'
+          );
+        }
+      }
+      const attendance = await client.query(
+        `
+        SELECT att.id
+        FROM volunteer_attendance att
+        JOIN volunteer_assignments a
+          ON a.id = att.assignment_id
+        JOIN volunteer_shifts s
+          ON s.id = a.shift_id
+          AND s.opportunity_id = a.opportunity_id
+        WHERE a.member_id = $1
+          AND a.opportunity_id = $2
+          AND s.service_date = $3::date
+        LIMIT 1
+        `,
+        [
+          row.member_id,
+          row.opportunity_id,
+          row.service_date
+        ]
+      );
+      if (attendance.rows.length) {
+        throw new ReportingError(
+          409,
+          'Duty attendance exists. Please contact the coordinator.'
+        );
+      }
+      const cancelled = await client.query(
+        `
+        UPDATE volunteer_assignments a
+        SET
+          status = 'cancelled',
+          cancellation_reason = 'Volunteer unavailable for service date',
+          updated_at = NOW()
+        FROM volunteer_shifts s
+        WHERE s.id = a.shift_id
+          AND s.opportunity_id = a.opportunity_id
+          AND a.member_id = $1
+          AND a.opportunity_id = $2
+          AND s.service_date = $3::date
+          AND a.status = 'assigned'
+          AND (
+            (s.service_date + s.start_time)
+            AT TIME ZONE 'Asia/Kolkata'
+          ) > clock_timestamp()
+        RETURNING a.id
+        `,
+        [
+          row.member_id,
+          row.opportunity_id,
+          row.service_date
+        ]
+      );
+      for (const assignment of cancelled.rows) {
+        const notification = await queueVolunteerPersonalDutyEvent(
+          Number(assignment.id),
+          'duty_cancelled',
+          client
+        );
+        if (!notification.eligible) {
+          throw new ReportingError(
+            409,
+            'Duty cancellation notification could not be queued'
+          );
+        }
+      }      const closed = await client.query(
+        `
+        UPDATE volunteer_service_dates
+        SET
+          status = 'closed',
+          closure_reason = 'Volunteer reported not available',
+          closed_at = NOW(),
+          closed_by = $1
+        WHERE id = $2
+          AND status = 'active'
+        RETURNING id
+        `,
+        [userId, row.service_date_id]
+      );
+      if (closed.rowCount !== 1) {
+        throw new ReportingError(
+          409,
+          'Service date could not be closed'
+        );
+      }
+      const updated = await client.query(
+        `
+        UPDATE volunteer_reporting
+        SET
+          status = 'unavailable',
+          responded_at = NOW(),
+          updated_at = NOW(),
+          revision = revision + 1
+        WHERE id = $1
+          AND revision = $2
+        RETURNING id, status, revision, responded_at
+        `,
+        [reportingId, revision]
+      );
+      if (updated.rowCount !== 1) {
+        throw new ReportingError(
+          409,
+          'Reporting response changed. Please refresh.'
+        );
+      }
+      return {
+        reporting: updated.rows[0],
+        service_date_id: row.service_date_id,
+        cancelled_assignment_ids: cancelled.rows.map(
+          item => Number(item.id)
+        )
+      };
+    });
+    return res.json({
+      success: true,
+      message: 'You have withdrawn from the selected service date',
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+export async function requestMyReportingTime(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    const userId = getUserId(req);
+    const reportingId = parseId(req.params.reportingId);
+    const revision = parseId(req.body?.revision);
+    const requestedTime = req.body?.requested_reporting_time;
+    const message = req.body?.volunteer_message;
+    if (
+      typeof requestedTime !== 'string' ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(requestedTime)
+    ) {
+      throw new ReportingError(
+        400,
+        'Enter a valid requested time in HH:MM format'
+      );
+    }
+    if (
+      message != null &&
+      (typeof message !== 'string' || message.length > 1000)
+    ) {
+      throw new ReportingError(
+        400,
+        'Message must not exceed 1000 characters'
+      );
+    }
+    const result = await transaction(async client => {
+      const lookup = await client.query(
+        `
+        SELECT sd.opportunity_id
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        `,
+        [reportingId, userId]
+      );
+      if (!lookup.rows.length) {
+        throw new ReportingError(404, 'Reporting record not found');
+      }
+      await client.query(
+        `
+        SELECT id
+        FROM volunteer_opportunities
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [lookup.rows[0].opportunity_id]
+      );
+      const current = await client.query(
+        `
+        SELECT
+          vr.id,
+          vr.revision,
+          vr.status,
+          sd.status AS service_date_status,
+          m.status AS member_status,
+          r.status AS registration_status,
+          (
+            (sd.service_date + vr.reporting_time)
+            AT TIME ZONE 'Asia/Kolkata'
+          ) > clock_timestamp() AS is_upcoming
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+          AND m.opportunity_id = sd.opportunity_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+          AND r.opportunity_id = sd.opportunity_id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        FOR UPDATE OF sd, m, r, vr
+        `,
+        [reportingId, userId]
+      );
+      if (!current.rows.length) {
+        throw new ReportingError(404, 'Reporting record not found');
+      }
+      const row = current.rows[0];
+      if (Number(row.revision) !== revision) {
+        throw new ReportingError(
+          409,
+          'Reporting details changed. Refresh and try again.'
+        );
+      }
+      if (
+        row.service_date_status !== 'active' ||
+        row.member_status !== 'approved' ||
+        !['approved', 'assigned', 'in_progress'].includes(
+          row.registration_status
+        ) ||
+        !['awaiting_response', 'confirmed', 'revised_pending'].includes(
+          row.status
+        ) ||
+        !row.is_upcoming
+      ) {
+        throw new ReportingError(
+          409,
+          'Alternate reporting time cannot be requested for this date'
+        );
+      }
+      const updated = await client.query(
+        `
+        UPDATE volunteer_reporting
+        SET
+          status = 'custom_requested',
+          requested_reporting_time = $2::time,
+          volunteer_message = $3,
+          admin_reply = NULL,
+          responded_at = NOW(),
+          updated_at = NOW(),
+          revision = revision + 1
+        WHERE id = $1
+        RETURNING
+          id AS reporting_id,
+          status,
+          revision,
+          requested_reporting_time,
+          responded_at
+        `,
+        [
+          reportingId,
+          requestedTime,
+          typeof message === 'string'
+            ? message.trim()
+            : null,
+        ]
+      );
+      return updated.rows[0];
+    });
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}// ========================================
+// DEVOTEE: CONTACTED COORDINATOR
+// ========================================
+export async function markMyCoordinatorContacted(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    const userId = getUserId(req);
+    const reportingId = parseId(req.params.reportingId);
+    const revision = parseId(req.body?.revision);
+    const result = await transaction(async client => {
+      // Identify the opportunity without acquiring a row lock.
+      const lookup = await client.query(
+        `
+        SELECT sd.opportunity_id
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+          AND m.opportunity_id = sd.opportunity_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+          AND r.opportunity_id = sd.opportunity_id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        `,
+        [reportingId, userId]
+      );
+      if (!lookup.rows.length) {
+        throw new ReportingError(
+          404,
+          'Reporting record not found'
+        );
+      }
+      // Match the lock ordering used by withdrawal.
+      await client.query(
+        `
+        SELECT id
+        FROM volunteer_opportunities
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [lookup.rows[0].opportunity_id]
+      );
+      const current = await client.query(
+        `
+        SELECT
+          vr.id,
+          vr.revision,
+          vr.status,
+          vr.coordinator_contacted_at,
+          sd.status AS service_date_status,
+          m.status AS member_status,
+          r.status AS registration_status,
+          COALESCE(
+            da.attendance_status,
+            'not_marked'
+          ) AS attendance_status,
+          (
+            (sd.service_date + vr.reporting_time)
+            AT TIME ZONE 'Asia/Kolkata'
+          ) > clock_timestamp() AS is_upcoming
+        FROM volunteer_reporting vr
+        JOIN volunteer_service_dates sd
+          ON sd.id = vr.service_date_id
+        JOIN volunteer_members m
+          ON m.id = sd.member_id
+          AND m.opportunity_id = sd.opportunity_id
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+          AND r.opportunity_id = sd.opportunity_id
+        LEFT JOIN volunteer_daily_attendance da
+          ON da.service_date_id = sd.id
+        WHERE vr.id = $1
+          AND (r.user_id = $2 OR m.user_id = $2)
+        FOR UPDATE OF sd, m, r, vr
+        `,
+        [reportingId, userId]
+      );
+      if (!current.rows.length) {
+        throw new ReportingError(
+          404,
+          'Reporting record not found'
+        );
+      }
+      const row = current.rows[0];
+      if (Number(row.revision) !== revision) {
+        throw new ReportingError(
+          409,
+          'Reporting details changed. Refresh and try again.'
+        );
+      }
+      if (
+        row.service_date_status !== 'active' ||
+        row.member_status !== 'approved' ||
+        !['approved', 'assigned', 'in_progress'].includes(
+          row.registration_status
+        ) ||
+        row.attendance_status !== 'not_marked' ||
+        !row.is_upcoming
+      ) {
+        throw new ReportingError(
+          409,
+          'Coordinator contact response is no longer available'
+        );
+      }
+      if (row.status === 'coordinator_contacted') {
+        return {
+          reporting_id: reportingId,
+          status: row.status,
+          revision: row.revision,
+          coordinator_contacted_at:
+            row.coordinator_contacted_at,
+          unchanged: true
+        };
+      }
+      if (
+        ![
+          'awaiting_response',
+          'confirmed',
+          'revised_pending'
+        ].includes(row.status)
+      ) {
+        throw new ReportingError(
+          409,
+          'Coordinator contact cannot be recorded for this reporting status'
+        );
+      }
+      const updated = await client.query(
+        `
+        UPDATE volunteer_reporting
+        SET
+          status = 'coordinator_contacted',
+          coordinator_contacted_at = NOW(),
+          coordinator_contact_method = NULL,
+          responded_at = NOW(),
+          updated_at = NOW(),
+          revision = revision + 1
+        WHERE id = $1
+        RETURNING
+          id AS reporting_id,
+          status,
+          revision,
+          coordinator_contacted_at,
+          responded_at
+        `,
+        [reportingId]
+      );
+      return updated.rows[0];
+    });
+    return res.json({
+      success: true,
+      message: 'Coordinator contact recorded',
+      data: result
+    });
+  } catch (error) {
     return handleError(res, error);
   }
 }

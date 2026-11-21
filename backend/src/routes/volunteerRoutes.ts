@@ -3,6 +3,8 @@ import {
 } from '../controllers/volunteerPhotoResubmissionController';import {
   getMyReporting,
   confirmMyReporting,
+  withdrawMyReporting,
+  markMyCoordinatorContacted,
 } from '../controllers/volunteerReportingController';
 import {
   getAvailableServiceDates,
@@ -160,6 +162,16 @@ router.post(
   '/reporting/:reportingId/confirm',
   authenticateToken,
   confirmMyReporting
+);
+router.post(
+  '/reporting/:reportingId/withdraw',
+  authenticateToken,
+  withdrawMyReporting
+);
+router.post(
+  '/reporting/:reportingId/contacted-coordinator',
+  authenticateToken,
+  markMyCoordinatorContacted
 );
 
 // ========================================

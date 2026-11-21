@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 import {
   getMyVolunteerReporting,
   confirmVolunteerReporting,
+  withdrawVolunteerReporting,
+  markVolunteerCoordinatorContacted,
   getVolunteerError,
   formatVolunteerDate,
   formatVolunteerTime,
@@ -41,6 +43,7 @@ interface Props {
   memberId: number;
   programmeName: string;
   registrationStatus: string;
+  onReportingChanged?: () => void;
 }
 
 export default function VolunteerReporting({
@@ -48,6 +51,7 @@ export default function VolunteerReporting({
   memberId,
   programmeName,
   registrationStatus,
+  onReportingChanged,
 }: Props) {
   const { t, i18n } = useTranslation();
 
@@ -126,6 +130,7 @@ export default function VolunteerReporting({
 
       if (current === version.current) {
         await load();
+        onReportingChanged?.();
       }
     } catch (err) {
       if (current === version.current) {
@@ -138,6 +143,7 @@ export default function VolunteerReporting({
         );
 
         await load();
+        onReportingChanged?.();
       }
     } finally {
       mutationLock.current = false;
@@ -170,7 +176,151 @@ export default function VolunteerReporting({
     );
   }
 
-  function normalizePhone(
+  async function markContacted(
+    item: VolunteerDailyReporting
+  ) {
+    if (
+      mutationLock.current ||
+      !item.reporting_id ||
+      !item.revision ||
+      item.attendance_status !== 'not_marked' ||
+      ![
+        'awaiting_response',
+        'confirmed',
+        'revised_pending'
+      ].includes(item.reporting_status)
+    ) {
+      return;
+    }
+    mutationLock.current = true;
+    setBusy(true);
+    const current = version.current;
+    try {
+      await markVolunteerCoordinatorContacted(
+        item.reporting_id,
+        item.revision
+      );
+      if (current === version.current) {
+        await load();
+        onReportingChanged?.();
+      }
+    } catch (err) {
+      if (current === version.current) {
+        Alert.alert(
+          t(
+            'volunteer.contactUnverified',
+            'Unable to verify coordinator contact'
+          ),
+          getVolunteerError(err)
+        );
+        await load();
+        onReportingChanged?.();
+      }
+    } finally {
+      mutationLock.current = false;
+      setBusy(false);
+    }
+  }
+  function requestContacted(
+    item: VolunteerDailyReporting
+  ) {
+    if (mutationLock.current || busy) {
+      return;
+    }
+    Alert.alert(
+      t(
+        'volunteer.contactedCoordinator',
+        'Contacted Coordinator'
+      ),
+      t(
+        'volunteer.contactedCoordinatorConfirm',
+        'Have you already spoken with or messaged the coordinator? Confirm only after making contact. Your reporting time will not change automatically.'
+      ),
+      [
+        {
+          text: t('common.cancel', 'Cancel'),
+          style: 'cancel'
+        },
+        {
+          text: t('volunteer.confirm', 'Confirm'),
+          onPress: () => void markContacted(item)
+        }
+      ]
+    );
+  }  async function withdraw(
+    item: VolunteerDailyReporting
+  ) {
+    if (
+      mutationLock.current ||
+      !item.reporting_id ||
+      !item.revision ||
+      ![
+        'awaiting_response',
+        'confirmed',
+        'custom_requested',
+        'revised_pending',
+        'coordinator_contacted',
+      ].includes(item.reporting_status)
+    ) {
+      return;
+    }
+    mutationLock.current = true;
+    setBusy(true);
+    const current = version.current;
+    try {
+      await withdrawVolunteerReporting(
+        item.reporting_id,
+        item.revision
+      );
+      if (current === version.current) {
+        await load();
+        onReportingChanged?.();
+        Alert.alert(
+          t('volunteer.withdrawalSubmitted', 'Withdrawal submitted'),
+          t(
+            'volunteer.withdrawalSubmittedMessage',
+            'Your participation for this service date has been closed.'
+          )
+        );
+      }
+    } catch (err) {
+      if (current === version.current) {
+        Alert.alert(
+          t('volunteer.withdrawalUnverified', 'Unable to verify withdrawal'),
+          getVolunteerError(err)
+        );
+        await load();
+        onReportingChanged?.();
+      }
+    } finally {
+      mutationLock.current = false;
+      setBusy(false);
+    }
+  }
+  function requestWithdrawal(
+    item: VolunteerDailyReporting
+  ) {
+    if (mutationLock.current || busy) return;
+    Alert.alert(
+      t('volunteer.notAvailable', 'Not Available'),
+      `${formatVolunteerDate(item.service_date)}\n\n` +
+        t(
+          'volunteer.withdrawalWarning',
+          'Withdraw from seva on this date? Future duty assignments for this date may be cancelled. This does not affect your other service dates or other volunteers.'
+        ),
+      [
+        {
+          text: t('common.cancel', 'Cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('volunteer.confirmWithdrawal', 'Confirm Withdrawal'),
+          style: 'destructive',
+          onPress: () => void withdraw(item),
+        },
+      ]
+    );
+  }  function normalizePhone(
     phone: string | null
   ): string | null {
     if (!phone) return null;
@@ -267,6 +417,11 @@ export default function VolunteerReporting({
           'Awaiting Confirmation'
         );
 
+      case 'coordinator_contacted':
+        return t(
+          'volunteer.contactedCoordinator',
+          'Contacted Coordinator'
+        );
       case 'confirmed':
         return t(
           'volunteer.availabilityConfirmed',
@@ -372,6 +527,20 @@ export default function VolunteerReporting({
           const cancelled =
             item.reporting_status === 'cancelled';
 
+          const withdrawn =
+            item.reporting_status === 'unavailable';
+          const attendanceCompleted =
+             item.attendance_status === 'present';
+           const attendanceAbsent =
+             item.attendance_status === 'absent';
+           const attendanceExcused =
+             item.attendance_status === 'excused';
+           const attendanceMarked =
+             attendanceCompleted ||
+             attendanceAbsent ||
+             attendanceExcused;
+           const inactive =
+             cancelled || withdrawn || attendanceMarked;
           const confirmed =
             item.reporting_status === 'confirmed';
 
@@ -392,7 +561,7 @@ export default function VolunteerReporting({
 
           const contactAllowed =
             sent &&
-            !cancelled &&
+            !inactive &&
             activeRegistration;
 
           return (
@@ -409,29 +578,57 @@ export default function VolunteerReporting({
               <View style={[
                 styles.badge,
                 {
-                  backgroundColor: cancelled
-                    ? C.lightRed
-                    : confirmed
-                      ? C.lightGreen
-                      : C.lightWarning,
+                  backgroundColor: attendanceCompleted
+                     ? C.lightGreen
+                     : inactive
+                       ? C.lightRed
+                       : confirmed
+                         ? C.lightGreen
+                         : C.lightWarning,
                 },
               ]}>
                 <Text style={{
                   fontSize: 12,
                   fontWeight: '700',
-                  color: cancelled
-                    ? C.red
-                    : confirmed
-                      ? C.green
-                      : C.warning,
+                  color: attendanceCompleted
+                     ? C.green
+                     : inactive
+                       ? C.red
+                       : confirmed
+                         ? C.green
+                         : C.warning,
                 }}>
-                  {statusLabel(
-                    item.reporting_status
-                  )}
+                  {attendanceCompleted
+                     ? t('volunteer.reportingCompleted', 'Completed')
+                     : attendanceAbsent
+                       ? t('volunteer.attendanceAbsent', 'Absent')
+                       : attendanceExcused
+                         ? t('volunteer.attendanceExcused', 'Excused')
+                         : withdrawn
+                           ? t('volunteer.withdrawn', 'Withdrawn')
+                           : statusLabel(item.reporting_status)}
                 </Text>
               </View>
 
-              {!sent ? (
+              {attendanceMarked && (
+                 <Text style={styles.description}>
+                   {attendanceCompleted
+                     ? t(
+                         'volunteer.attendanceCompletedMessage',
+                         'Attendance marked Present by the temple administration. Daily Reporting is completed.'
+                       )
+                     : attendanceAbsent
+                       ? t(
+                           'volunteer.attendanceAbsentMessage',
+                           'Attendance marked Absent by the temple administration.'
+                         )
+                       : t(
+                           'volunteer.attendanceExcusedMessage',
+                           'Attendance marked Excused by the temple administration.'
+                         )}
+                 </Text>
+               )}
+               {!sent ? (
                 <Text style={styles.description}>
                   {t(
                     'volunteer.reportingPendingMessage',
@@ -498,7 +695,8 @@ export default function VolunteerReporting({
                   )}
 
                   {activeRegistration &&
-                    item.can_confirm &&
+                     !attendanceMarked &&
+                     item.can_confirm &&
                     future &&
                     item.reporting_status ===
                       'awaiting_response' && (
@@ -514,7 +712,30 @@ export default function VolunteerReporting({
                       />
                     )}
 
-                  {contactAllowed && (
+                  {activeRegistration &&
+                     !attendanceMarked &&
+                     future &&
+                     !!item.reporting_id &&
+                    !!item.revision &&
+                    [
+                      'awaiting_response',
+                      'confirmed',
+                      'custom_requested',
+                      'revised_pending',
+        'coordinator_contacted',
+                    ].includes(item.reporting_status) && (
+                      <VolunteerButton
+                        title={t(
+                          'volunteer.notAvailable',
+                          'Not Available'
+                        )}
+                        secondary
+                        disabled={busy}
+                        onPress={() =>
+                          requestWithdrawal(item)
+                        }
+                      />
+                    )}                  {contactAllowed && (
                     <View style={styles.contact}>
                       <Text style={styles.label}>
                         {t(
@@ -523,7 +744,25 @@ export default function VolunteerReporting({
                         )}
                       </Text>
 
-                      <VolunteerButton
+                      {future &&
+                        !attendanceMarked &&
+                        !!item.reporting_id &&
+                        !!item.revision &&
+                        [
+                          'awaiting_response',
+                          'confirmed',
+                          'revised_pending'
+                        ].includes(item.reporting_status) && (
+                          <VolunteerButton
+                            title={t(
+                              'volunteer.contactedCoordinator',
+                              'Contacted Coordinator'
+                            )}
+                            secondary
+                            disabled={busy}
+                            onPress={() => requestContacted(item)}
+                          />
+                        )}                      <VolunteerButton
                         title={t(
                           'volunteer.whatsappCoordinator',
                           'WhatsApp Coordinator'
