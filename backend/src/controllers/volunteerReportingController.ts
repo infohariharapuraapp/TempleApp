@@ -1755,6 +1755,7 @@ export async function markMyCoordinatorContacted(
             da.attendance_status,
             'not_marked'
           ) AS attendance_status,
+          COALESCE(da.is_finalized, FALSE) AS attendance_finalized,
           (
             (sd.service_date + vr.reporting_time)
             AT TIME ZONE 'Asia/Kolkata'
@@ -1796,7 +1797,8 @@ export async function markMyCoordinatorContacted(
           row.registration_status
         ) ||
         row.attendance_status !== 'not_marked' ||
-        !row.is_upcoming
+         row.attendance_finalized ||
+         !row.is_upcoming
       ) {
         throw new ReportingError(
           409,

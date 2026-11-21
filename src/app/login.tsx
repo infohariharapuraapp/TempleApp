@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import LanguageSelector from '@/components/LanguageSelector';
 
 import React, { useState } from 'react';
 import { notifyAuthChanged } from '@/services/authSession';
@@ -214,6 +215,7 @@ export default function LoginScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.form}>
+              <LanguageSelector />
               <Text style={styles.label}>{t('authLocal.hariharipura_temple')}</Text>
 
               <Text style={styles.title}>{t('authLocal.welcome_back')}</Text>

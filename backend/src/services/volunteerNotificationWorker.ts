@@ -86,11 +86,11 @@ async function updateVolunteerNotificationStatus(
     UPDATE notifications n
 
     SET
-      status = $4,
+      status = $4::varchar,
 
       sent_at = CASE
 
-        WHEN $4 = 'sent'
+        WHEN $4::varchar = 'sent'
         THEN COALESCE(n.sent_at, NOW())
 
         ELSE n.sent_at

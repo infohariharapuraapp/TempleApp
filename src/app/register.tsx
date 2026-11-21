@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import LanguageSelector from '@/components/LanguageSelector';
 
 import React, { useRef, useState } from 'react';
 import {
@@ -292,6 +293,8 @@ export default function RegisterScreen() {
             styles.form,
             small && styles.smallForm,
           ]}>
+            <LanguageSelector />
+
             <View style={styles.header}>
               <View style={styles.templeIcon}>
                 <Text style={styles.templeEmoji}>🙏</Text>

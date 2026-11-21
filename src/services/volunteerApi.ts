@@ -756,7 +756,8 @@ export async function getMyVolunteerReporting(
       Number.isSafeInteger(item.member_id) &&
       typeof item.service_date === 'string' &&
       typeof item.reporting_status === 'string' &&
-      typeof item.can_confirm === 'boolean'
+      typeof item.can_confirm === 'boolean' &&
+      typeof item.attendance_finalized === 'boolean'
     )
   ) {
     throw new ApiError(

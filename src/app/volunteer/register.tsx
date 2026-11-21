@@ -158,6 +158,35 @@ export default function VolunteerRegisterScreen() {
   const mounted = useRef(false);
   const version = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRefs = useRef<
+    Partial<Record<TextField, TextInput | null>>
+  >({});
+  const dobInputRef = useRef<TextInput | null>(null);
+  const focusOrder: TextField[] = [
+    'full_name',
+    'mobile',
+    'email',
+    'country',
+    'pincode',
+    'state',
+    'district',
+    'mandal',
+    'city',
+    'street',
+    'door_number',
+    'qualification',
+    'profession',
+    'area_of_interest',
+  ];
+  function focusNextField(current: TextField) {
+    const index = focusOrder.indexOf(current);
+    const next = focusOrder[index + 1];
+    if (next) {
+      inputRefs.current[next]?.focus();
+    } else {
+      Keyboard.dismiss();
+    }
+  }
 
   async function load() {
     const requestVersion = ++version.current;
@@ -686,8 +715,10 @@ export default function VolunteerRegisterScreen() {
         <Text style={styles.label}>
           {label}
         </Text>
-
         <TextInput
+          ref={ref => {
+            inputRefs.current[key] = ref;
+          }}
           style={[
             styles.input,
             multiline && styles.multiline,
@@ -699,6 +730,19 @@ export default function VolunteerRegisterScreen() {
           keyboardType={keyboardType}
           multiline={multiline}
           maxLength={maxLength}
+          returnKeyType={
+            key === 'area_of_interest' ? 'done' : 'next'
+          }
+          blurOnSubmit={multiline}
+          onSubmitEditing={() => {
+            if (key === 'email') {
+              dobInputRef.current?.focus();
+            } else if (key === 'area_of_interest') {
+              Keyboard.dismiss();
+            } else {
+              focusNextField(key);
+            }
+          }}
           onChangeText={value =>
             updateMember({ [key]: value })
           }
@@ -706,7 +750,6 @@ export default function VolunteerRegisterScreen() {
       </View>
     );
   }
-
   const registrationOpen =
     opportunity?.registration_status === 'open' &&
     Date.parse(opportunity.registration_end_at) > Date.now();
@@ -957,6 +1000,8 @@ export default function VolunteerRegisterScreen() {
             <VolunteerBirthDateField
               key={`${id}-${memberIndex}-dob`}
               value={member.date_of_birth}
+              firstInputRef={dobInputRef}
+              onNext={() => inputRefs.current.country?.focus()}
               disabled={
                 submitting ||
                 uncertain ||
@@ -1399,12 +1444,18 @@ function VolunteerBirthDateField({
   value,
   disabled = false,
   onChange,
+  firstInputRef,
+  onNext,
 }: {
   value: string;
   disabled?: boolean;
   onChange: (value: string) => void;
+  firstInputRef: React.RefObject<TextInput | null>;
+  onNext: () => void;
 }) {
   const { t } = useTranslation();
+  const monthInputRef = useRef<TextInput | null>(null);
+  const yearInputRef = useRef<TextInput | null>(null);
   const [showPicker, setShowPicker] =
     useState(false);
   const todayParts =
@@ -1537,9 +1588,13 @@ function VolunteerBirthDateField({
       <View style={styles.dobManualRow}>
         <TextInput
           style={styles.dobManualInput}
+          ref={firstInputRef}
           placeholder="DD"
           placeholderTextColor={C.muted}
           keyboardType="number-pad"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => monthInputRef.current?.focus()}
           maxLength={2}
           editable={!disabled}
           value={manualDay}
@@ -1551,9 +1606,13 @@ function VolunteerBirthDateField({
         />
         <TextInput
           style={styles.dobManualInput}
+          ref={monthInputRef}
           placeholder="MM"
           placeholderTextColor={C.muted}
           keyboardType="number-pad"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => yearInputRef.current?.focus()}
           maxLength={2}
           editable={!disabled}
           value={manualMonth}
@@ -1565,9 +1624,13 @@ function VolunteerBirthDateField({
         />
         <TextInput
           style={styles.dobManualInput}
+          ref={yearInputRef}
           placeholder="YYYY"
           placeholderTextColor={C.muted}
           keyboardType="number-pad"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={onNext}
           maxLength={4}
           editable={!disabled}
           value={manualYear}

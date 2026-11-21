@@ -184,6 +184,7 @@ export default function VolunteerReporting({
       !item.reporting_id ||
       !item.revision ||
       item.attendance_status !== 'not_marked' ||
+      item.attendance_finalized ||
       ![
         'awaiting_response',
         'confirmed',
@@ -746,6 +747,7 @@ export default function VolunteerReporting({
 
                       {future &&
                         !attendanceMarked &&
+                        !item.attendance_finalized &&
                         !!item.reporting_id &&
                         !!item.revision &&
                         [
