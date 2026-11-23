@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
+import { openVolunteerSevaNotification } from './volunteerNotificationNavigation';
 
 import { subscribeAuth } from './authSession';
 import { getToken } from './authStorage';
@@ -1191,6 +1192,10 @@ export function handleNotificationResponse(
     // ANNOUNCEMENT
     // ========================================
 
+    if (data.type === 'volunteer_seva') {
+      openVolunteerSevaNotification(data);
+      return;
+    }
     if (data.type === 'announcement') {
 
       router.push({

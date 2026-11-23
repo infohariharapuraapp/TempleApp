@@ -22,6 +22,7 @@ import { router, useFocusEffect } from 'expo-router';
 
 import { apiRequest } from '@/services/api';
 import { getToken } from '@/services/authStorage';
+import { openVolunteerSevaNotification } from '@/services/volunteerNotificationNavigation';
 
 type NotificationItem = {
   id: number;
@@ -218,6 +219,12 @@ const notificationType =
   data.type || item.notification_type;
 
 switch (notificationType) {
+  case 'volunteer_seva':
+    openVolunteerSevaNotification({
+      ...data,
+      type: 'volunteer_seva',
+    });
+    break;
   case 'event':
     router.push('/events');
     break;

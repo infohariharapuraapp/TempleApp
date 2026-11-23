@@ -3,6 +3,7 @@ import VolunteerDailyService from '@/components/volunteer/VolunteerDailyService'
 import volunteerI18n from '@/localization/i18n';
 import React, {
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -174,6 +175,8 @@ export default function RegistrationDetailsScreen() {
 
   const params = useLocalSearchParams<{
     registrationId: string;
+    section?: string;
+    milestone?: string;
   }>();
 
   const rawId =
@@ -213,6 +216,9 @@ export default function RegistrationDetailsScreen() {
   const journeyScroll = useRef<ScrollView>(null);
   const sectionOffset = useRef(0);
   const journeyOffset = useRef(0);
+  const milestoneScrollHandled = useRef('');
+  const milestoneScrollTimer =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const [photoBusy, setPhotoBusy] =
     useState(false);
   const [photoRefreshKey, setPhotoRefreshKey] =
@@ -316,6 +322,49 @@ export default function RegistrationDetailsScreen() {
       };
     }, [load, i18n.language])
   );
+
+  const requestedMilestone =
+    typeof params.milestone === 'string' &&
+    /^[0-6]$/.test(params.milestone)
+      ? Number(params.milestone)
+      : null;
+  useEffect(() => {
+    if (params.section === 'overview') {
+      setSection('overview');
+    }
+  }, [params.section, params.registrationId]);
+  useEffect(() => {
+    milestoneScrollHandled.current = '';
+    return () => {
+      if (milestoneScrollTimer.current) {
+        clearTimeout(milestoneScrollTimer.current);
+        milestoneScrollTimer.current = null;
+      }
+    };
+  }, [params.registrationId, params.milestone]);
+  function scrollToNotificationMilestone(
+    index: number,
+    rowY: number
+  ) {
+    if (requestedMilestone !== index || !data) {
+      return;
+    }
+    const key = `${rawId}:${requestedMilestone}`;
+    if (milestoneScrollHandled.current === key) {
+      return;
+    }
+    milestoneScrollHandled.current = key;
+    if (milestoneScrollTimer.current) {
+      clearTimeout(milestoneScrollTimer.current);
+    }
+    milestoneScrollTimer.current = setTimeout(() => {
+      journeyScroll.current?.scrollTo({
+        y: Math.max(0, journeyOffset.current + rowY - 60),
+        animated: true,
+      });
+      milestoneScrollTimer.current = null;
+    }, 450);
+  }
 
   function handleJourneyHeaderBack() {
     if (photoLock.current || refreshing) {
@@ -1125,6 +1174,12 @@ export default function RegistrationDetailsScreen() {
                   {journeySteps.map((step, index) => (
                     <TouchableOpacity
                       key={index}
+                      onLayout={event =>
+                        scrollToNotificationMilestone(
+                          index,
+                          event.nativeEvent.layout.y
+                        )
+                      }
                       accessibilityRole="button"
                       accessibilityLabel={step.label}
                       disabled={photoBusy || refreshing}
@@ -1132,7 +1187,15 @@ export default function RegistrationDetailsScreen() {
                       onPress={() =>
                         openJourneySection(step.target)
                       }
-                      style={styles.journeyRow}
+                      style={[
+                        styles.journeyRow,
+                        requestedMilestone === index && {
+                          backgroundColor: '#FFF1D1',
+                          borderColor: '#D9A441',
+                          borderWidth: 1,
+                          borderRadius: 12,
+                        },
+                      ]}
                     >
                       <View style={styles.journeyRail}>
                         {index !== journeySteps.length - 1 && (
