@@ -111,6 +111,12 @@ import {
 dotenv.config();
 
 const app = express();
+// Enable proxy trust only after verifying the deployment topology.
+// Never use unrestricted `trust proxy: true`.
+if (process.env.TRUST_PROXY_HOPS === '1') {
+  app.set('trust proxy', 1);
+}
+
 const PORT = Number(process.env.PORT) || 5000;
 
 app.use(cors());

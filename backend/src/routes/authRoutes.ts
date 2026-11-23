@@ -1,43 +1,89 @@
+
 import { Router } from 'express';
+
 import {
-  register,
-  login,
-  getMe,
-    updateProfile,
+  deleteAccount,
   forgotPassword,
-   verifyResetOtp,
-   deleteAccount,
-   resetPassword,
+  getMe,
+  login,
+  register,
+  resetPassword,
+  updateProfile,
+  verifyResetOtp,
 } from '../controllers/authController';
-import { authenticateToken } from '../middleware/authMiddleware';
+
+import {
+  authenticateToken,
+} from '../middleware/authMiddleware';
+
+import {
+  forgotPasswordLimiter,
+  loginLimiter,
+  registerLimiter,
+  resetPasswordLimiter,
+  verifyOtpLimiter,
+} from '../middleware/authRateLimit';
 
 const router = Router();
 
-router.post('/register', register);
-router.post('/login', login);
+// ========================================
+// PUBLIC AUTHENTICATION ROUTES
+// ========================================
+
+// Register new devotee
+router.post(
+  '/register',
+  registerLimiter,
+  register
+);
+
+// Login
+router.post(
+  '/login',
+  loginLimiter,
+  login
+);
+
+// Request password reset OTP
 router.post(
   '/forgot-password',
+  forgotPasswordLimiter,
   forgotPassword
 );
+
+// Verify password reset OTP
+router.post(
+  '/verify-reset-otp',
+  verifyOtpLimiter,
+  verifyResetOtp
+);
+
+// Reset password
+router.post(
+  '/reset-password',
+  resetPasswordLimiter,
+  resetPassword
+);
+
+// ========================================
+// AUTHENTICATED USER ROUTES
+// ========================================
+
+// Update profile
 router.put(
   '/profile',
   authenticateToken,
   updateProfile
 );
-router.post(
-  '/verify-reset-otp',
-  verifyResetOtp
-);
-router.post(
-  '/reset-password',
-  resetPassword
-);
 
+// Get current user
 router.get(
   '/me',
   authenticateToken,
   getMe
 );
+
+// Delete account
 router.delete(
   '/account',
   authenticateToken,
