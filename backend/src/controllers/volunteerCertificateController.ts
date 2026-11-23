@@ -83,7 +83,10 @@ function handleError(
   error: unknown
 ) {
   if (res.headersSent) {
-    res.end();
+    console.error('Certificate response failed after headers were sent:', error);
+    if (!res.destroyed) {
+      res.destroy(error instanceof Error ? error : new Error('Certificate response failed'));
+    }
     return;
   }
 

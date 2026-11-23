@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface CertificateData {
   certificate_number: string;
@@ -22,7 +24,12 @@ interface CertificateData {
   status: string;
 }
 
-const COLORS = {
+const TEMPLATE_PATH = path.resolve(
+  __dirname,
+  '../../assets/certificates/volunteer-certificate-template.png'
+);
+const CERTIFICATE_WIDTH = 900;
+const CERTIFICATE_HEIGHT = 600;const COLORS = {
   maroon: '#6B1720',
   gold: '#C69A3A',
   darkGold: '#947023',
@@ -47,9 +54,10 @@ export function generateVolunteerCertificate(
   res: Response,
   preview = false
 ) {
+  const template = fs.readFileSync(TEMPLATE_PATH);
+
   const doc = new PDFDocument({
-    size: 'A4',
-    layout: 'landscape',
+    size: [CERTIFICATE_WIDTH, CERTIFICATE_HEIGHT],
     margin: 0,
     autoFirstPage: true,
 
@@ -63,8 +71,11 @@ export function generateVolunteerCertificate(
   const width = doc.page.width;
   const height = doc.page.height;
 
-  const filename =
-    `${certificate.certificate_number}.pdf`;
+  const safeCertificateNumber =
+    String(certificate.certificate_number ?? '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 100) || 'volunteer-certificate';
+  const filename = `${safeCertificateNumber}.pdf`;
 
   res.setHeader(
     'Content-Type',
@@ -83,341 +94,146 @@ export function generateVolunteerCertificate(
 
   doc.on('error', error => {
     console.error('Certificate PDF error:', error);
-    res.destroy(error);
+    if (!res.destroyed) {
+      res.destroy(error);
+    }
   });
-
   doc.pipe(res);
+  try {
 
   // ========================================
   // BACKGROUND
   // ========================================
 
-  doc.rect(0, 0, width, height)
-    .fill(COLORS.ivory);
+  doc.image(template, 0, 0, {
+    width,
+    height,
+  });
 
   // ========================================
-  // OUTER BORDER
   // ========================================
-
-  doc.rect(
-    18,
-    18,
-    width - 36,
-    height - 36
-  )
-    .lineWidth(3)
-    .stroke(COLORS.maroon);
-
-  doc.rect(
-    27,
-    27,
-    width - 54,
-    height - 54
-  )
-    .lineWidth(1.5)
-    .stroke(COLORS.gold);
-
-  doc.rect(
-    33,
-    33,
-    width - 66,
-    height - 66
-  )
-    .lineWidth(0.5)
-    .stroke(COLORS.gold);
-
+  // GOLDEN CERTIFICATE DYNAMIC DETAILS
   // ========================================
-  // DECORATIVE CORNERS
-  // ========================================
-
-  const corners = [
-    [45, 45],
-    [width - 45, 45],
-    [45, height - 45],
-    [width - 45, height - 45],
-  ];
-
-  for (const [x, y] of corners) {
-    doc.circle(x, y, 5)
-      .fill(COLORS.gold);
-  }
-
-  // ========================================
-  // TEMPLE HEADER
-  // ========================================
-
-  doc.font('Times-Bold')
-    .fontSize(18)
-    .fillColor(COLORS.maroon)
-    .text(
-      'DIVYAKSHETRA HARIHARAPURA',
-      60,
-      55,
-      {
-        width: width - 120,
+  // The template image already contains the
+  // original portraits, temple artwork, headings,
+  // blessings, decorations and printed labels.
+  const scaleX = width / 1536;
+  const scaleY = height / 1024;
+  const sx = (value: number) => value * scaleX;
+  const sy = (value: number) => value * scaleY;
+  const cleanText = (value: unknown, maxLength = 200) =>
+    typeof value === 'string'
+      ? value.replace(/[\u0000-\u001F\u007F]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, maxLength)
+      : '';
+  const drawField = (
+    value: string,
+    px: number,
+    py: number,
+    pw: number,
+    ph: number,
+    fontSize: number,
+    font: string = 'Helvetica-Bold'
+  ) => {
+    if (!value) return;
+    doc.font(font);
+    let size = fontSize;
+    while (
+      size > 6 &&
+      doc.fontSize(size).widthOfString(value) > sx(pw)
+    ) {
+      size -= 0.5;
+    }
+    doc.fontSize(size)
+      .fillColor(COLORS.maroon)
+      .text(value, sx(px), sy(py), {
+        width: sx(pw),
+        height: sy(ph),
         align: 'center',
         lineBreak: false,
-      }
-    );
-
-  doc.font('Helvetica')
-    .fontSize(10)
-    .fillColor(COLORS.darkGold)
-    .text(
-      'VOLUNTEER SEVA',
-      60,
-      83,
-      {
-        width: width - 120,
-        align: 'center',
-        characterSpacing: 3,
-      }
-    );
-
-  doc.moveTo(220, 105)
-    .lineTo(width - 220, 105)
-    .lineWidth(1)
-    .stroke(COLORS.gold);
-
-  // ========================================
-  // CERTIFICATE TITLE
-  // ========================================
-
-  doc.font('Times-Bold')
-    .fontSize(30)
-    .fillColor(COLORS.maroon)
-    .text(
-      certificate.certificate_title,
-      60,
-      122,
-      {
-        width: width - 120,
-        height: 40,
-        align: 'center',
         ellipsis: true,
-      }
-    );
-
-  doc.font('Helvetica')
-    .fontSize(12)
-    .fillColor(COLORS.muted)
-    .text(
-      'This certificate is proudly presented to',
-      60,
-      170,
-      {
-        width: width - 120,
-        align: 'center',
-      }
-    );
-
-  // ========================================
-  // VOLUNTEER NAME
-  // ========================================
-
-  doc.font('Times-BoldItalic')
-    .fontSize(32);
-
-  while (
-    doc.widthOfString(
-      certificate.volunteer_name
-    ) > width - 150 &&
-    doc.currentLineHeight() > 20
-  ) {
-    const currentSize =
-      doc.currentLineHeight() / 1.15;
-
-    doc.fontSize(currentSize - 1);
-  }
-
-  doc.fillColor(COLORS.darkGold)
-    .text(
-      certificate.volunteer_name,
-      75,
-      195,
-      {
-        width: width - 150,
-        height: 48,
-        align: 'center',
-        ellipsis: true,
-      }
-    );
-
-  doc.moveTo(180, 248)
-    .lineTo(width - 180, 248)
-    .lineWidth(0.7)
-    .stroke(COLORS.gold);
-
-  // ========================================
-  // CERTIFICATE MESSAGE
-  // ========================================
-
+      });
+  };
+  // ADMIN DYNAMIC CERTIFICATE MESSAGE
+  const defaultMessage =
+    'In sincere appreciation of your dedicated service, valuable time ' +
+    'and selfless contribution as a Volunteer (Sevaka) at ' +
+    'Divyakshetra Hariharapura. Your commitment to Dharma, Seva ' +
+    'and the Temple activities is deeply valued and greatly appreciated.';
   const message =
-    certificate.certificate_message ||
-    `In recognition of dedicated voluntary service and valuable contribution towards ${certificate.programme_name} at Divyakshetra Hariharapura.`;
-
-  doc.font('Helvetica')
-    .fontSize(12)
-    .fillColor(COLORS.text)
-    .text(
-      message,
-      100,
-      266,
-      {
-        width: width - 200,
-        height: 64,
-        align: 'center',
-        lineGap: 4,
-        ellipsis: true,
-      }
-    );
-
-  // ========================================
-  // SERVICE DETAILS
-  // ========================================
-
-  const attendanceMode =
-    certificate.attendance_mode ?? 'legacy';
-  if (
-    attendanceMode !== 'none' &&
-    certificate.service_start_date &&
-    certificate.service_end_date
-  ) {
-    const startDate = formatDate(
-      certificate.service_start_date
-    );
-    const endDate = formatDate(
-      certificate.service_end_date
-    );
-    doc.font('Helvetica-Bold')
-      .fontSize(11)
-      .fillColor(COLORS.maroon)
-      .text(
-        `Service period: ${startDate} - ${endDate}`,
-        60,
-        342,
-        {
-          width: width - 120,
-          align: 'center',
-        }
-      );
-  }
-  const serviceDetails: string[] = [];
-  if (
-    attendanceMode !== 'none' &&
-    certificate.total_service_days != null
-  ) {
-    serviceDetails.push(
-      `Service days: ${certificate.total_service_days}`
-    );
-  }
-  if (
-    ['legacy', 'detailed'].includes(attendanceMode) &&
-    certificate.total_service_hours != null
-  ) {
-    const hours = Number(
-      certificate.total_service_hours
-    );
-    if (Number.isFinite(hours) && hours >= 0) {
-      const label =
-        attendanceMode === 'detailed'
-          ? 'Actual service hours'
-          : 'Scheduled hours attended';
-      serviceDetails.push(
-        `${label}: ${hours}`
-      );
-    }
-  }
-  if (serviceDetails.length > 0) {
-    doc.font('Helvetica')
-      .fontSize(12)
-      .fillColor(COLORS.text)
-      .text(
-        serviceDetails.join('     |     '),
-        60,
-        366,
-        {
-          width: width - 120,
-          align: 'center',
-        }
-      );
-  }
-  // ========================================
-  // SIGNATORY
-  // ========================================
-
-  doc.moveTo(
-    width / 2 - 120,
-    435
-  )
-    .lineTo(
-      width / 2 + 120,
-      435
-    )
-    .lineWidth(0.8)
-    .stroke(COLORS.gold);
-
-  doc.font('Times-Bold')
-    .fontSize(14)
+    cleanText(certificate.certificate_message, 400) ||
+    defaultMessage;
+  doc.font('Times-BoldItalic')
+    .fontSize(13)
     .fillColor(COLORS.maroon)
-    .text(
-      certificate.signatory_name ||
-        'Authorized Signatory',
-      100,
-      445,
-      {
-        width: width - 200,
-        height: 20,
-        align: 'center',
-        ellipsis: true,
-      }
-    );
-
-  doc.font('Helvetica')
-    .fontSize(10)
-    .fillColor(COLORS.muted)
-    .text(
-      certificate.signatory_designation ||
-        'Temple Administration',
-      100,
-      467,
-      {
-        width: width - 200,
-        height: 20,
-        align: 'center',
-        ellipsis: true,
-      }
-    );
-
-  // ========================================
-  // CERTIFICATE NUMBER AND ISSUED DATE
-  // ========================================
-
-  doc.font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.muted)
-    .text(
-      `Certificate No: ${certificate.certificate_number}`,
-      50,
-      height - 82,
-      {
-        width: width - 100,
-        align: 'center',
-      }
-    );
-
+    .text(message, sx(445), sy(565), {
+      width: sx(650),
+      height: sy(125),
+      align: 'center',
+      ellipsis: true
+    });  // Volunteer name
+  drawField(
+    cleanText(certificate.volunteer_name),
+    445, 492, 650, 48, 26,
+    'Times-BoldItalic'
+  );
+  // Service period
+  const attendanceEnabled =
+    certificate.attendance_mode !== 'none';
+  const startDate =
+    attendanceEnabled && certificate.service_start_date
+      ? formatDate(certificate.service_start_date)
+      : '';
+  const endDate =
+    attendanceEnabled && certificate.service_end_date
+      ? formatDate(certificate.service_end_date)
+      : '';
+  const servicePeriod =
+    startDate && endDate
+      ? startDate === endDate
+        ? startDate
+        : `${startDate} - ${endDate}`
+      : startDate || endDate;
+  drawField(
+    servicePeriod,
+    505, 719, 375, 28, 10.5
+  );
+  // Total service days
+  const serviceDays =
+    attendanceEnabled &&
+    certificate.total_service_days != null &&
+    Number.isFinite(Number(certificate.total_service_days))
+      ? String(certificate.total_service_days)
+      : '';
+  drawField(
+    serviceDays,
+    1135, 718, 85, 30, 12
+  );
+  // Certificate number
+  drawField(
+    cleanText(certificate.certificate_number, 150),
+    277, 816, 190, 38, 9
+  );
+  // Issue date
   if (certificate.issued_at) {
-    doc.text(
-      `Issued on: ${formatDate(certificate.issued_at)}`,
-      50,
-      height - 65,
-      {
-        width: width - 100,
-        align: 'center',
-      }
+    drawField(
+      formatDate(certificate.issued_at),
+      241, 878, 220, 30, 10
     );
   }
-
+  // Signatory details above the existing signature line.
+  // The original background and printed labels remain unchanged.
+  drawField(
+    cleanText(certificate.signatory_name, 120),
+    1120, 800, 320, 26, 11,
+    'Times-Bold'
+  );
+  drawField(
+    cleanText(certificate.signatory_designation, 120),
+    1120, 831, 320, 24, 8
+  );
   // ========================================
   // DRAFT / REVOKED WATERMARK
   // ========================================
@@ -456,5 +272,17 @@ export function generateVolunteerCertificate(
     doc.restore();
   }
 
-  doc.end();
+    doc.end();
+  } catch (error) {
+    console.error('Certificate PDF rendering failed:', error);
+    const failure =
+      error instanceof Error
+        ? error
+        : new Error('Certificate PDF rendering failed');
+    doc.destroy();
+    if (res.headersSent && !res.destroyed) {
+      res.destroy();
+    }
+    throw failure;
+  }
 }
