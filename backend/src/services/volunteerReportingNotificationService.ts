@@ -402,7 +402,8 @@ export async function validateVolunteerReportingEvent(
     data: {
       type: 'volunteer_seva',
       event: job.event_type,
-      screen: '/my-sevas',
+      screen: '/volunteer/registration-details',
+      registrationId: job.registration_id,
       opportunityId: job.opportunity_id,
     },
   };

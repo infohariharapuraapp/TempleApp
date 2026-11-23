@@ -2628,6 +2628,12 @@ if (
 
       screen: '/my-sevas',
 
+      ...(isValidId(job.registration_id)
+
+        ? { registrationId: job.registration_id }
+
+        : {}),
+
       opportunityId: job.opportunity_id,
     },
   };
@@ -2660,6 +2666,12 @@ if (
       event: job.event_type,
 
       screen: '/my-sevas',
+
+      ...(isValidId(job.registration_id)
+
+        ? { registrationId: job.registration_id }
+
+        : {}),
 
       opportunityId: job.opportunity_id,
     },
@@ -2695,6 +2707,12 @@ if (
 
       screen: '/my-sevas',
 
+      ...(isValidId(job.registration_id)
+
+        ? { registrationId: job.registration_id }
+
+        : {}),
+
       opportunityId: job.opportunity_id,
     },
   };
@@ -2729,6 +2747,12 @@ if (
 
       screen: '/my-sevas',
 
+      ...(isValidId(job.registration_id)
+
+        ? { registrationId: job.registration_id }
+
+        : {}),
+
       opportunityId: job.opportunity_id,
     },
   };
@@ -2750,6 +2774,12 @@ if (
       event: job.event_type,
 
       screen: '/my-sevas',
+
+      ...(isValidId(job.registration_id)
+
+        ? { registrationId: job.registration_id }
+
+        : {}),
 
       ...(isValidId(job.opportunity_id)
         ? {
