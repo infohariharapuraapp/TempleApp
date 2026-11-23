@@ -44,6 +44,7 @@ export const getAvailableServiceDates = async (
         SELECT
           id,
           title,
+          required_volunteers,
 
           service_start_date::text
             AS service_start_date,
@@ -115,6 +116,7 @@ export const getAvailableServiceDates = async (
 
           total_available_dates: dates.length,
 
+          required_volunteers: Number(opportunity.required_volunteers),
           service_dates: dates,
         },
       });

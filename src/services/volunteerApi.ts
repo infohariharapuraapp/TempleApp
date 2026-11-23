@@ -671,14 +671,24 @@ export async function getVolunteerRegistrationDetails(
   }
 
   return data;
-}export interface VolunteerServiceDates {
+}
+
+export interface VolunteerServiceDateAvailability {
+  service_date: string;
+  capacity: number;
+  registered: number;
+  remaining: number;
+  status: 'available' | 'limited' | 'full';
+}
+export interface VolunteerServiceDates {
   opportunity_id: number;
   programme_name: string;
   service_start_date: string;
   service_end_date: string;
   registration_open: boolean;
   total_available_dates: number;
-  service_dates: string[];
+  required_volunteers: number;
+  service_dates: VolunteerServiceDateAvailability[];
 }
 export async function getVolunteerServiceDates(
   opportunityId: number
@@ -700,10 +710,21 @@ export async function getVolunteerServiceDates(
     !data ||
     data.opportunity_id !== opportunityId ||
     typeof data.registration_open !== 'boolean' ||
+    !Number.isSafeInteger(data.required_volunteers) ||
+    data.required_volunteers <= 0 ||
     !Array.isArray(data.service_dates) ||
-    !data.service_dates.every(date =>
-      typeof date === 'string' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(date)
+    !data.service_dates.every(item =>
+      item &&
+      typeof item.service_date === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(item.service_date) &&
+      Number.isSafeInteger(item.capacity) &&
+      item.capacity > 0 &&
+      Number.isSafeInteger(item.registered) &&
+      item.registered >= 0 &&
+      Number.isSafeInteger(item.remaining) &&
+      item.remaining >= 0 &&
+      item.remaining <= item.capacity &&
+      ['available', 'limited', 'full'].includes(item.status)
     )
   ) {
     throw new ApiError(

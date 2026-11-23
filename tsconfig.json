@@ -1,20 +1,30 @@
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@/assets/*": [
-        "./assets/*"
-      ]
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+﻿{
+    "extends":  "expo/tsconfig.base",
+    "compilerOptions":  {
+                            "strict":  true,
+                            "paths":  {
+                                          "@/*":  [
+                                                      "./src/*"
+                                                  ],
+                                          "@/assets/*":  [
+                                                             "./assets/*"
+                                                         ]
+                                      }
+                        },
+    "include":  [
+                    "**/*.ts",
+                    "**/*.tsx",
+                    ".expo/types/**/*.ts",
+                    "expo-env.d.ts"
+                ],
+    "exclude":  [
+                    "node_modules",
+                    "backend",
+                    "backup_*",
+                    "**/backup_*/**",
+                    "simple-attendance-register-screen.tsx",
+                    "register-before-capacity.tsx",
+                    "mobile-capacity-current.txt",
+                    "*.txt"
+                ]
 }

@@ -44,6 +44,7 @@ import type {
   VolunteerOpportunity,
   VolunteerMemberInput,
   VolunteerRegistrationInput,
+  VolunteerServiceDateAvailability,
 } from '@/services/volunteerApi';
 
 import {
@@ -98,6 +99,8 @@ export default function VolunteerRegisterScreen() {
 
   const [serviceDates, setServiceDates] =
     useState<string[]>([]);
+  const [serviceDateAvailability, setServiceDateAvailability] =
+    useState<VolunteerServiceDateAvailability[]>([]);
   const [shifts, setShifts] =
     useState<VolunteerShift[]>([]);
   const isLegacy =
@@ -225,10 +228,12 @@ export default function VolunteerRegisterScreen() {
       }
 
       setOpportunity(item);
+      const capacityDates = available?.registration_open
+        ? available.service_dates
+        : [];
+      setServiceDateAvailability(capacityDates);
       setServiceDates(
-        available?.registration_open
-          ? available.service_dates
-          : []
+        capacityDates.map(item => item.service_date)
       );
       setShifts(loadedShifts);
 
@@ -515,7 +520,16 @@ export default function VolunteerRegisterScreen() {
         : [...selected, shiftId],
     });
   }
+  function getDateAvailability(date: string) {
+    return serviceDateAvailability.find(
+      item => item.service_date === date
+    );
+  }
   function toggleServiceDate(date: string) {
+    const availability = getDateAvailability(date);
+    if (!availability || availability.status === 'full') {
+      return;
+    }
     const selected = member.service_dates ?? [];
     updateMember({
       shift_ids: [],
@@ -1196,7 +1210,9 @@ export default function VolunteerRegisterScreen() {
                       onPress={() =>
                         updateMember({
                           shift_ids: [],
-                          service_dates: [...availableDates],
+                          service_dates: availableDates.filter(date =>
+                            getDateAvailability(date)?.status !== 'full'
+                          ),
                         })
                       }
                     />
@@ -1225,42 +1241,93 @@ export default function VolunteerRegisterScreen() {
                 }}>
                   {availableDates.map(date => {
                     const selected =
-                      (member.service_dates ?? [])
-                        .includes(date);
+                      (member.service_dates ?? []).includes(date);
+                    const availability = getDateAvailability(date);
+                    if (!availability) return null;
+                    const isFull = availability.status === 'full';
+                    const isLimited = availability.status === 'limited';
+                    const cardBackground = isFull
+                      ? '#FFEBEE'
+                      : isLimited
+                        ? '#FFF8E1'
+                        : '#E8F5E9';
+                    const cardBorder = isFull
+                      ? '#C62828'
+                      : isLimited
+                        ? '#F9A825'
+                        : '#2E7D32';
+                    const cardText = isFull
+                      ? '#B71C1C'
+                      : isLimited
+                        ? '#795500'
+                        : '#1B5E20';
                     return (
                       <TouchableOpacity
                         key={date}
                         accessibilityRole="checkbox"
+                        accessibilityLabel={`${formatVolunteerDate(date)}, ${availability.remaining} slots remaining`}
                         accessibilityState={{
                           checked: selected,
-                          disabled: submitting || uncertain || photoBusy,
+                          disabled: isFull || submitting || uncertain || photoBusy,
                         }}
-                        disabled={submitting || uncertain || photoBusy}
-                        onPress={() =>
-                          toggleServiceDate(date)
+                        disabled={
+                          isFull || submitting || uncertain || photoBusy
                         }
+                        onPress={() => toggleServiceDate(date)}
                         style={{
                           width: '47%',
                           padding: 12,
                           borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: selected
-                            ? C.maroon
-                            : C.border,
-                          backgroundColor: selected
-                            ? C.maroon
-                            : C.white,
+                          borderWidth: selected ? 2 : 1,
+                          borderColor: selected ? C.maroon : cardBorder,
+                          backgroundColor: cardBackground,
+                          opacity: isFull ? 0.8 : 1,
                         }}
                       >
                         <Text style={{
-                          color: selected
-                            ? C.white
-                            : C.maroon,
+                          color: cardText,
                           fontWeight: '700',
                           textAlign: 'center',
                         }}>
                           {selected ? '✓ ' : ''}
                           {formatVolunteerDate(date)}
+                        </Text>
+                        <Text style={{
+                          color: cardText,
+                          fontSize: 12,
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          marginTop: 6,
+                        }}>
+                          {isFull
+                            ? 'FULL'
+                            : isLimited
+                              ? 'LIMITED'
+                              : 'AVAILABLE'}
+                        </Text>
+                        <Text style={{
+                          color: cardText,
+                          fontSize: 11,
+                          textAlign: 'center',
+                          marginTop: 4,
+                        }}>
+                          Required: {availability.capacity}
+                        </Text>
+                        <Text style={{
+                          color: cardText,
+                          fontSize: 11,
+                          textAlign: 'center',
+                        }}>
+                          Registered: {availability.registered}
+                        </Text>
+                        <Text style={{
+                          color: cardText,
+                          fontSize: 12,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          marginTop: 3,
+                        }}>
+                          Remaining: {availability.remaining}
                         </Text>
                       </TouchableOpacity>
                     );

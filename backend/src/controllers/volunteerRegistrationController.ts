@@ -637,6 +637,72 @@ export const createVolunteerRegistration = async (
         );
       }
 
+      // ========================================
+      // SIMPLE ATTENDANCE: PER-DATE CAPACITY
+      // ========================================
+      if (attendanceMode === 'simple') {
+        const capacity = Number(opportunity.required_volunteers);
+        if (
+          !Number.isSafeInteger(capacity) ||
+          capacity <= 0
+        ) {
+          fail(409, 'Programme volunteer capacity is invalid');
+        }
+        const requestedDates = [
+          ...new Set(
+            members.flatMap(member => member.service_dates)
+          ),
+        ].sort();
+        const requestedCounts = new Map<string, number>();
+        for (const member of members) {
+          for (const serviceDate of member.service_dates) {
+            requestedCounts.set(
+              serviceDate,
+              (requestedCounts.get(serviceDate) || 0) + 1
+            );
+          }
+        }
+        if (requestedDates.length > 0) {
+          const occupiedResult = await client.query(
+            `
+            SELECT
+              vsd.service_date::text AS service_date,
+              COUNT(DISTINCT m.id)::integer AS registered
+            FROM volunteer_service_dates vsd
+            JOIN volunteer_members m
+              ON m.id = vsd.member_id
+              AND m.opportunity_id = vsd.opportunity_id
+            JOIN volunteer_registrations r
+              ON r.id = m.registration_id
+              AND r.opportunity_id = m.opportunity_id
+            WHERE vsd.opportunity_id = $1
+              AND vsd.service_date = ANY($2::date[])
+              AND r.status NOT IN ('rejected', 'cancelled')
+            GROUP BY vsd.service_date
+            `,
+            [opportunityId, requestedDates]
+          );
+          const occupiedCounts = new Map<string, number>();
+          for (const row of occupiedResult.rows) {
+            occupiedCounts.set(
+              String(row.service_date).slice(0, 10),
+              Number(row.registered)
+            );
+          }
+          for (const serviceDate of requestedDates) {
+            const registered = occupiedCounts.get(serviceDate) || 0;
+            const requested = requestedCounts.get(serviceDate) || 0;
+            if (registered + requested > capacity) {
+              const remaining = Math.max(0, capacity - registered);
+              fail(
+                409,
+                `Service date ${serviceDate} has only ${remaining} slots remaining. Please select another date.`
+              );
+            }
+          }
+        }
+      }
+
       // Create main registration.
 
       const registrationResult = await client.query(

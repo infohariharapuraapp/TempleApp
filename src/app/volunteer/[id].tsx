@@ -117,7 +117,13 @@ export default function VolunteerDetailsScreen() {
         }
 
         setItem(opportunity);
-        setServiceDates(availableShifts.registration_open ? availableShifts.service_dates : []);
+        setServiceDates(
+          availableShifts.registration_open
+            ? availableShifts.service_dates
+                .filter(date => date.status !== 'full')
+                .map(date => date.service_date)
+            : []
+        );
       } catch (error) {
         if (
           version !== requestVersion.current
