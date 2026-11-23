@@ -305,7 +305,7 @@ async function saveVolunteerDeviceOutcome(
         WHEN $4 = 'retry'
         THEN NOW() +
           ($7::integer * INTERVAL '1 second')
-        ELSE next_attempt_at
+        ELSE vd.next_attempt_at
       END,
 
       updated_at = NOW()
