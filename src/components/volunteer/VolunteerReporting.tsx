@@ -697,7 +697,7 @@ export default function VolunteerReporting({
 
                   {activeRegistration &&
                      !attendanceMarked &&
-                     item.can_confirm &&
+                     Boolean(item.can_confirm) &&
                     future &&
                     item.reporting_status ===
                       'awaiting_response' && (
@@ -736,7 +736,8 @@ export default function VolunteerReporting({
                           requestWithdrawal(item)
                         }
                       />
-                    )}                  {contactAllowed && (
+                    )}
+                  {contactAllowed && (
                     <View style={styles.contact}>
                       <Text style={styles.label}>
                         {t(
@@ -764,7 +765,8 @@ export default function VolunteerReporting({
                             disabled={busy}
                             onPress={() => requestContacted(item)}
                           />
-                        )}                      <VolunteerButton
+                        )}
+                      <VolunteerButton
                         title={t(
                           'volunteer.whatsappCoordinator',
                           'WhatsApp Coordinator'

@@ -72,7 +72,9 @@ node_modules/
 android/.gradle/
 android/build/
 android/app/build/
-ios/Pods/# Temporary development scripts and backups
+ios/Pods/
+
+# Temporary development scripts and backups
 *.bak
 /fix-*.cjs
 /translate-*.cjs
@@ -83,3 +85,24 @@ ios/Pods/# Temporary development scripts and backups
 /translation_existing_code.txt
 /backend/fix-*.cjs
 /admin/dist-final/
+# Centralized backup and security exclusions
+*.backup
+*.backup-*
+*.backup2
+*.bak
+/ProjectHandover/
+/backup_*/
+/admin/dist-backup-*/
+/backend/certificate-test*
+/backend/certificate-*-test.pdf
+/backend/src/services/volunteerCertificateService.new.ts
+**/.env
+**/.env.*
+**/*.sql
+**/*.pem
+**/*.key
+**/*.jks
+**/*.p12
+**/*.p8
+# Required Firebase Android configuration
+!/google-services.json

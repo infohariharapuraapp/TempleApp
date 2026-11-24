@@ -327,16 +327,6 @@ export default function DynamicWelcomeScreen({
 
       <View style={styles.content}>
 
-        {/* Gold ornamental header */}
-
-        <View style={styles.headerDecoration}>
-          <View style={styles.headerLine} />
-
-          <View style={styles.headerDiamond} />
-
-          <View style={styles.headerLine} />
-        </View>
-
         {/* Welcome image frame */}
 
         {Boolean(settings?.image_url) && (
@@ -375,27 +365,12 @@ export default function DynamicWelcomeScreen({
 
         {Boolean(settings?.title) && (
           <View style={styles.titleContainer}>
-            <View style={styles.titleDivider}>
-              <View style={styles.titleLine} />
-              <View style={styles.titleDiamond} />
-              <View style={styles.titleLine} />
-            </View>
 
             <Text style={styles.title}>
               {settings?.title}
             </Text>
           </View>
         )}
-
-        {/* Bottom decorative ornament */}
-
-        <View style={styles.footerDecoration}>
-          <View style={styles.footerLine} />
-
-          <View style={styles.footerDiamond} />
-
-          <View style={styles.footerLine} />
-        </View>
 
       </View>
 

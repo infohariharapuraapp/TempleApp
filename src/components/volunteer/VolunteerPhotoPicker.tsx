@@ -9,10 +9,12 @@ import {
   Image,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
+import VolunteerPhotoEditor from './VolunteerPhotoEditor';
 
 import { useTranslation } from 'react-i18next';
 
@@ -56,6 +58,7 @@ export default function VolunteerPhotoPicker({
     useState(false);
 
   const [error, setError] = useState('');
+  const [editingAsset, setEditingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const [candidate, setCandidate] =
     useState<ImagePicker.ImagePickerAsset | null>(
@@ -188,7 +191,7 @@ export default function VolunteerPhotoPicker({
 
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false,
         aspect: [3, 4],
         quality: 0.8,
         allowsMultipleSelection: false,
@@ -216,7 +219,7 @@ export default function VolunteerPhotoPicker({
       const asset = result.assets[0];
 
       pendingPhoto.current = true;
-      setCandidate(asset);
+      setEditingAsset(asset);
 
     } catch (err) {
       if (mounted.current) {
@@ -329,23 +332,32 @@ export default function VolunteerPhotoPicker({
               'Check your photograph before saving.'
             )}
           </Text>
-          <VolunteerButton
-            title={
-              uploading
-                ? t(
-                    'volunteer.uploadingPhoto',
-                    'Saving Photograph...'
-                  )
-                : t(
-                    'volunteer.saveSelectedPhoto',
-                    'Save Photo'
-                  )
-            }
-            disabled={busy}
-            onPress={() =>
-              void choosePhoto('save')
-            }
-          />
+          <View style={styles.confirmRow}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Discard selected photograph"
+              disabled={busy}
+              style={[styles.confirmAction, busy && styles.disabledAction]}
+              onPress={() => {
+                if (lock.current) return;
+                pendingPhoto.current = false;
+                setCandidate(null);
+                setError('');
+                onBusyChange(false);
+              }}
+            >
+              <Text style={styles.cancelSymbol}>{'\u2715'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Confirm and upload photograph"
+              disabled={busy}
+              style={[styles.confirmAction, styles.acceptAction, busy && styles.disabledAction]}
+              onPress={() => void choosePhoto('save')}
+            >
+              <Text style={styles.acceptSymbol}>{'\u2713'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
       {!!candidate && !!error && (
@@ -410,6 +422,22 @@ export default function VolunteerPhotoPicker({
         </View>
       </View>
       )}
+      {editingAsset && (
+        <VolunteerPhotoEditor
+          asset={editingAsset}
+          onCancel={() => {
+            setEditingAsset(null);
+            pendingPhoto.current = false;
+            onBusyChange(false);
+          }}
+          onConfirm={(selected) => {
+            setEditingAsset(null);
+            setCandidate(selected);
+            pendingPhoto.current = true;
+            onBusyChange(true);
+          }}
+        />
+      )}
       <Text style={styles.note}>
         {t(
           'volunteer.photoPrivacyNote',
@@ -469,6 +497,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  confirmRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  confirmAction: {
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  acceptAction: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  disabledAction: {
+    opacity: 0.5,
+  },
+  cancelSymbol: {
+    fontSize: 25,
+    color: C.red,
+    fontWeight: '800',
+  },
+  acceptSymbol: {
+    fontSize: 27,
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
   savePhotoPanel: {
     gap: 10,
     marginTop: 10,
