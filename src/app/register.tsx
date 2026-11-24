@@ -171,6 +171,54 @@ export default function RegisterScreen() {
     };
   }, []);
 
+
+  const getRegistrationError = (error: unknown): string => {
+    const err = error as {
+      message?: string;
+      status?: number;
+    } | null;
+    const message =
+      typeof err?.message === 'string'
+        ? err.message.trim()
+        : '';
+    if (
+      err?.status === 409 ||
+      message === 'Mobile number or email is already registered.'
+    ) {
+      return t('authLocal.registration_already_exists');
+    }
+    if (
+      err?.status === 429 ||
+      message === 'Too many requests. Please try again later.'
+    ) {
+      return t('authLocal.registration_too_many_requests');
+    }
+    if (
+      message === 'Request timed out. Please try again.'
+    ) {
+      return t('authLocal.registration_request_timeout');
+    }
+    if (
+      message === 'Network request failed' ||
+      message === 'Failed to fetch' ||
+      message === 'Unable to connect to the server.'
+    ) {
+      return t('authLocal.unable_to_connect_to_the_server');
+    }
+    if (message === 'Full name must contain between 2 and 100 characters.') {
+      return t('authLocal.enter_your_full_name_2_100_characters');
+    }
+    if (message === 'Email address is required.') {
+      return t('authLocal.email_required');
+    }
+    if (message === 'Enter a valid email address.') {
+      return t('authLocal.please_enter_a_valid_email_address');
+    }
+    return localizeAuthError(
+      message,
+      t('authLocal.unable_to_create_your_account')
+    );
+  };
   const handleRegister = async () => {
     if (loading) return;
 
@@ -208,7 +256,7 @@ export default function RegisterScreen() {
 
     if (
       password.length < 8 ||
-      new TextEncoder().encode(password).length > 72
+      getUtf8ByteLength(password) > 72
     ) {
       Alert.alert(t('authLocal.invalid_password'),
         t('authLocal.password_must_be_at_least_8_characters_and_no_more_than_72_utf_8_bytes')
@@ -254,7 +302,7 @@ export default function RegisterScreen() {
       );
     } catch (error: any) {
       Alert.alert(t('authLocal.registration_failed'),
-        localizeAuthError(error?.message, t('authLocal.unable_to_connect_to_the_server'))
+        getRegistrationError(error)
       );
     } finally {
       setLoading(false);
@@ -663,3 +711,20 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+function getUtf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    if (codePoint <= 0x7f) {
+      bytes += 1;
+    } else if (codePoint <= 0x7ff) {
+      bytes += 2;
+    } else if (codePoint <= 0xffff) {
+      bytes += 3;
+    } else {
+      bytes += 4;
+    }
+  }
+  return bytes;
+}

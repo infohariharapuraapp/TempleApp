@@ -256,7 +256,7 @@ export default function ForgotPasswordScreen() {
 
     if (
       newPassword.length < 8 ||
-      new TextEncoder().encode(newPassword).length > 72
+      getUtf8ByteLength(newPassword) > 72
     ) {
       Alert.alert(t('authLocal.invalid_password'),
         t('authLocal.use_at_least_8_characters_and_no_more_than_72_utf_8_bytes')
@@ -686,3 +686,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+function getUtf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    if (codePoint <= 0x7f) {
+      bytes += 1;
+    } else if (codePoint <= 0x7ff) {
+      bytes += 2;
+    } else if (codePoint <= 0xffff) {
+      bytes += 3;
+    } else {
+      bytes += 4;
+    }
+  }
+  return bytes;
+}

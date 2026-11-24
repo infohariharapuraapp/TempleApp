@@ -19,7 +19,6 @@ import {
 import {
   forgotPasswordLimiter,
   loginLimiter,
-  registerLimiter,
   resetPasswordLimiter,
   verifyOtpLimiter,
 } from '../middleware/authRateLimit';
@@ -33,7 +32,6 @@ const router = Router();
 // Register new devotee
 router.post(
   '/register',
-  registerLimiter,
   register
 );
 

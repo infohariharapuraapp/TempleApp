@@ -1,4 +1,4 @@
-﻿{
+{
     "extends":  "expo/tsconfig.base",
     "compilerOptions":  {
                             "strict":  true,
@@ -25,6 +25,7 @@
                     "simple-attendance-register-screen.tsx",
                     "register-before-capacity.tsx",
                     "mobile-capacity-current.txt",
-                    "*.txt"
+                    "*.txt",
+                    "ProjectHandover"
                 ]
 }

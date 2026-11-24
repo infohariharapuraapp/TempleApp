@@ -726,6 +726,9 @@
     "something_went_wrong_please_try_again": "Something went wrong. Please try again."
   },
   "authLocal": {
+    "registration_already_exists": "Mobile number or email is already registered. Please login or use Forgot Password.",
+    "registration_request_timeout": "Request timed out. Please try again.",
+    "registration_too_many_requests": "Too many requests. Please try again later.",
     "hariharipura_temple": "HARIHARIPURA TEMPLE",
     "temple": "TEMPLE",
     "welcome_back": "Welcome Back",

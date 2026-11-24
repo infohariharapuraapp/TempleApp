@@ -726,6 +726,9 @@
     "something_went_wrong_please_try_again": "ಏನೋ ಸಮಸ್ಯೆಯಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "authLocal": {
+    "registration_already_exists": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಅಥವಾ ಇಮೇಲ್ ಈಗಾಗಲೇ ನೋಂದಾಯಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಲಾಗಿನ್ ಮಾಡಿ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್ ಮರುಪಡೆಯಿರಿ.",
+    "registration_request_timeout": "ವಿನಂತಿಯ ಸಮಯ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "registration_too_many_requests": "ಹಲವಾರು ವಿನಂತಿಗಳನ್ನು ಕಳುಹಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ನಂತರ ಪ್ರಯತ್ನಿಸಿ.",
     "hariharipura_temple": "ಹರಿಹರಪುರ ದೇವಾಲಯ",
     "temple": "ದೇವಾಲಯ",
     "welcome_back": "ಮತ್ತೆ ಸ್ವಾಗತ",
