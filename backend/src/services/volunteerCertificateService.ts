@@ -196,10 +196,34 @@ export function generateVolunteerCertificate(
         ? startDate
         : `${startDate} - ${endDate}`
       : startDate || endDate;
-  drawField(
-    servicePeriod,
-    505, 719, 375, 28, 10.5
-  );
+  // Service period: fixed safe area after the printed label.
+  // Supports both a single date and a two-date range.
+  const periodX = sx(535);
+  const periodY = sy(719);
+  const periodWidth = sx(345);
+  const periodHeight = sy(28);
+  if (servicePeriod) {
+    doc.save();
+    doc.font('Helvetica-Bold');
+    const availableWidth = periodWidth - sx(8);
+    let periodFontSize = 10.5;
+    while (
+      periodFontSize > 7 &&
+      doc.fontSize(periodFontSize).widthOfString(servicePeriod) > availableWidth
+    ) {
+      periodFontSize -= 0.5;
+    }
+    doc.fontSize(periodFontSize)
+      .fillColor(COLORS.maroon)
+      .text(servicePeriod, periodX, periodY, {
+        width: periodWidth,
+        height: periodHeight,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true
+      });
+    doc.restore();
+  }
   // Total service days
   const serviceDays =
     attendanceEnabled &&
@@ -209,7 +233,7 @@ export function generateVolunteerCertificate(
       : '';
   drawField(
     serviceDays,
-    1135, 718, 85, 30, 12
+    1110, 718, 110, 30, 12
   );
   // Certificate number
   drawField(
