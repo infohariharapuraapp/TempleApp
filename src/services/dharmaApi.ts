@@ -230,6 +230,7 @@ export async function reportDharmaContent(data: {
 // OWN COMMUNITY ANSWER
 // ========================================
 export type MyDharmaAnswer = {
+  rejection_reason?: string | null;
   id: number;
   question_id: number;
   answer: string;

@@ -30,6 +30,7 @@ type DharmaAnswer = {
   answer: string;
   answer_type: 'community' | 'official';
   status: Status;
+  rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
   devotee_name: string | null;
@@ -592,9 +593,14 @@ useEffect(() => {
   // MODERATE COMMUNITY ANSWER
   // ========================================
 
+  const [rejectingAnswer, setRejectingAnswer] =
+    useState<DharmaAnswer | null>(null);
+  const [rejectionReason, setRejectionReason] =
+    useState('');
   const moderateAnswer = async (
     answer: DharmaAnswer,
-    status: ModerationStatus
+    status: ModerationStatus,
+    reason?: string
   ) => {
     if (moderatingAnswerId !== null) return;
     if (answer.answer_type !== 'community') return;
@@ -607,11 +613,24 @@ useEffect(() => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Change answer #${answer.id} to ${status}?\n\n${answer.answer}`
-    );
-
-    if (!confirmed) return;
+    if (status === 'rejected' && reason === undefined) {
+      setRejectionReason('');
+      setRejectingAnswer(answer);
+      return;
+    }
+    if (status === 'rejected') {
+      if (typeof reason !== 'string' || reason.length > 500) {
+        window.alert('Rejection reason must not exceed 500 characters.');
+        return;
+      }
+    } else {
+      const confirmed = window.confirm(
+        `Change answer #${answer.id} to ${status}?\n\n${answer.answer}`
+      );
+      if (!confirmed) return;
+    }
+    setRejectingAnswer(null);
+    setRejectionReason('');
 
     setModeratingAnswerId(answer.id);
 
@@ -620,7 +639,14 @@ useEffect(() => {
         `/admin/dharma/answers/${answer.id}/status`,
         {
           method: 'PATCH',
-          body: JSON.stringify({ status, revision: answer.revision }),
+          body: JSON.stringify({
+            status,
+            revision: answer.revision,
+            rejection_reason:
+              status === 'rejected'
+                ? reason?.trim() || null
+                : null,
+          }),
         }
       );
 
@@ -644,6 +670,121 @@ useEffect(() => {
 
   return (
     <main className="content">
+      {rejectingAnswer && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-answer-title"
+            style={{
+              background: '#FFFFFF',
+              color: '#30241F',
+              borderRadius: 14,
+              padding: 24,
+              width: '100%',
+              maxWidth: 540,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 16px 50px rgba(0,0,0,0.2)',
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setRejectingAnswer(null);
+                setRejectionReason('');
+              }
+            }}
+          >
+            <h3 id="reject-answer-title">
+              Reject Community Answer
+            </h3>
+            <p>Answer #{rejectingAnswer.id}</p>
+            <p style={{
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              background: '#F8F4EE',
+              padding: 12,
+              borderRadius: 8,
+              maxHeight: 160,
+              overflowY: 'auto',
+            }}>
+              {rejectingAnswer.answer}
+            </p>
+            <label htmlFor="dharma-rejection-reason">
+              Rejection reason (optional)
+            </label>
+            <textarea
+              id="dharma-rejection-reason"
+              autoFocus
+              rows={4}
+              maxLength={500}
+              value={rejectionReason}
+              onChange={(event) =>
+                setRejectionReason(event.target.value.slice(0, 500))
+              }
+              placeholder="Enter the reason for rejecting this answer..."
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                marginTop: 8,
+                padding: 12,
+                border: '1px solid #D6C9B8',
+                borderRadius: 8,
+                resize: 'vertical',
+                font: 'inherit',
+              }}
+            />
+            <p style={{ textAlign: 'right', fontSize: 12 }}>
+              {rejectionReason.length}/500 characters
+            </p>
+            <p style={{ fontSize: 12, color: '#65584E' }}>
+              This reason is visible only to the respective devotee
+              and authorized administrators.
+            </p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+              marginTop: 20,
+            }}>
+              <button
+                type="button"
+                style={buttonStyle('#EDE4D8', '#30241F')}
+                onClick={() => {
+                  setRejectingAnswer(null);
+                  setRejectionReason('');
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={moderatingAnswerId !== null}
+                style={buttonStyle('#A83C3C')}
+                onClick={() =>
+                  void moderateAnswer(
+                    rejectingAnswer,
+                    'rejected',
+                    rejectionReason
+                  )
+                }
+              >
+                Reject Answer
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <div className="page-head">
         <div>
           <h2>Dharma Sandeham</h2>
@@ -1002,6 +1143,21 @@ useEffect(() => {
                         >
                           {answer.answer}
                         </p>
+                        {answer.status === 'rejected' &&
+                          answer.rejection_reason && (
+                            <div style={{
+                              marginTop: 8,
+                              padding: 10,
+                              background: '#FFF2F2',
+                              color: '#8B3030',
+                              borderRadius: 8,
+                              whiteSpace: 'pre-wrap',
+                              overflowWrap: 'anywhere',
+                            }}>
+                              <strong>Rejection reason:</strong>
+                              <div>{answer.rejection_reason}</div>
+                            </div>
+                          )}
                       </td>
 
                       <td>

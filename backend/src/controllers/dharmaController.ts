@@ -1440,6 +1440,11 @@ export const getMyDharmaAnswer = async (
         a.question_id,
         a.answer,
         a.status,
+        CASE
+          WHEN a.status = 'rejected'
+          THEN a.rejection_reason
+          ELSE NULL
+        END AS rejection_reason,
         a.revision,
         a.created_at,
         a.updated_at
@@ -1581,6 +1586,7 @@ export const updateMyDharmaAnswer = async (
         SET
           answer = $1,
           status = 'pending',
+          rejection_reason = NULL,
           revision = revision + 1,
           updated_at = NOW()
         WHERE id = $2
@@ -1593,6 +1599,7 @@ export const updateMyDharmaAnswer = async (
           question_id,
           answer,
           status,
+          rejection_reason,
           revision,
           created_at,
           updated_at

@@ -570,6 +570,7 @@
     "go_back": "Go back"
   },
   "dharmaLocal": {
+    "rejection_reason": "Rejection Reason",
     "my_answer": "My Answer",
     "edit_my_answer": "Edit My Answer",
     "save_answer_changes": "Save Changes",

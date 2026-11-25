@@ -1200,6 +1200,39 @@ setVotedIds(
                           })[myAnswer.status]
                         })}
                       </Text>
+                      {myAnswer.status === 'rejected' &&
+                        typeof myAnswer.rejection_reason === 'string' &&
+                        myAnswer.rejection_reason.trim().length > 0 && (
+                          <View style={{
+                            backgroundColor: '#FFF1F1',
+                            borderColor: '#E9C3C3',
+                            borderWidth: 1,
+                            borderRadius: 10,
+                            padding: 12,
+                            marginBottom: 14,
+                          }}>
+                            <Text style={{
+                              color: '#8B3030',
+                              fontSize: 14,
+                              fontWeight: '700',
+                              marginBottom: 6,
+                            }}>
+                              {t('dharmaLocal.rejection_reason', {
+                                defaultValue: 'Rejection Reason'
+                              })}
+                            </Text>
+                            <Text
+                              selectable
+                              style={{
+                                color: '#603030',
+                                fontSize: 14,
+                                lineHeight: 21,
+                              }}
+                            >
+                              {myAnswer.rejection_reason}
+                            </Text>
+                          </View>
+                        )}
                       {editingMyAnswer && canEditMyAnswer ? (
                         <>
                           <TextInput

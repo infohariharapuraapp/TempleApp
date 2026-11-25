@@ -181,6 +181,7 @@ export const getAdminDharmaAnswers = async (
         a.answer,
         a.answer_type,
         a.status,
+        a.rejection_reason,
         a.created_at,
         a.updated_at,
         a.revision,
@@ -250,6 +251,25 @@ export const moderateDharmaAnswer = async (
       message: 'Valid answer ID, status and revision are required. Refresh the admin panel.',
     });
   }
+  const rawReason = req.body?.rejection_reason;
+  if (
+    rawReason !== undefined &&
+    rawReason !== null &&
+    (
+      typeof rawReason !== 'string' ||
+      rawReason.length > 500 ||
+      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(rawReason)
+    )
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Rejection reason must not exceed 500 characters.',
+    });
+  }
+  const rejectionReason =
+    status === 'rejected' && typeof rawReason === 'string'
+      ? rawReason.trim() || null
+      : null;
   try {
     const client = await pool.connect();
     try {
@@ -289,6 +309,7 @@ export const moderateDharmaAnswer = async (
         UPDATE dharma_answers AS a
         SET
           status = $1,
+          rejection_reason = $5,
           revision = revision + 1,
           updated_at = NOW()
         WHERE a.id = $2
@@ -305,10 +326,11 @@ export const moderateDharmaAnswer = async (
           a.question_id,
           a.answer_type,
           a.status,
+          a.rejection_reason,
           a.revision,
           a.updated_at
         `,
-        [status, answerId, revision, adminId]
+        [status, answerId, revision, adminId, rejectionReason]
       );
       if (result.rows.length !== 1) {
         await client.query('ROLLBACK');

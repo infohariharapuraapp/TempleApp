@@ -570,6 +570,7 @@
     "go_back": "वापस जाएँ"
   },
   "dharmaLocal": {
+    "rejection_reason": "\u0905\u0938\u094d\u0935\u0940\u0915\u0943\u0924\u093f \u0915\u093e \u0915\u093e\u0930\u0923",
     "my_answer": "मेरा उत्तर",
     "edit_my_answer": "मेरा उत्तर संपादित करें",
     "save_answer_changes": "परिवर्तन सहेजें",

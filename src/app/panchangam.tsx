@@ -326,6 +326,7 @@ export default function PanchangamScreen() {
   const gpsRequestId = useRef(0);
   const searchRequestId = useRef(0);
   const lastSearchAt = useRef(0);
+  const searchLock = useRef(false);
 
   const latitude = selectedPlace.latitude;
   const longitude = selectedPlace.longitude;
@@ -624,9 +625,9 @@ export default function PanchangamScreen() {
   };
 
   const searchPlaces = async (text?: string) => {
-    const term = (text ?? query).trim();
+    const term = (text ?? query).trim().replace(/\s+/g, ' ');
 
-    if (term.length < 2) {
+    if (term.length < 2 || term.length > 120) {
       Alert.alert(
         trPanchangam("Enter Location"),
         trPanchangam("Please enter at least 2 characters."),
@@ -634,7 +635,7 @@ export default function PanchangamScreen() {
       return;
     }
 
-    if (searching) return;
+    if (searching || searchLock.current) return;
 
     if (Date.now() - lastSearchAt.current < 1200) {
       Alert.alert(
@@ -644,6 +645,7 @@ export default function PanchangamScreen() {
       return;
     }
 
+    searchLock.current = true;
     lastSearchAt.current = Date.now();
     const id = ++searchRequestId.current;
 
@@ -696,14 +698,17 @@ export default function PanchangamScreen() {
         return;
       }
 
+      if (!Array.isArray(data)) throw new Error('Invalid location response.');
+
       const places: Place[] = data
+        .filter(item => item && typeof item.display_name === 'string' && typeof item.lat === 'string' && typeof item.lon === 'string' && item.lat.trim() && item.lon.trim())
         .map(item => {
           const address = item.address ?? {};
 
           const name =
-            address.city ||
-            address.town ||
             address.village ||
+            address.town ||
+            address.city ||
             address.municipality ||
             address.county ||
             address.state_district ||
@@ -756,6 +761,7 @@ export default function PanchangamScreen() {
       }
     } finally {
       clearTimeout(timeout);
+      searchLock.current = false;
 
       if (
         mounted.current &&
@@ -1251,6 +1257,7 @@ export default function PanchangamScreen() {
                 value={query}
                 onChangeText={setQuery}
                 autoCorrect={false}
+                maxLength={120}
                 returnKeyType="search"
                 onSubmitEditing={() =>
                   searchPlaces()
