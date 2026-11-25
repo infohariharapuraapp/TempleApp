@@ -268,12 +268,18 @@ async function prepareAnnouncementNotification(
        WHERE notification_type = 'announcement'
          AND data->>'announcementId' = $1
          AND status IN (
-           'scheduled', 'pending', 'processing', 'sent'
+           'scheduled', 'pending', 'processing', 'sent', 'unknown'
          )
        FOR UPDATE`,
       [String(announcementId)]
     );
     const current = existing.rows[0];
+    if (current && current.status === 'unknown') {
+      throw new AnnouncementRequestError(
+        409,
+        'Previous notification delivery is uncertain. Resending is blocked to prevent duplicates.'
+      );
+    }
     if (current && current.status === 'sent') {
       throw new AnnouncementRequestError(
         409, 'Notification has already been sent'

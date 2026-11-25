@@ -63,6 +63,7 @@ type PushTarget = {
 };
 
 type PushOutcome = {
+  uncertainDeviceIds: Set<number>;
   accepted: number;
   failed: number;
   tickets: Array<{
@@ -514,6 +515,7 @@ async function sendPushTargets(
   targets: PushTarget[]
 ): Promise<PushOutcome> {
   const outcome: PushOutcome = {
+    uncertainDeviceIds: new Set<number>(),
     accepted: 0,
     failed: 0,
     tickets: [],
@@ -542,6 +544,7 @@ async function sendPushTargets(
     );
 
     offset += chunk.length;
+    let submissionAttempted = false;
 
     try {
       const currentTargets =
@@ -561,6 +564,7 @@ async function sendPushTargets(
       if (!currentTargets.length) {
         continue;
       }
+      submissionAttempted = true;
       const tickets: ExpoPushTicket[] =
         await expo.sendPushNotificationsAsync(
           currentTargets.map(target => target.message)
@@ -578,7 +582,9 @@ async function sendPushTargets(
 
         if (
           ticket &&
-          ticket.status === 'ok'
+          ticket.status === 'ok' &&
+          typeof ticket.id === 'string' &&
+          ticket.id.length > 0
         ) {
           outcome.accepted++;
 
@@ -590,11 +596,16 @@ async function sendPushTargets(
           continue;
         }
 
-        outcome.failed++;
-
-        const error = ticket
-          ? JSON.stringify(ticket)
-          : 'Expo returned no push ticket';
+        const confirmedRejection =
+          ticket?.status === 'error';
+        if (confirmedRejection) {
+          outcome.failed++;
+        } else {
+          outcome.uncertainDeviceIds.add(device.id);
+        }
+        const error = confirmedRejection
+          ? 'Expo rejected push submission'
+          : 'Push submission outcome uncertain';
 
         outcome.errors.push({
           device,
@@ -615,10 +626,9 @@ async function sendPushTargets(
         }
       }
     } catch (error) {
-      console.error(
-        'Expo push chunk error:',
-        error
-      );
+      console.error('Expo push chunk failed', {
+        submissionAttempted,
+      });
 
       for (const target of chunkTargets) {
         if (
@@ -631,11 +641,18 @@ async function sendPushTargets(
         ) {
           continue;
         }
-        outcome.failed++;
-
+        if (submissionAttempted) {
+          outcome.uncertainDeviceIds.add(
+            target.device.id
+          );
+        } else {
+          outcome.failed++;
+        }
         outcome.errors.push({
           device: target.device,
-          error: String(error),
+          error: submissionAttempted
+            ? 'Push submission outcome uncertain'
+            : 'Push preparation failed',
         });
       }
     }
@@ -711,6 +728,15 @@ async function saveDeliverySummaries(
     );
   }
 
+  const uncertainUsers = new Set(
+    targets
+      .filter(target =>
+        outcome.uncertainDeviceIds.has(
+          target.device.id
+        )
+      )
+      .map(target => target.device.user_id)
+  );
   for (const userId of userIds) {
     const accepted =
       acceptedByUser.get(userId) ?? [];
@@ -728,9 +754,11 @@ async function saveDeliverySummaries(
     const status =
       accepted.length > 0
         ? 'sent'
-        : device
-          ? 'failed'
-          : 'no_device';
+        : uncertainUsers.has(userId)
+          ? 'unknown'
+          : device
+            ? 'failed'
+            : 'no_device';
 
     await pool.query(
       `
@@ -824,6 +852,15 @@ if (notification.status === 'cancelled') {
       };
     }
 
+    if (notification.status === 'unknown') {
+      return {
+        success: false,
+        sent: 0,
+        notificationId,
+        message:
+          'Previous delivery outcome is uncertain. Resubmission is blocked.',
+      };
+    }
     if (notification.status === 'processing') {
       return {
         success: false,
@@ -988,9 +1025,7 @@ if (notification.status === 'cancelled') {
           publicAnnouncement.rows.length > 0;
       } catch (error) {
         console.warn(
-          'Announcement translation verification failed:',
-          error
-        );
+          'Announcement translation verification failed:');
       }
     }
     const targets = await buildPushTargets(
@@ -1057,7 +1092,9 @@ if (notification.status === 'cancelled') {
       notificationId,
       outcome.accepted > 0
         ? 'sent'
-        : 'failed',
+        : outcome.uncertainDeviceIds.size > 0
+          ? 'unknown'
+          : 'failed',
       outcome.accepted > 0
     );
 
@@ -1067,11 +1104,15 @@ if (notification.status === 'cancelled') {
         notificationId,
         accepted: outcome.accepted,
         failed: outcome.failed,
+        uncertain: outcome.uncertainDeviceIds.size,
       }
     );
 
     return {
       success: outcome.accepted > 0,
+      message: outcome.uncertainDeviceIds.size > 0
+        ? 'Some push submission outcomes are uncertain. Do not resend without review.'
+        : undefined,
       sent: outcome.accepted,
       totalDevices: targets.length,
       totalUsers: new Set(
@@ -1083,9 +1124,7 @@ if (notification.status === 'cancelled') {
     };
   } catch (error) {
     console.error(
-      'Send notification record error:',
-      error
-    );
+      'Send notification record error:');
 
     try {
       if (claimed && !submissionStarted) {
@@ -1102,9 +1141,7 @@ if (notification.status === 'cancelled') {
       }
     } catch (databaseError) {
       console.error(
-        'Notification status update error:',
-        databaseError
-      );
+        'Notification status update error:');
     }
 
     return {
@@ -1129,6 +1166,7 @@ export async function sendPushNotificationToUser(
 ): Promise<SendResult> {
   let notificationId:
     number | undefined;
+  let submissionStarted = false;
 
   try {
     const notification =
@@ -1210,7 +1248,7 @@ export async function sendPushNotificationToUser(
       notification.id,
       'processing'
     );
-
+    submissionStarted = true;
     const outcome =
       await sendPushTargets(targets);
 
@@ -1225,7 +1263,9 @@ export async function sendPushNotificationToUser(
       notification.id,
       outcome.accepted > 0
         ? 'sent'
-        : 'failed',
+        : outcome.uncertainDeviceIds.size > 0
+          ? 'unknown'
+          : 'failed',
       outcome.accepted > 0
     );
 
@@ -1236,21 +1276,26 @@ export async function sendPushNotificationToUser(
         notificationId: notification.id,
         accepted: outcome.accepted,
         failed: outcome.failed,
+        uncertain: outcome.uncertainDeviceIds.size,
       }
     );
 
     return {
       success: outcome.accepted > 0,
+      message: outcome.uncertainDeviceIds.size > 0
+        ? 'Some push submission outcomes are uncertain. Do not resend without review.'
+        : undefined,
       sent: outcome.accepted,
       notificationId: notification.id,
     };
   } catch (error) {
     console.error(
-      'Send user notification error:',
-      error
-    );
+      'Send user notification error:');
 
-    if (notificationId !== undefined) {
+    if (
+      notificationId !== undefined &&
+      !submissionStarted
+    ) {
       try {
         await updateNotificationStatus(
           notificationId,
@@ -1258,9 +1303,7 @@ export async function sendPushNotificationToUser(
         );
       } catch (databaseError) {
         console.error(
-          'Notification status error:',
-          databaseError
-        );
+          'Notification status error:');
       }
     }
 
@@ -1384,7 +1427,7 @@ export async function checkPushReceipts(
             failed++;
 
             const errorDetails =
-              JSON.stringify(receipt);
+              'Expo reported a push delivery failure';
 
             await pool.query(
               `
@@ -1411,9 +1454,7 @@ export async function checkPushReceipts(
       }
     } catch (error) {
       console.error(
-        'Expo receipt check error:',
-        error
-      );
+        'Expo receipt check error:');
 
       pending += chunk.length;
     }

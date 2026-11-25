@@ -48,6 +48,8 @@ export const getMySevaDetails = async (
 
   try {
     const client = await pool.connect();
+    let discardClient = false;
+    let clientReleased = false;
 
     try {
       await client.query(
@@ -623,6 +625,9 @@ export const getMySevaDetails = async (
       // ORGANIZE RESULTS BY MEMBER
       // ========================================
 
+      await client.query('COMMIT');
+      clientReleased = true;
+      client.release();
       function groupByMember(
         rows: any[]
       ): Map<number, any[]> {
@@ -966,7 +971,6 @@ upcoming.sort(
 
 const nextDuty = upcoming[0] || null;
 
-      await client.query('COMMIT');
 
       // ========================================
       // FINAL RESPONSE
@@ -985,18 +989,24 @@ const nextDuty = upcoming[0] || null;
         },
       });
     } catch (error) {
-      await client.query('ROLLBACK')
-        .catch(console.error);
+      if (!clientReleased) {
+        try {
+          await client.query('ROLLBACK');
+        } catch {
+          discardClient = true;
+          console.error('Volunteer transaction rollback failed');
+        }
+      }
 
       throw error;
     } finally {
-      client.release();
+      if (!clientReleased) {
+        clientReleased = true;
+        client.release(discardClient);
+      }
     }
   } catch (error) {
-    console.error(
-      'My Seva details error:',
-      error
-    );
+    console.error('My Seva details error:');
 
     return res.status(500).json({
       success: false,

@@ -372,7 +372,7 @@ export async function createGalleryItem(
 
     if (req.file) {
 
-      finalImageUrl = `/uploads/gallery/${req.file.filename}`;
+      finalImageUrl = req.file.path;
 
     }
 
@@ -524,7 +524,7 @@ export async function updateGalleryItem(
 
     if (req.file) {
 
-      imageValue = `/uploads/gallery/${req.file.filename}`;
+      imageValue = req.file.path;
 
     } else if (image_url?.trim()) {
 
@@ -750,7 +750,7 @@ export async function uploadGalleryImage(
 
     const imageUrl =
 
-      `/uploads/gallery/${req.file.filename}`;
+      req.file.path;
 
     res.status(201).json({
 

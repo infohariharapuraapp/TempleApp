@@ -192,10 +192,7 @@ function handleError(
     });
   }
 
-  console.error(
-    'Volunteer reporting error:',
-    error
-  );
+  console.error('Volunteer reporting error:');
 
   return res.status(500).json({
     success: false,
@@ -208,6 +205,7 @@ async function transaction<T>(
 ): Promise<T> {
 
   const client = await pool.connect();
+    let discardClient = false;
 
   try {
 
@@ -221,14 +219,18 @@ async function transaction<T>(
 
   } catch (error) {
 
-    await client.query('ROLLBACK')
-      .catch(console.error);
+    try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
     throw error;
 
   } finally {
 
-    client.release();
+    client.release(discardClient);
   }
 }
 

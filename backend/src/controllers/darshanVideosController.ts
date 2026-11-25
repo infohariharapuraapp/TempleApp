@@ -507,7 +507,7 @@ export async function createDarshanVideo(
 
     if (req.file) {
       thumbnailUrl =
-        `/uploads/darshan/${req.file.filename}`;
+        req.file.path;
     }
 
     // Automatically generate YouTube thumbnail.
@@ -643,7 +643,7 @@ export async function updateDarshanVideo(
 
     if (req.file) {
       thumbnailUrl =
-        `/uploads/darshan/${req.file.filename}`;
+        req.file.path;
     }
 
     // Generate thumbnail if none exists.

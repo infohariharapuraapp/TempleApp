@@ -64,10 +64,7 @@ const handleError = (
     });
   }
 
-  console.error(
-    'Volunteer ID card error:',
-    error
-  );
+  console.error('Volunteer ID card error:');
 
   return res.status(500).json({
     success: false,
@@ -670,6 +667,7 @@ export const issueVolunteerIdCards = async (
     }
 
     const client = await pool.connect();
+    let discardClient = false;
 
     try {
       await client.query('BEGIN');
@@ -814,12 +812,16 @@ export const issueVolunteerIdCards = async (
         data: issued.map(row => withVolunteerPhotoAccess(row)),
       });
     } catch (error) {
-      await client.query('ROLLBACK')
-        .catch(console.error);
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
       throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   } catch (error) {
     return handleError(res, error);
@@ -871,6 +873,7 @@ export const revokeVolunteerIdCard = async (
     }
 
     const client = await pool.connect();
+    let discardClient = false;
 
     try {
       await client.query('BEGIN');
@@ -977,12 +980,16 @@ await client.query('COMMIT');
         data: withVolunteerPhotoAccess(result.rows[0]),
       });
     } catch (error) {
-      await client.query('ROLLBACK')
-        .catch(console.error);
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
       throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   } catch (error) {
     return handleError(res, error);
@@ -1027,6 +1034,7 @@ export const refreshVolunteerIdCard = async (
     }
 
     const client = await pool.connect();
+    let discardClient = false;
 
     try {
       await client.query('BEGIN');
@@ -1150,12 +1158,16 @@ export const refreshVolunteerIdCard = async (
         data: withVolunteerPhotoAccess(result.rows[0]),
       });
     } catch (error) {
-      await client.query('ROLLBACK')
-        .catch(console.error);
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
       throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   } catch (error) {
     return handleError(res, error);

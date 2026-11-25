@@ -107,10 +107,7 @@ const handleError = (
     });
   }
 
-  console.error(
-    'Volunteer registration error:',
-    error
-  );
+  console.error('Volunteer registration error:');
 
   return res.status(500).json({
     success: false,
@@ -461,6 +458,7 @@ export const createVolunteerRegistration = async (
     ];
 
     const client = await pool.connect();
+    let discardClient = false;
 
     try {
       await client.query('BEGIN');
@@ -1014,12 +1012,16 @@ await client.query('COMMIT');
         },
       });
     } catch (error) {
-      await client.query('ROLLBACK')
-        .catch(console.error);
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
       throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   } catch (error) {
     return handleError(res, error);

@@ -61,6 +61,7 @@ export const resubmitVolunteerPhoto = async (
       fail(400, 'Invalid photograph revision');
     }
     const client = await pool.connect();
+    let discardClient = false;
     try {
       await client.query('BEGIN');
       await client.query(
@@ -279,10 +280,15 @@ export const resubmitVolunteerPhoto = async (
         data: result.rows[0],
       });
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
       throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   } catch (error) {
     if (error instanceof PhotoError) {

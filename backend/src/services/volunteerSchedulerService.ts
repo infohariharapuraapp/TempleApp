@@ -63,6 +63,7 @@ let schedulerGeneration = 0;
 const timers = new Set<SchedulerTimer>();
 
 const activeTasks = new Set<string>();
+const activeCycles = new Set<Promise<void>>();
 
 // ========================================
 // SAFE TASK EXECUTION
@@ -119,7 +120,13 @@ function scheduleTask(
     }
 
     try {
-      await runTask(name, task);
+      const cycle = runTask(name, task);
+      activeCycles.add(cycle);
+      try {
+        await cycle;
+      } finally {
+        activeCycles.delete(cycle);
+      }
     } finally {
       if (
         schedulerStarted &&
@@ -287,4 +294,10 @@ export function stopVolunteerScheduler(): void {
   console.log(
     '[Volunteer Scheduler] Stopped'
   );
+}// Wait for complete scheduler cycles, including nested tasks.
+export async function waitForVolunteerSchedulerIdle():
+  Promise<void> {
+  while (activeCycles.size > 0) {
+    await Promise.allSettled([...activeCycles]);
+  }
 }

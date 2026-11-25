@@ -1,6 +1,6 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
-import express from 'express';
+import express, { ErrorRequestHandler } from 'express';
 
 import { pool } from './db';
 import activityRoutes from './routes/activityRoutes';
@@ -41,6 +41,8 @@ import adminQuotesRoutes from './routes/adminQuotesRoutes';
 
 import {
   startVolunteerScheduler,
+  stopVolunteerScheduler,
+  waitForVolunteerSchedulerIdle,
 } from './services/volunteerSchedulerService';
 
 
@@ -463,66 +465,152 @@ app.listen(PORT, '0.0.0.0', () => {
 });*/
 
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Temple App Backend running on port ${PORT}`);
-
-  startVolunteerScheduler();
-});
 // ========================================
-// SCHEDULED NOTIFICATION PROCESSOR
+// CENTRALIZED API ERROR HANDLING
 // ========================================
-
+const apiErrorHandler: ErrorRequestHandler =
+  (error, _req, res, next) => {
+    if (res.headersSent) {
+      return next(error);
+    }
+    const type =
+      typeof error?.type === 'string'
+        ? error.type
+        : '';
+    const suppliedStatus =
+      error?.status ?? error?.statusCode;
+    let status = 500;
+    let message = 'Unable to complete the request';
+    if (type === 'entity.parse.failed') {
+      status = 400;
+      message = 'Invalid JSON request';
+    } else if (type === 'entity.too.large') {
+      status = 413;
+      message = 'Request is too large';
+    } else if (
+      Number.isInteger(suppliedStatus) &&
+      suppliedStatus >= 400 &&
+      suppliedStatus <= 499
+    ) {
+      status = suppliedStatus;
+      message = 'Invalid or unauthorized request';
+    }
+    if (status >= 500) {
+      console.error('Unhandled API request error');
+    }
+    res.status(status).json({
+      success: false,
+      message,
+    });
+  };
+app.use(apiErrorHandler);
 // ========================================
-// SCHEDULED NOTIFICATION PROCESSOR
+// MANAGED BACKGROUND TASKS
 // ========================================
-
-// Run once when backend starts
-processScheduledNotifications()
-  .catch((error) => {
-    console.error(
-      'Initial notification scheduler error:',
-      error
-    );
-  });
-
-// Then check every 30 seconds
-setInterval(
-  () => {
-    processScheduledNotifications()
-      .catch((error) => {
-        console.error(
-          'Notification scheduler error:',
-          error
-        );
-      });
-  },
-  30 * 1000
-);
-// ========================================
-// EXPO PUSH RECEIPT PROCESSOR
-// ========================================
-
-// Check Expo receipts every 5 minutes.
-// Receipts confirm Expo's handoff to FCM,
-// not that a notification appeared on the phone.
-
-setInterval(() => {
-  checkPushReceipts()
-    .then((result) => {
-      if (
-        result.checked > 0 ||
-        result.failed > 0
-      ) {
-        console.log(
-          'Push receipt results:',
-          result
-        );
+let shuttingDown = false;
+let scheduledTask: Promise<void> | null = null;
+let receiptTask: Promise<void> | null = null;
+function runScheduledNotifications(): void {
+  if (shuttingDown || scheduledTask) {
+    return;
+  }
+  scheduledTask = processScheduledNotifications()
+    .then(() => undefined)
+    .catch(() => {
+      console.error('Notification scheduler failed');
+    })
+    .finally(() => {
+      scheduledTask = null;
+    });
+}
+function runReceiptProcessor(): void {
+  if (shuttingDown || receiptTask) {
+    return;
+  }
+  receiptTask = checkPushReceipts()
+    .then(result => {
+      if (result.checked > 0 || result.failed > 0) {
+        console.log('Push receipt results:', {
+          checked: result.checked,
+          accepted: result.accepted,
+          failed: result.failed,
+          pending: result.pending,
+        });
       }
     })
-    .catch((error) => {
-      console.error(
-        'Push receipt processor error:',
-        error
-      );
+    .catch(() => {
+      console.error('Push receipt processor failed');
+    })
+    .finally(() => {
+      receiptTask = null;
     });
-}, 5 * 60 * 1000);
+}
+const scheduledTimer = setInterval(
+  runScheduledNotifications,
+  30 * 1000
+);
+const receiptTimer = setInterval(
+  runReceiptProcessor,
+  5 * 60 * 1000
+);
+// ========================================
+// SERVER STARTUP
+// ========================================
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Temple App Backend running on port ${PORT}`);
+  if (!shuttingDown) {
+    startVolunteerScheduler();
+    runScheduledNotifications();
+  }
+});
+// ========================================
+// GRACEFUL SHUTDOWN
+// ========================================
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  console.log('Graceful shutdown started:', signal);
+  const deadline = setTimeout(() => {
+    console.error('Graceful shutdown deadline exceeded');
+    process.exit(1);
+  }, 25000);
+  try {
+    clearInterval(scheduledTimer);
+    clearInterval(receiptTimer);
+    stopVolunteerScheduler();
+    const httpClosed = new Promise<void>(
+      (resolve, reject) => {
+        server.close(error => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      }
+    );
+    server.closeIdleConnections();
+    await Promise.all([
+      httpClosed,
+      waitForVolunteerSchedulerIdle(),
+      scheduledTask ?? Promise.resolve(),
+      receiptTask ?? Promise.resolve(),
+    ]);
+    await pool.end();
+    clearTimeout(deadline);
+    console.log('Graceful shutdown completed');
+    process.exit(0);
+  } catch {
+    clearTimeout(deadline);
+    console.error('Graceful shutdown failed');
+    process.exit(1);
+  }
+}
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
+});

@@ -49,12 +49,19 @@ function formatDate(value: string | Date) {
   }).format(date);
 }
 
+let cachedCertificateTemplate: Buffer | undefined;
+function getCertificateTemplate(): Buffer {
+  if (!cachedCertificateTemplate) {
+    cachedCertificateTemplate = fs.readFileSync(TEMPLATE_PATH);
+  }
+  return cachedCertificateTemplate;
+}
 export function generateVolunteerCertificate(
   certificate: CertificateData,
   res: Response,
   preview = false
 ) {
-  const template = fs.readFileSync(TEMPLATE_PATH);
+  const template = getCertificateTemplate();
 
   const doc = new PDFDocument({
     size: [CERTIFICATE_WIDTH, CERTIFICATE_HEIGHT],
@@ -93,7 +100,7 @@ export function generateVolunteerCertificate(
   );
 
   doc.on('error', error => {
-    console.error('Certificate PDF error:', error);
+    console.error('Certificate PDF stream failed');
     if (!res.destroyed) {
       res.destroy(error);
     }
@@ -298,7 +305,7 @@ export function generateVolunteerCertificate(
 
     doc.end();
   } catch (error) {
-    console.error('Certificate PDF rendering failed:', error);
+    console.error('Certificate PDF rendering failed');
     const failure =
       error instanceof Error
         ? error

@@ -121,10 +121,7 @@ const handleError = (
     });
   }
 
-  console.error(
-    'Volunteer accommodation error:',
-    error
-  );
+  console.error('Volunteer accommodation error:');
 
   return res.status(500).json({
     success: false,
@@ -634,6 +631,7 @@ export const createVolunteerAccommodation =
       validateDates(checkIn, checkOut);
 
       const client = await pool.connect();
+    let discardClient = false;
 
       try {
         await client.query('BEGIN');
@@ -764,12 +762,16 @@ export const createVolunteerAccommodation =
           data: created,
         });
       } catch (error) {
-        await client.query('ROLLBACK')
-          .catch(console.error);
+        try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
         throw error;
       } finally {
-        client.release();
+        client.release(discardClient);
       }
     } catch (error) {
       return handleError(res, error);
@@ -822,6 +824,7 @@ export const updateVolunteerAccommodation =
       );
 
       const client = await pool.connect();
+    let discardClient = false;
 
       try {
         await client.query('BEGIN');
@@ -918,12 +921,16 @@ export const updateVolunteerAccommodation =
           data: result.rows[0],
         });
       } catch (error) {
-        await client.query('ROLLBACK')
-          .catch(console.error);
+        try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
         throw error;
       } finally {
-        client.release();
+        client.release(discardClient);
       }
     } catch (error) {
       return handleError(res, error);
@@ -987,8 +994,8 @@ export const updateVolunteerAccommodationVisibility =
         );
       }
 
-      const client =
-        await pool.connect();
+      const client = await pool.connect();
+    let discardClient = false;
 
       try {
 
@@ -1157,14 +1164,18 @@ export const updateVolunteerAccommodationVisibility =
 
       } catch (error) {
 
-        await client.query('ROLLBACK')
-          .catch(console.error);
+        try {
+        await client.query('ROLLBACK');
+      } catch {
+        discardClient = true;
+        console.error('Volunteer transaction rollback failed');
+      }
 
         throw error;
 
       } finally {
 
-        client.release();
+        client.release(discardClient);
       }
 
     } catch (error) {
