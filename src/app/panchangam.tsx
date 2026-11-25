@@ -122,6 +122,16 @@ const POPULAR_PLACES = [
   'Mysuru, Karnataka',
   'Shivamogga, Karnataka',
 ];
+const POPULAR_COORDINATES: Record<string, [number, number]> = {
+  'Hariharapura, Karnataka': [13.5205251, 75.3017655],
+  'Bengaluru, Karnataka': [12.9716, 77.5946],
+  'Hyderabad, Telangana': [17.388786, 78.4610647],
+  'Guntur, Andhra Pradesh': [16.3067, 80.4365],
+  'Vijayawada, Andhra Pradesh': [16.5062, 80.6480],
+  'Chennai, Tamil Nadu': [13.0827, 80.2707],
+  'Mysuru, Karnataka': [12.2958, 76.6394],
+  'Shivamogga, Karnataka': [13.9299, 75.5681],
+};
 
 function normalizeDate(date: Date): Date {
   return new Date(
@@ -448,10 +458,25 @@ export default function PanchangamScreen() {
         });
 
       if (!position) {
-        position =
-          await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
+        let gpsTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          position = await Promise.race([
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }),
+            new Promise<never>((_, reject) => {
+              gpsTimer = setTimeout(() => {
+                reject(new Error(
+                  'Unable to detect your location. Select a city manually.'
+                ));
+              }, 20000);
+            }),
+          ]);
+        } finally {
+          if (gpsTimer !== undefined) {
+            clearTimeout(gpsTimer);
+          }
+        }
       }
 
       if (!mounted.current || id !== gpsRequestId.current) {
@@ -659,21 +684,21 @@ export default function PanchangamScreen() {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      12000,
+      30000,
     );
 
+    let searchStage = 'url';
+    let searchHttpStatus = 0;
     try {
-      const params = new URLSearchParams({
-        q: term,
-        countrycodes: 'in',
-        format: 'jsonv2',
-        addressdetails: '1',
-        limit: '15',
-        dedupe: '1',
-      });
+      const searchUrl =
+        'https://nominatim.openstreetmap.org/search?q=' +
+        encodeURIComponent(term) +
+        '&countrycodes=in&format=jsonv2' +
+        '&addressdetails=1&limit=15&dedupe=1';
+      searchStage = 'network';
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+        searchUrl,
         {
           headers: {
             Accept: 'application/json',
@@ -684,10 +709,13 @@ export default function PanchangamScreen() {
         },
       );
 
+      searchHttpStatus = response.status;
+      searchStage = 'http';
       if (!response.ok) {
         throw new Error('Location search unavailable.');
       }
 
+      searchStage = 'json';
       const data: NominatimResult[] =
         await response.json();
 
@@ -698,6 +726,7 @@ export default function PanchangamScreen() {
         return;
       }
 
+      searchStage = 'validation';
       if (!Array.isArray(data)) throw new Error('Invalid location response.');
 
       const places: Place[] = data
@@ -750,6 +779,16 @@ export default function PanchangamScreen() {
       setResults(places);
       setSearched(true);
     } catch (error) {
+      if (__DEV__) {
+        console.warn('[PANCHANGAM_SEARCH_DEBUG]', {
+          stage: searchStage,
+          status: searchHttpStatus,
+          aborted: controller.signal.aborted,
+          errorType: error instanceof Error
+            ? error.name
+            : 'UnknownError',
+        });
+      }
       if (
         mounted.current &&
         searchRequestId.current === id
@@ -772,6 +811,23 @@ export default function PanchangamScreen() {
     }
   };
 
+  const selectPopularPlace = (label: string) => {
+    const coordinates = POPULAR_COORDINATES[label];
+    if (!coordinates) {
+      void searchPlaces(label);
+      return;
+    }
+    const [latitude, longitude] = coordinates;
+    const [name, state] = label.split(',').map(value => value.trim());
+    selectPlace({
+      id: `popular-${name}`,
+      name,
+      state,
+      latitude,
+      longitude,
+      source: 'search',
+    });
+  };
   const changeDate = (days: number) => {
     setSelectedDate(previous => {
       const next = normalizeDate(previous);
@@ -1297,7 +1353,7 @@ export default function PanchangamScreen() {
                       key={place}
                       style={styles.cityRow}
                       onPress={() =>
-                        searchPlaces(place)
+                        selectPopularPlace(place)
                       }
                     >
                       <View style={{ flex: 1 }}>
