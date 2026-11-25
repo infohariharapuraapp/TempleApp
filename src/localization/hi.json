@@ -741,6 +741,11 @@
     "something_went_wrong_please_try_again": "कुछ गलत हुआ। पुनः प्रयास करें।"
   },
   "authLocal": {
+    "otp_attempts_exceeded": "बहुत अधिक प्रयास किए गए हैं। नया OTP अनुरोध करें।",
+    "otp_delivery_guidance": "OTP न मिलने पर स्पैम फ़ोल्डर देखें। यदि कई बार OTP का अनुरोध किया है, तो 15 मिनट बाद प्रयास करें।",
+    "otp_email_unavailable": "ईमेल सेवा अस्थायी रूप से उपलब्ध नहीं है। कृपया बाद में प्रयास करें।",
+    "otp_processing_failed": "पासवर्ड पुनर्प्राप्ति अनुरोध पूरा नहीं हो सका। कृपया बाद में प्रयास करें।",
+    "otp_resend_countdown": "{{seconds}} सेकंड बाद OTP फिर भेजें",
     "registration_already_exists": "मोबाइल नंबर या ईमेल पहले से पंजीकृत है। कृपया लॉग इन करें या पासवर्ड पुनर्प्राप्त करें।",
     "registration_request_timeout": "अनुरोध का समय समाप्त हो गया। कृपया पुनः प्रयास करें।",
     "registration_too_many_requests": "बहुत अधिक अनुरोध भेजे गए हैं। कृपया बाद में प्रयास करें।",

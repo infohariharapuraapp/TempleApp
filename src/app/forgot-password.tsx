@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +17,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiRequest } from '@/services/api';
+import { apiRequest, ApiError } from '@/services/api';
 
 type Step = 'identifier' | 'otp' | 'password';
 
@@ -34,6 +34,13 @@ export default function ForgotPasswordScreen() {
       return fallback;
     }
     const knownMessages: Record<string, string> = {
+      "Too many requests. Please try again later.": "authLocal.registration_too_many_requests",
+      "Request timed out. Please try again.": "authLocal.registration_request_timeout",
+      "Email service is temporarily unavailable. Please try again later.": "authLocal.otp_email_unavailable",
+      "Unable to process password reset.": "authLocal.otp_processing_failed",
+      "Invalid response from server": "authLocal.otp_processing_failed",
+      "Too many attempts. Request a new OTP.": "authLocal.otp_attempts_exceeded",
+      "Invalid or expired OTP.": "authLocal.invalid_or_expired_otp_please_request_a_new_otp",
       "HARIHARIPURA TEMPLE": "authLocal.hariharipura_temple",
       "TEMPLE": "authLocal.temple",
       "Welcome Back": "authLocal.welcome_back",
@@ -147,6 +154,24 @@ export default function ForgotPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
   const [loading, setLoading] = useState(false);
+  // OTP_RESEND_SECURITY_V1
+  const otpRequestLock = useRef(false);
+  const resendDeadline = useRef(0);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const startResendCooldown = () => {
+    resendDeadline.current = Date.now() + 60000;
+    setResendSeconds(60);
+  };
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((resendDeadline.current - Date.now()) / 1000)
+      );
+      setResendSeconds(remaining);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const cleanIdentifier = identifier.trim();
   const isMobile = /^[6-9]\d{9}$/.test(cleanIdentifier);
@@ -173,37 +198,73 @@ export default function ForgotPasswordScreen() {
   };
 
   const handleSendOtp = async () => {
-    if (loading || !validIdentifier()) return;
-
+    if (
+      loading ||
+      otpRequestLock.current ||
+      Date.now() < resendDeadline.current ||
+      !validIdentifier()
+    ) {
+      return;
+    }
+    otpRequestLock.current = true;
     Keyboard.dismiss();
     setLoading(true);
-
     try {
       const response = await apiRequest('/auth/forgot-password', {
         method: 'POST',
+        timeoutMs: 45000,
+        token: '',
         body: {
           identifier: cleanIdentifier,
         },
       });
-
       if (response.success) {
+        startResendCooldown();
         setOtp('');
         setResetToken('');
         setStep('otp');
-
-        Alert.alert(t('authLocal.check_your_email'),
+        Alert.alert(
+          t('authLocal.check_your_email'),
           t('authLocal.if_your_account_has_a_registered_email_address_a_6_digit_password_reset_otp_will_be_sent_there')
         );
       } else {
-        Alert.alert(t('authLocal.unable_to_send_otp'),
-          localizeAuthError(response.message, t('authLocal.please_try_again'))
+        startResendCooldown();
+        Alert.alert(
+          t('authLocal.unable_to_send_otp'),
+          localizeAuthError(
+            response.message,
+            t('authLocal.otp_processing_failed')
+          )
         );
       }
-    } catch (error: any) {
-      Alert.alert(t('authLocal.unable_to_send_otp'),
-        localizeAuthError(error?.message, t('authLocal.unable_to_connect_to_the_server'))
+    } catch (error: unknown) {
+      startResendCooldown();
+      let message = t('authLocal.otp_processing_failed');
+      if (error instanceof ApiError) {
+        if (error.status === 429) {
+          message = t('authLocal.registration_too_many_requests');
+        } else if (error.status === 503) {
+          message = t('authLocal.otp_email_unavailable');
+        } else {
+          message = localizeAuthError(
+            error.message,
+            t('authLocal.otp_processing_failed')
+          );
+        }
+      } else if (
+        error instanceof Error &&
+        /network request failed|failed to fetch|networkerror/i.test(
+          error.message
+        )
+      ) {
+        message = t('authLocal.unable_to_connect_to_the_server');
+      }
+      Alert.alert(
+        t('authLocal.unable_to_send_otp'),
+        message
       );
     } finally {
+      otpRequestLock.current = false;
       setLoading(false);
     }
   };
@@ -350,15 +411,26 @@ export default function ForgotPasswordScreen() {
       <TouchableOpacity
         style={[
           styles.primaryButton,
-          loading && styles.disabledButton,
+          (loading || resendSeconds > 0) && styles.disabledButton,
         ]}
         onPress={handleSendOtp}
-        disabled={loading}
+        disabled={loading || resendSeconds > 0}
+        accessibilityRole="button"
+        accessibilityState={{
+          disabled: loading || resendSeconds > 0,
+          busy: loading,
+        }}
       >
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>{t('authLocal.send_otp')}</Text>
+          <Text style={styles.primaryButtonText}>
+            {resendSeconds > 0
+              ? t('authLocal.otp_resend_countdown', {
+                  seconds: resendSeconds,
+                })
+              : t('authLocal.send_otp')}
+          </Text>
         )}
       </TouchableOpacity>
     </>
@@ -415,12 +487,29 @@ export default function ForgotPasswordScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.secondaryAction}
+        style={[
+          styles.secondaryAction,
+          (loading || resendSeconds > 0) && styles.disabledButton,
+        ]}
         onPress={handleSendOtp}
-        disabled={loading}
+        disabled={loading || resendSeconds > 0}
+        accessibilityRole="button"
+        accessibilityState={{
+          disabled: loading || resendSeconds > 0,
+          busy: loading,
+        }}
       >
-        <Text style={styles.secondaryActionText}>{t('authLocal.resend_otp')}</Text>
+        <Text style={styles.secondaryActionText}>
+          {resendSeconds > 0
+            ? t('authLocal.otp_resend_countdown', {
+                seconds: resendSeconds,
+              })
+            : t('authLocal.resend_otp')}
+        </Text>
       </TouchableOpacity>
+      <Text style={[styles.helperText, { textAlign: 'center' }]}>
+        {t('authLocal.otp_delivery_guidance')}
+      </Text>
     </>
   );
 

@@ -32,10 +32,10 @@ export const registerLimiter = createAuthLimiter(
   5
 );
 
-// 5 password-recovery requests per 15 minutes per IP.
+// 30 password-recovery requests per 15 minutes per IP.
 export const forgotPasswordLimiter = createAuthLimiter(
   15 * 60 * 1000,
-  5
+  30
 );
 
 // 10 OTP verification requests per 15 minutes per IP.

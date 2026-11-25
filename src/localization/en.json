@@ -741,6 +741,11 @@
     "something_went_wrong_please_try_again": "Something went wrong. Please try again."
   },
   "authLocal": {
+    "otp_attempts_exceeded": "Too many attempts. Request a new OTP.",
+    "otp_delivery_guidance": "If the OTP does not arrive, check your spam folder. If you have requested several codes, wait 15 minutes before trying again.",
+    "otp_email_unavailable": "Email service is temporarily unavailable. Please try again later.",
+    "otp_processing_failed": "Unable to process password recovery. Please try again later.",
+    "otp_resend_countdown": "Resend OTP in {{seconds}}s",
     "registration_already_exists": "Mobile number or email is already registered. Please login or use Forgot Password.",
     "registration_request_timeout": "Request timed out. Please try again.",
     "registration_too_many_requests": "Too many requests. Please try again later.",

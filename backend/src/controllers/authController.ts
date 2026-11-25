@@ -486,6 +486,7 @@ export const forgotPassword = async (
   res: Response
 ) => {
   let client: import('pg').PoolClient | undefined;
+  let discardClient = false;
   let delivery: { email: string; otp: string } | undefined;
   const genericMessage =
     'If your account has a registered email, a password reset OTP will be sent there.';
@@ -542,6 +543,22 @@ export const forgotPassword = async (
         message: genericMessage,
       });
     }
+    const accountRequests = await client.query(
+      `SELECT COUNT(*)::int AS total
+       FROM password_reset_request_events
+       WHERE user_id = $1
+         AND requested_at >
+             clock_timestamp() - INTERVAL '15 minutes'`,
+      [user.id]
+    );
+    // Keep responses generic to prevent account enumeration.
+    if (Number(accountRequests.rows[0].total) >= 5) {
+      await client.query('COMMIT');
+      return res.json({
+        success: true,
+        message: genericMessage,
+      });
+    }
     const otp = randomInt(100000, 1000000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
     // Replace the previous OTP atomically.
@@ -571,6 +588,11 @@ export const forgotPassword = async (
          created_at = EXCLUDED.created_at`,
       [user.id, otpHash]
     );
+    await client.query(
+      `INSERT INTO password_reset_request_events (user_id)
+       VALUES ($1)`,
+      [user.id]
+    );
     await client.query('COMMIT');
     delivery = {
       email: user.email,
@@ -580,7 +602,10 @@ export const forgotPassword = async (
     if (client) {
       try {
         await client.query('ROLLBACK');
-      } catch {}
+      } catch {
+        discardClient = true;
+        console.error('Password recovery rollback failed.');
+      }
     }
     console.error('Forgot password database operation failed.');
     return res.status(500).json({
@@ -589,7 +614,27 @@ export const forgotPassword = async (
     });
   } finally {
     if (client) {
-      client.release();
+      client.release(discardClient);
+    }
+  }
+  // Occasionally remove old tracking records.
+  // Keep cleanup bounded and outside the OTP transaction.
+  if (delivery && randomInt(0, 20) === 0) {
+    try {
+      await pool.query(
+        `DELETE FROM password_reset_request_events
+         WHERE id IN (
+           SELECT id
+           FROM password_reset_request_events
+           WHERE requested_at <
+                 clock_timestamp() - INTERVAL '24 hours'
+           ORDER BY requested_at
+           LIMIT 500
+           FOR UPDATE SKIP LOCKED
+         )`
+      );
+    } catch {
+      console.error('Password recovery event cleanup failed.');
     }
   }
   // Send email after releasing the database connection.

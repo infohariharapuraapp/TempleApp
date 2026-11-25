@@ -84,12 +84,11 @@ Divyakshetra Hariharapura`,
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
+    await response.body?.cancel();
 
     console.error(
-      'Brevo email delivery failed:',
-      response.status,
-      errorText
+      'Brevo password reset email delivery failed:',
+      response.status
     );
 
     throw new Error(
