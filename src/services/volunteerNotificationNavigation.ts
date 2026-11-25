@@ -49,6 +49,7 @@ export function openVolunteerSevaNotification(
   // announcements should open the Seva listing.
   if (
 
+    event === 'registration_submitted' ||
     event === 'registration_opened' ||
     event === 'registration_extended' ||
     event === 'registration_closing_reminder'

@@ -15,12 +15,32 @@ function extractUser(decoded: string | JwtPayload) {
     typeof decoded === 'string' ||
     typeof decoded.userId !== 'number' ||
     !Number.isSafeInteger(decoded.userId) ||
-    decoded.userId <= 0
+    decoded.userId <= 0 ||
+    typeof decoded.exp !== 'number' ||
+    !Number.isSafeInteger(decoded.exp) ||
+    typeof decoded.iat !== 'number' ||
+    !Number.isSafeInteger(decoded.iat) ||
+    decoded.iat <= 0 ||
+    decoded.exp <= decoded.iat ||
+    decoded.iat > Math.floor(Date.now() / 1000) + 60 ||
+    decoded.exp - decoded.iat > 7 * 24 * 60 * 60
   ) {
     return null;
   }
 
+  const tokenVersion =
+    decoded.tokenVersion === undefined
+      ? 0
+      : decoded.tokenVersion;
+  if (
+    typeof tokenVersion !== 'number' ||
+    !Number.isSafeInteger(tokenVersion) ||
+    tokenVersion < 0
+  ) {
+    return null;
+  }
   return {
+    tokenVersion,
     userId: decoded.userId,
     email: typeof decoded.email === 'string' ? decoded.email : '',
     role: typeof decoded.role === 'string' ? decoded.role : '',
@@ -55,7 +75,8 @@ export const authenticateToken = async (
   try {
     decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET as string
+      process.env.JWT_SECRET as string,
+      { algorithms: ['HS256'] }
     );
   } catch {
     return res.status(401).json({
@@ -75,7 +96,7 @@ export const authenticateToken = async (
 
   try {
     const result = await pool.query(
-      `SELECT id, email, role
+      `SELECT id, email, role, token_version
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -90,7 +111,12 @@ export const authenticateToken = async (
     }
 
     const dbUser = result.rows[0];
-
+    if (dbUser.token_version !== user.tokenVersion) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token',
+      });
+    }
     req.user = {
       userId: dbUser.id,
       email: dbUser.email ?? '',
@@ -130,7 +156,8 @@ export const optionalAuthenticateToken = async (
   try {
     decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET as string
+      process.env.JWT_SECRET as string,
+      { algorithms: ['HS256'] }
     );
   } catch {
     return next();
@@ -144,7 +171,7 @@ export const optionalAuthenticateToken = async (
 
   try {
     const result = await pool.query(
-      `SELECT id, email, role
+      `SELECT id, email, role, token_version
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -153,7 +180,9 @@ export const optionalAuthenticateToken = async (
 
     if (result.rows.length > 0) {
       const dbUser = result.rows[0];
-
+      if (dbUser.token_version !== user.tokenVersion) {
+        return next();
+      }
       req.user = {
         userId: dbUser.id,
         email: dbUser.email ?? '',

@@ -379,7 +379,8 @@ async function processVolunteerNotificationJob(
       const processed =
         await sendNextVolunteerPushDevice(
           job,
-          notificationId
+          notificationId,
+          currentContent
         );
 
       if (!processed) {

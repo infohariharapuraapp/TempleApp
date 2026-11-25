@@ -76,3 +76,10 @@ src.zip
 /translation_existing_code.txt
 /backend/fix-*.cjs
 /admin/dist-final/
+# ENVIRONMENT SECURITY V1
+# Protect environment credentials at every directory level.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template

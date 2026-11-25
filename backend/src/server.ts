@@ -111,6 +111,15 @@ import {
 dotenv.config();
 
 const app = express();
+// Reduce unnecessary framework information exposure.
+app.disable('x-powered-by');
+// Security headers compatible with mobile and admin clients.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
 // Enable proxy trust only after verifying the deployment topology.
 // Never use unrestricted `trust proxy: true`.
 if (process.env.TRUST_PROXY_HOPS === '1') {
@@ -409,7 +418,7 @@ app.get('/api/health', async (_req, res) => {
       databaseTime: result.rows[0].now,
     });
   } catch (error) {
-    console.error('Database connection error:', error);
+    console.error('Database health check failed');
 
     res.status(500).json({
       success: false,
@@ -421,7 +430,7 @@ app.get('/api/health', async (_req, res) => {
 /* ================================
    ANDROID EMULATOR
    ================================
-   
+
 app.listen(PORT, () => {
   console.log(`Temple App Backend running on port ${PORT}`);
 });

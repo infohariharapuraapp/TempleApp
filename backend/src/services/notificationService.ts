@@ -6,6 +6,7 @@ import {
 } from 'expo-server-sdk';
 
 import { pool } from '../db';
+import { getPrivatePushContent } from './privatePushContentService';
 import {
   TranslationLanguage,
   SUPPORTED_LANGUAGES,
@@ -43,6 +44,8 @@ type DeviceToken = {
   expo_push_token: string;
   platform: string;
   preferred_language: string;
+  binding_version: number;
+  binding_updated_at: string;
 };
 
 type SendResult = {
@@ -77,29 +80,48 @@ type PushOutcome = {
 // ========================================
 
 async function deactivateInvalidPushToken(
-  expoPushToken: string
+  device: DeviceToken
 ): Promise<void> {
+  if (
+    !Number.isSafeInteger(device.id) ||
+    device.id <= 0 ||
+    !Number.isSafeInteger(device.user_id) ||
+    device.user_id <= 0 ||
+    !Number.isSafeInteger(device.binding_version) ||
+    device.binding_version < 0 ||
+    typeof device.binding_updated_at !== 'string' ||
+    !device.binding_updated_at ||
+    typeof device.expo_push_token !== 'string'
+  ) {
+    return;
+  }
   try {
-    await pool.query(
+    const result = await pool.query(
       `
         UPDATE device_tokens
         SET
           is_active = FALSE,
           updated_at = CURRENT_TIMESTAMP
-        WHERE expo_push_token = $1
+        WHERE id = $1
+          AND user_id = $2
+          AND expo_push_token = $3
+          AND binding_version = $4
+          AND updated_at::text = $5
           AND is_active = TRUE
       `,
-      [expoPushToken]
+      [
+        device.id,
+        device.user_id,
+        device.expo_push_token,
+        device.binding_version,
+        device.binding_updated_at,
+      ]
     );
-
-    console.log(
-      'Deactivated invalid Expo push token.'
-    );
-  } catch (error) {
-    console.error(
-      'Deactivate token error:',
-      error
-    );
+    if (result.rowCount === 1) {
+      console.log('Deactivated matching invalid push binding.');
+    }
+  } catch {
+    console.error('Push binding deactivation failed.');
   }
 }
 
@@ -112,7 +134,9 @@ async function getAllActiveDevices():
         user_id,
         expo_push_token,
         platform,
-        preferred_language
+        preferred_language,
+        binding_version,
+        updated_at::text AS binding_updated_at
       FROM device_tokens
       WHERE is_active = TRUE
       ORDER BY id ASC
@@ -132,7 +156,9 @@ async function getUserActiveDevices(
         user_id,
         expo_push_token,
         platform,
-        preferred_language
+        preferred_language,
+        binding_version,
+        updated_at::text AS binding_updated_at
       FROM device_tokens
       WHERE user_id = $1
         AND is_active = TRUE
@@ -388,7 +414,8 @@ async function buildPushTargets(
   title: string,
   body: string,
   data: NotificationData,
-  allowTranslation: boolean = false
+  allowTranslation: boolean = false,
+  privatePush: boolean = false
 ): Promise<PushTarget[]> {
   const targets: PushTarget[] = [];
   const localizedContent =
@@ -409,9 +436,7 @@ async function buildPushTargets(
         `Invalid Expo token, device ${device.id}`
       );
 
-      await deactivateInvalidPushToken(
-        device.expo_push_token
-      );
+      await deactivateInvalidPushToken(device);
 
       continue;
     }
@@ -419,9 +444,12 @@ async function buildPushTargets(
     const language = normalizePushLanguage(
       device.preferred_language
     );
-    const content =
-      localizedContent.get(language) ??
-      { title, body };
+    const content = privatePush
+      ? getPrivatePushContent(language)
+      : localizedContent.get(language) ?? { title, body };
+    const pushData = privatePush
+      ? getPrivatePushContent(language).data
+      : data;
     targets.push({
       device,
       message: {
@@ -430,7 +458,7 @@ async function buildPushTargets(
         channelId: 'default',
         title: content.title,
         body: content.body,
-        data,
+        data: pushData,
       },
     });
   }
@@ -442,6 +470,46 @@ async function buildPushTargets(
 // SEND PUSH MESSAGES
 // ========================================
 
+async function filterCurrentPushTargets(
+  targets: PushTarget[]
+): Promise<PushTarget[]> {
+  if (!targets.length) {
+    return [];
+  }
+  const snapshots = targets.map(({ device }) => ({
+    id: device.id,
+    user_id: device.user_id,
+    expo_push_token: device.expo_push_token,
+    binding_version: device.binding_version,
+    binding_updated_at: device.binding_updated_at,
+  }));
+  const result = await pool.query(
+    `
+      SELECT dt.id
+      FROM device_tokens dt
+      JOIN jsonb_to_recordset($1::jsonb) AS snapshot(
+        id integer,
+        user_id integer,
+        expo_push_token text,
+        binding_version integer,
+        binding_updated_at text
+      )
+        ON dt.id = snapshot.id
+        AND dt.user_id = snapshot.user_id
+        AND dt.expo_push_token = snapshot.expo_push_token
+        AND dt.binding_version = snapshot.binding_version
+        AND dt.updated_at::text = snapshot.binding_updated_at
+      WHERE dt.is_active = TRUE
+    `,
+    [JSON.stringify(snapshots)]
+  );
+  const validIds = new Set<number>(
+    result.rows.map(row => Number(row.id))
+  );
+  return targets.filter(
+    target => validIds.has(target.device.id)
+  );
+}
 async function sendPushTargets(
   targets: PushTarget[]
 ): Promise<PushOutcome> {
@@ -476,18 +544,35 @@ async function sendPushTargets(
     offset += chunk.length;
 
     try {
+      const currentTargets =
+        await filterCurrentPushTargets(chunkTargets);
+      const currentIds = new Set(
+        currentTargets.map(target => target.device.id)
+      );
+      for (const target of chunkTargets) {
+        if (!currentIds.has(target.device.id)) {
+          outcome.failed++;
+          outcome.errors.push({
+            device: target.device,
+            error: 'Device binding changed before submission',
+          });
+        }
+      }
+      if (!currentTargets.length) {
+        continue;
+      }
       const tickets: ExpoPushTicket[] =
         await expo.sendPushNotificationsAsync(
-          chunk
+          currentTargets.map(target => target.message)
         );
 
       for (
         let index = 0;
-        index < chunkTargets.length;
+        index < currentTargets.length;
         index++
       ) {
         const device =
-          chunkTargets[index].device;
+          currentTargets[index].device;
 
         const ticket = tickets[index];
 
@@ -526,9 +611,7 @@ async function sendPushTargets(
           ticket.details?.error ===
             'DeviceNotRegistered'
         ) {
-          await deactivateInvalidPushToken(
-            device.expo_push_token
-          );
+          await deactivateInvalidPushToken(device);
         }
       }
     } catch (error) {
@@ -538,6 +621,16 @@ async function sendPushTargets(
       );
 
       for (const target of chunkTargets) {
+        if (
+          outcome.errors.some(
+            entry => entry.device.id === target.device.id
+          ) ||
+          outcome.tickets.some(
+            entry => entry.device.id === target.device.id
+          )
+        ) {
+          continue;
+        }
         outcome.failed++;
 
         outcome.errors.push({
@@ -682,6 +775,8 @@ async function saveDeliverySummaries(
 export async function sendNotificationRecord(
   notificationId: number
 ): Promise<SendResult> {
+  let claimed = false;
+  let submissionStarted = false;
   try {
     const result = await pool.query(
       `
@@ -708,7 +803,7 @@ export async function sendNotificationRecord(
       };
     }
 
-    const notification = result.rows[0];
+    let notification = result.rows[0];
 
 if (notification.status === 'cancelled') {
   return {
@@ -751,9 +846,83 @@ if (notification.status === 'cancelled') {
       };
     }
 
-    await createAllUserDeliveries(
-      notificationId
+    const claim = await pool.query(
+      `
+        UPDATE notifications
+        SET status = 'processing',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+          AND target_type = 'all'
+          AND (
+            status = 'pending'
+            OR (
+              status = 'scheduled'
+              AND scheduled_at <= CURRENT_TIMESTAMP
+            )
+          )
+        RETURNING *
+      `,
+      [notificationId]
     );
+    if (claim.rowCount !== 1) {
+      return {
+        success: false,
+        sent: 0,
+        notificationId,
+        message: 'Notification is not available for processing',
+      };
+    }
+    claimed = true;
+    notification = claim.rows[0];
+    if (notification.notification_type === 'announcement') {
+      const announcementData = parseNotificationData(
+        notification.data
+      );
+      const announcementId = String(
+        announcementData.announcementId ?? ''
+      );
+      const validAnnouncement = await pool.query(
+        `
+          SELECT id
+          FROM announcements
+          WHERE id::text = $1
+            AND is_active = TRUE
+            AND (
+              expires_at IS NULL
+              OR expires_at > CURRENT_TIMESTAMP
+            )
+            AND (
+              publish_at IS NULL
+              OR publish_at <= CURRENT_TIMESTAMP
+            )
+            AND title = $2
+            AND message = $3
+          LIMIT 1
+        `,
+        [
+          announcementId,
+          notification.title,
+          notification.body,
+        ]
+      );
+      if (
+        announcementData.type !== 'announcement' ||
+        !/^[1-9][0-9]{0,18}$/.test(announcementId) ||
+        validAnnouncement.rowCount !== 1
+      ) {
+        await updateNotificationStatus(
+          notificationId,
+          'cancelled'
+        );
+        return {
+          success: false,
+          sent: 0,
+          notificationId,
+          message: 'Announcement is unavailable or has changed',
+        };
+      }
+    }
+    await createAllUserDeliveries(notificationId);
 
     const devices =
       await getAllActiveDevices();
@@ -858,10 +1027,7 @@ if (notification.status === 'cancelled') {
       };
     }
 
-    await updateNotificationStatus(
-      notificationId,
-      'processing'
-    );
+    submissionStarted = true;
 
     const outcome =
       await sendPushTargets(targets);
@@ -922,10 +1088,18 @@ if (notification.status === 'cancelled') {
     );
 
     try {
-      await updateNotificationStatus(
-        notificationId,
-        'failed'
-      );
+      if (claimed && !submissionStarted) {
+        await pool.query(
+          `
+            UPDATE notifications
+            SET status = 'failed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+              AND status = 'processing'
+          `,
+          [notificationId]
+        );
+      }
     } catch (databaseError) {
       console.error(
         'Notification status update error:',
@@ -998,7 +1172,9 @@ export async function sendPushNotificationToUser(
       devices,
       title,
       body,
-      data
+      data,
+      false,
+      true
     );
 
     if (!targets.length) {
@@ -1227,15 +1403,9 @@ export async function checkPushReceipts(
               ]
             );
 
-            if (
-              receipt.details?.error ===
-                'DeviceNotRegistered' &&
-              row.expo_push_token
-            ) {
-              await deactivateInvalidPushToken(
-                row.expo_push_token
-              );
-            }
+            // Delayed receipts must not deactivate a device
+            // without its original binding snapshot.
+            // The delivery failure remains recorded above.
           }
         }
       }

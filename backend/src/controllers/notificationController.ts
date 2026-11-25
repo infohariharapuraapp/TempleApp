@@ -1,3 +1,10 @@
+import {
+  parseDeviceBinding,
+  claimDeviceBindingVersion,
+  DeviceBindingValidationError,
+  DeviceBindingConflictError,
+} from '../services/deviceBindingService';
+import { Expo } from 'expo-server-sdk';
 
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -97,53 +104,86 @@ export const registerDevice = async (
   req: AuthRequest,
   res: Response
 ) => {
+  let client: import('pg').PoolClient | undefined;
   try {
     const userId = req.user?.userId;
-
     if (!userId) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required',
       });
     }
-
     const {
       expoPushToken,
       platform,
       deviceName,
       preferredLanguage,
-    } = req.body;
+      installationSecret,
+      bindingVersion,
+    } = req.body ?? {};
+    if (
+      typeof expoPushToken !== 'string' ||
+      expoPushToken.length > 512 ||
+      expoPushToken !== expoPushToken.trim() ||
+      !Expo.isExpoPushToken(expoPushToken)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Expo push token',
+      });
+    }
+    if (platform !== 'android' && platform !== 'ios') {
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported device platform',
+      });
+    }
+    if (
+      deviceName !== undefined &&
+      deviceName !== null &&
+      (
+        typeof deviceName !== 'string' ||
+        deviceName.length > 255 ||
+        /[\u0000-\u001F\u007F]/.test(deviceName)
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid device name',
+      });
+    }
+    const identity = parseDeviceBinding(
+      installationSecret,
+      bindingVersion
+    );
     const deviceLanguage =
       typeof preferredLanguage === 'string'
         ? getNotificationLanguage(preferredLanguage)
         : null;
-
-    if (!expoPushToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Expo push token is required',
-      });
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    if (identity) {
+      await claimDeviceBindingVersion(client, identity);
     }
-
-    if (!platform) {
-      return res.status(400).json({
-        success: false,
-        message: 'Platform is required',
-      });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO device_tokens (
+    const result = await client.query(
+      `
+      INSERT INTO device_tokens (
         user_id,
         expo_push_token,
         platform,
         device_name,
         preferred_language,
         is_active,
+        installation_secret_hash,
+        binding_version,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, COALESCE($5::varchar, 'en'), TRUE, CURRENT_TIMESTAMP)
-
+      VALUES (
+        $1, $2, $3, $4,
+        COALESCE($5::varchar, 'en'),
+        TRUE, $6, $7, CURRENT_TIMESTAMP
+      )
       ON CONFLICT (expo_push_token)
       DO UPDATE SET
         user_id = EXCLUDED.user_id,
@@ -153,9 +193,24 @@ export const registerDevice = async (
           $5::varchar,
           device_tokens.preferred_language
         ),
+        installation_secret_hash = COALESCE(
+          device_tokens.installation_secret_hash,
+          EXCLUDED.installation_secret_hash
+        ),
+        binding_version = EXCLUDED.binding_version,
         is_active = TRUE,
         updated_at = CURRENT_TIMESTAMP
-
+      WHERE
+        (
+          device_tokens.installation_secret_hash IS NULL
+          AND device_tokens.binding_version = 0
+          AND device_tokens.user_id = EXCLUDED.user_id
+        )
+        OR (
+          $6::text IS NOT NULL
+          AND device_tokens.installation_secret_hash = $6
+          AND device_tokens.binding_version < $7
+        )
       RETURNING
         id,
         user_id,
@@ -165,143 +220,238 @@ export const registerDevice = async (
         preferred_language,
         is_active,
         created_at,
-        updated_at`,
+        updated_at,
+        binding_version
+      `,
       [
         userId,
         expoPushToken,
         platform,
         deviceName || null,
         deviceLanguage,
+        identity?.installationHash ?? null,
+        identity?.bindingVersion ?? 0,
       ]
     );
-
+    if (result.rowCount !== 1) {
+      throw new DeviceBindingConflictError();
+    }
+    // Deactivate previous push tokens belonging to
+    // this verified installation after token rotation.
+    if (identity) {
+      await client.query(
+        `
+        UPDATE device_tokens
+        SET
+          is_active = FALSE,
+          binding_version = $2,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE installation_secret_hash = $1
+          AND expo_push_token <> $3
+          AND binding_version < $2
+        `,
+        [
+          identity.installationHash,
+          identity.bindingVersion,
+          expoPushToken,
+        ]
+      );
+    }
+    await client.query('COMMIT');
     return res.status(200).json({
       success: true,
       message: 'Device registered for notifications',
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('Register device error:', error);
-
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        client.release(true);
+        client = undefined;
+      }
+    }
+    if (error instanceof DeviceBindingValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid device binding identity',
+      });
+    }
+    if (error instanceof DeviceBindingConflictError) {
+      return res.status(409).json({
+        success: false,
+        code: 'DEVICE_BINDING_CONFLICT',
+        message: 'Device ownership or version could not be verified',
+      });
+    }
+    console.error('Device registration failed');
     return res.status(500).json({
       success: false,
       message: 'Failed to register device',
     });
+  } finally {
+    client?.release();
   }
 };
-
-
-
 // ========================================
 // UNREGISTER CURRENT PUSH DEVICE
 // ========================================
-
 export const unregisterDevice = async (
   req: AuthRequest,
   res: Response
 ) => {
-
+  let client: import('pg').PoolClient | undefined;
   try {
-
     const userId = req.user?.userId;
-
     if (!userId) {
-
       return res.status(401).json({
-
         success: false,
-
         message: 'Authentication required',
       });
     }
-
-    const expoPushToken =
-      req.body?.expoPushToken;
-
+    const {
+      expoPushToken,
+      installationSecret,
+      bindingVersion,
+    } = req.body ?? {};
     if (
       typeof expoPushToken !== 'string' ||
-      !expoPushToken.trim() ||
-      expoPushToken.length > 512
+      expoPushToken.length > 512 ||
+      expoPushToken !== expoPushToken.trim() ||
+      !Expo.isExpoPushToken(expoPushToken)
     ) {
-
       return res.status(400).json({
-
         success: false,
-
         message: 'Invalid Expo push token',
       });
     }
-
-    // ====================================
-    // DEACTIVATE ONLY THE CURRENT USER'S
-    // REGISTERED DEVICE
-    // ====================================
-
-    const result = await pool.query(
-
+    const identity = parseDeviceBinding(
+      installationSecret,
+      bindingVersion
+    );
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    if (identity) {
+      await claimDeviceBindingVersion(client, identity);
+    }
+    const existing = await client.query(
+      `
+      SELECT
+        user_id,
+        installation_secret_hash,
+        binding_version
+      FROM device_tokens
+      WHERE expo_push_token = $1
+      FOR UPDATE
+      `,
+      [expoPushToken]
+    );
+    const device = existing.rows[0];
+    const requestedTokenConflict = Boolean(
+      device &&
+      !(
+        (
+          device.user_id === userId &&
+          device.installation_secret_hash === null &&
+          device.binding_version === 0
+        ) ||
+        (
+          identity !== null &&
+          device.installation_secret_hash ===
+            identity.installationHash &&
+          device.binding_version <
+            identity.bindingVersion
+        )
+      )
+    );
+    if (requestedTokenConflict && !identity) {
+      throw new DeviceBindingConflictError();
+    }    const result = await client.query(
       `
       UPDATE device_tokens
-
       SET
         is_active = FALSE,
-
+        binding_version = $4,
+        installation_secret_hash = COALESCE(
+          installation_secret_hash,
+          $3::text
+        ),
         updated_at = CURRENT_TIMESTAMP
-
-      WHERE user_id = $1
-
-        AND expo_push_token = $2
-
-        AND is_active IS DISTINCT FROM FALSE
-
+      WHERE (
+          (
+            user_id = $1
+            AND expo_push_token = $2
+          )
+          OR (
+            $3::text IS NOT NULL
+            AND installation_secret_hash = $3
+          )
+        )
+        AND (
+          (
+            installation_secret_hash IS NULL
+            AND binding_version = 0
+          )
+          OR (
+            installation_secret_hash = $3
+            AND binding_version < $4
+          )
+        )
       RETURNING id
       `,
-
       [
         userId,
-
-        expoPushToken.trim(),
+        expoPushToken,
+        identity?.installationHash ?? null,
+        identity?.bindingVersion ?? 0,
       ]
     );
-
-    // ====================================
-    // IDEMPOTENT SUCCESS RESPONSE
-    // ====================================
-
+    await client.query('COMMIT');
     return res.status(200).json({
-
       success: true,
-
-      message: 'Device unregistered for notifications',
-
+      message: 'Device unregistration processed',
       data: {
-
-        deactivated:
-          (result.rowCount ?? 0) > 0,
+        deactivated: (result.rowCount ?? 0) > 0,
+        bindingRecorded: identity !== null,
+        requestedTokenConflict,
       },
     });
-
   } catch (error) {
-
-    console.error(
-      'Unregister device error:',
-      error
-    );
-
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        client.release(true);
+        client = undefined;
+      }
+    }
+    if (error instanceof DeviceBindingValidationError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid device binding identity',
+      });
+    }
+    if (error instanceof DeviceBindingConflictError) {
+      return res.status(409).json({
+        success: false,
+        code: 'DEVICE_BINDING_CONFLICT',
+        message: 'Device ownership or version could not be verified',
+      });
+    }
+    console.error('Device unregistration failed');
     return res.status(500).json({
-
       success: false,
-
-      message:
-        'Failed to unregister device',
+      message: 'Failed to unregister device',
     });
+  } finally {
+    client?.release();
   }
 };
-
-
 // ========================================
 // SEND TEST PUSH NOTIFICATION
 // ========================================
-
 export const sendTestNotification = async (
   req: AuthRequest,
   res: Response

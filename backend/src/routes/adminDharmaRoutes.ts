@@ -8,6 +8,7 @@ import {
 
 import {
     createOfficialDharmaAnswer,
+    deleteOfficialDharmaAnswer,
     getAdminDharmaAnswers,
     getAdminDharmaQuestions,
     moderateDharmaAnswer,
@@ -90,4 +91,8 @@ router.patch(
     reviewDharmaReport
 );
 
+router.delete(
+    '/official-answers/:id',
+    deleteOfficialDharmaAnswer
+);
 export default router;

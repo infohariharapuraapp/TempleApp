@@ -24,6 +24,7 @@ type DharmaQuestion = {
 
 type DharmaAnswer = {
   id: number;
+  revision: number;
   question_id: number;
   user_id: number;
   answer: string;
@@ -158,6 +159,10 @@ const [officialAnswerText, setOfficialAnswerText] =
   useState('');
   const [existingOfficialAnswers, setExistingOfficialAnswers] =
   useState<Record<number, DharmaAnswer>>({});
+const [allOfficialAnswers, setAllOfficialAnswers] =
+  useState<DharmaAnswer[]>([]);
+const [deletingOfficialId, setDeletingOfficialId] =
+  useState<number | null>(null);
 
 const [officialQuestionsLoading, setOfficialQuestionsLoading] =
   useState(false);
@@ -451,6 +456,11 @@ answerResponse.answers
   });
 
 setExistingOfficialAnswers(officialMap);
+setAllOfficialAnswers(
+  answerResponse.answers
+    .filter((item) => item.answer_type === 'official')
+    .sort((a, b) => a.id - b.id)
+);
   } catch (error) {
     setOfficialQuestions([]);
     setOfficialError(errorMessage(error));
@@ -462,7 +472,54 @@ setExistingOfficialAnswers(officialMap);
 // PUBLISH OFFICIAL ANSWER
 // ========================================
 
+const deleteOfficialAnswer = async (item: DharmaAnswer) => {
+  if (
+    deletingOfficialId !== null ||
+    publishingOfficial ||
+    officialQuestionsLoading ||
+    item.answer_type !== 'official'
+  ) return;
+  const confirmed = window.confirm(
+    `Permanently delete official answer #${item.id}?\n\n` +
+    `${item.answer}\n\n` +
+    'Associated helpful votes and reports will also be deleted. ' +
+    'The question and community answers will remain unchanged.'
+  );
+  if (!confirmed) return;
+  setDeletingOfficialId(item.id);
+  setOfficialError('');
+  setOfficialSuccess('');
+  try {
+    const response = await apiRequest<ActionResponse>(
+      `/admin/dharma/official-answers/${item.id}`,
+      { method: 'DELETE' }
+    );
+    if (!response.success) {
+      throw new Error(
+        response.message || 'Unable to delete official answer.'
+      );
+    }
+    setSelectedQuestionId('');
+    setOfficialAnswerText('');
+    setAllOfficialAnswers((previous) =>
+      previous.filter((answer) => answer.id !== item.id)
+    );
+    await loadOfficialQuestions();
+    setOfficialSuccess(
+      `Official answer #${item.id} deleted successfully.`
+    );
+  } catch (error) {
+    setOfficialError(errorMessage(error));
+  } finally {
+    setDeletingOfficialId(null);
+  }
+};
 const publishOfficialAnswer = async () => {
+  if (
+    deletingOfficialId !== null ||
+    officialQuestionsLoading ||
+    publishingOfficial
+  ) return;
   const questionId = Number(selectedQuestionId);
   const answer = officialAnswerText.trim();
 
@@ -541,6 +598,14 @@ useEffect(() => {
   ) => {
     if (moderatingAnswerId !== null) return;
     if (answer.answer_type !== 'community') return;
+    if (
+      !Number.isSafeInteger(answer.revision) ||
+      answer.revision <= 0
+    ) {
+      window.alert('Answer revision unavailable. Refresh the admin panel.');
+      await loadAnswers();
+      return;
+    }
 
     const confirmed = window.confirm(
       `Change answer #${answer.id} to ${status}?\n\n${answer.answer}`
@@ -555,7 +620,7 @@ useEffect(() => {
         `/admin/dharma/answers/${answer.id}/status`,
         {
           method: 'PATCH',
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status, revision: answer.revision }),
         }
       );
 
@@ -567,6 +632,7 @@ useEffect(() => {
       window.alert(result.message || 'Answer updated successfully.');
     } catch (error) {
       window.alert(errorMessage(error));
+      await loadAnswers();
     } finally {
       setModeratingAnswerId(null);
     }
@@ -1224,7 +1290,67 @@ useEffect(() => {
       </div>
     )}
 
-    {/* OFFICIAL ANSWER EDITOR */}
+    {selectedQuestionId && !officialQuestionsLoading && (
+  <div style={{ marginBottom: 22 }}>
+    <h4 style={{ color: '#6B1720', marginBottom: 12 }}>
+      Existing Official Answers
+    </h4>
+    {allOfficialAnswers
+      .filter(
+        (item) =>
+          Number(item.question_id) === Number(selectedQuestionId)
+      )
+      .map((item) => (
+        <div
+          key={item.id}
+          style={{
+            padding: 16,
+            marginBottom: 12,
+            border: '1px solid #E8DCCB',
+            borderRadius: 10,
+            background: '#FFFFFF',
+          }}
+        >
+          <strong style={{ color: '#6B1720' }}>
+            Official Answer #{item.id}
+          </strong>
+          <p style={{
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            lineHeight: 1.7,
+          }}>
+            {item.answer}
+          </p>
+          <p style={{ fontSize: 12, color: '#24643C' }}>
+            Status: {item.status}
+          </p>
+          <button
+            type="button"
+            disabled={
+              deletingOfficialId !== null ||
+              publishingOfficial ||
+              officialQuestionsLoading
+            }
+            onClick={() => void deleteOfficialAnswer(item)}
+            style={{
+              background: '#B91C1C',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: 8,
+              padding: '9px 15px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {deletingOfficialId === item.id
+              ? 'Deleting...'
+              : 'Delete Official Answer'}
+          </button>
+        </div>
+      ))}
+  </div>
+)}
+{/* OFFICIAL ANSWER EDITOR */}
 
     <div style={{ marginBottom: 22 }}>
       <label
@@ -1270,7 +1396,19 @@ useEffect(() => {
           marginTop: 7,
         }}
       >
-        {officialAnswerText.trim().length} / 2000 characters
+        {officialAnswerText.trim().length < 10 && (
+  <span
+    role="status"
+    style={{
+      color: '#B91C1C',
+      fontWeight: 600,
+      marginRight: 12,
+    }}
+  >
+    Please enter {10 - officialAnswerText.trim().length} more {10 - officialAnswerText.trim().length === 1 ? 'character' : 'characters'}.
+  </span>
+)}
+{officialAnswerText.trim().length} / 2000 characters
       </p>
     </div>
 
@@ -1285,8 +1423,7 @@ useEffect(() => {
       <button
         type="button"
         disabled={
-          publishingOfficial ||
-          !selectedQuestionId ||
+          publishingOfficial || deletingOfficialId !== null || officialQuestionsLoading || !selectedQuestionId ||
           officialAnswerText.trim().length < 10
         }
         onClick={() => void publishOfficialAnswer()}

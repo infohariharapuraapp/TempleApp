@@ -27,7 +27,7 @@ import { apiRequest } from '@/services/api';
 
 import {
   getToken,
-  removeToken,
+  removeTokenIfMatches,
 } from '@/services/authStorage';
 
 // ========================================
@@ -268,7 +268,12 @@ export default function AccountScreen() {
                     'Authentication session changed during logout.'
                   );
                 }
-                await removeToken();
+                const removed = await removeTokenIfMatches(originalToken);
+                if (!removed) {
+                  throw new Error(
+                    'Authentication session changed during logout.'
+                  );
+                }
               }
               // Clear local authenticated user details.
               setUser(null);

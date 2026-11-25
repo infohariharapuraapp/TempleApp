@@ -13,7 +13,6 @@ import {
   createGalleryItem,
   updateGalleryItem,
   deleteGalleryItem,
-  sendAnnouncementNotification,
 } from '../controllers/adminContentController';
 
 const router = Router();
@@ -56,9 +55,6 @@ router.delete('/gallery/:id', deleteGalleryItem);
 // All other announcement operations are handled
 // by adminAnnouncementRoutes.ts.
 
-router.post(
-  '/announcements/:id/send',
-  sendAnnouncementNotification
-);
+
 
 export default router;

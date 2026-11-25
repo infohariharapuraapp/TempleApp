@@ -1,5 +1,8 @@
 import { Expo } from 'expo-server-sdk';
 import { pool } from '../db';
+import { getPrivatePushContent } from './privatePushContentService';
+import { getPublicSevaPushContent } from './publicSevaPushContentService';
+import type { VolunteerDeliveryContent } from './volunteerNotificationDeliveryService';
 
 import {
   VolunteerNotificationJob,
@@ -16,6 +19,8 @@ interface VolunteerPushDevice {
   device_token_id: number;
   user_id: number;
   expo_push_token: string;
+  binding_version: number;
+  binding_updated_at: string;
   attempts: number;
 }
 
@@ -189,8 +194,9 @@ async function claimVolunteerPushDevice(
     WITH next_device AS (
       SELECT
         vd.id,
-        dt.expo_push_token
-
+        dt.expo_push_token,
+        dt.binding_version,
+        dt.updated_at::text AS binding_updated_at
       FROM volunteer_notification_devices vd
 
       JOIN volunteer_notification_jobs j
@@ -243,7 +249,9 @@ async function claimVolunteerPushDevice(
       vd.device_token_id,
       vd.user_id,
       vd.attempts,
-      next_device.expo_push_token
+      next_device.expo_push_token,
+      next_device.binding_version,
+      next_device.binding_updated_at
     `,
     [
       job.id,
@@ -342,23 +350,38 @@ async function saveVolunteerDeviceOutcome(
 async function deactivateVolunteerPushDevice(
   device: VolunteerPushDevice
 ): Promise<void> {
-
+  if (
+    !Number.isSafeInteger(device.device_token_id) ||
+    device.device_token_id <= 0 ||
+    !Number.isSafeInteger(device.user_id) ||
+    device.user_id <= 0 ||
+    !Number.isSafeInteger(device.binding_version) ||
+    device.binding_version < 0 ||
+    typeof device.binding_updated_at !== 'string' ||
+    !device.binding_updated_at ||
+    typeof device.expo_push_token !== 'string'
+  ) {
+    return;
+  }
   await pool.query(
     `
     UPDATE device_tokens
-
     SET
       is_active = FALSE,
       updated_at = NOW()
-
     WHERE id = $1
       AND user_id = $2
       AND expo_push_token = $3
+      AND binding_version = $4
+      AND updated_at::text = $5
+      AND is_active = TRUE
     `,
     [
       device.device_token_id,
       device.user_id,
       device.expo_push_token,
+      device.binding_version,
+      device.binding_updated_at,
     ]
   );
 }
@@ -369,7 +392,8 @@ async function deactivateVolunteerPushDevice(
 
 export async function sendNextVolunteerPushDevice(
   job: VolunteerNotificationJob,
-  notificationId: number
+  notificationId: number,
+  currentContent: VolunteerDeliveryContent
 ): Promise<boolean> {
 
   if (!job.lock_token) {
@@ -380,10 +404,7 @@ export async function sendNextVolunteerPushDevice(
 
   const notificationResult = await pool.query(
     `
-    SELECT
-      n.title,
-      n.body,
-      n.data
+    SELECT n.id
 
     FROM notifications n
 
@@ -410,8 +431,6 @@ export async function sendNextVolunteerPushDevice(
     );
   }
 
-  const notification =
-    notificationResult.rows[0];
 
   const device =
     await claimVolunteerPushDevice(job);
@@ -428,7 +447,7 @@ export async function sendNextVolunteerPushDevice(
     )
   ) {
 
-    await saveVolunteerDeviceOutcome(
+    const saved = await saveVolunteerDeviceOutcome(
       job,
       device,
       {
@@ -436,10 +455,12 @@ export async function sendNextVolunteerPushDevice(
         error: 'Invalid Expo push token',
       }
     );
-
-    await deactivateVolunteerPushDevice(
-      device
-    );
+    if (!saved) {
+      throw new Error(
+        'Worker lock lost while saving invalid token result'
+      );
+    }
+    await deactivateVolunteerPushDevice(device);
 
     return true;
   }
@@ -449,7 +470,17 @@ export async function sendNextVolunteerPushDevice(
 
   const currentDevice = await pool.query(
     `
-    SELECT dt.id
+    SELECT
+      dt.id,
+      dt.preferred_language,
+      j.target_type,
+      j.event_type,
+      j.recipient_user_id,
+      j.opportunity_id,
+      j.registration_id,
+      j.member_id,
+      j.assignment_id,
+      n.target_type AS notification_target_type
 
     FROM device_tokens dt
 
@@ -466,6 +497,17 @@ export async function sendNextVolunteerPushDevice(
       AND dt.user_id = vd.user_id
       AND dt.expo_push_token = $2
       AND dt.is_active = TRUE
+      AND dt.binding_version = $5
+      AND dt.updated_at::text = $6
+      AND n.id = $7
+      AND n.notification_type = 'volunteer_seva'
+      AND (
+        j.target_type = 'all'
+        OR (
+          j.target_type = 'user'
+          AND j.recipient_user_id = vd.user_id
+        )
+      )
 
       AND j.id = $3
       AND j.lock_token = $4
@@ -483,6 +525,9 @@ export async function sendNextVolunteerPushDevice(
       device.expo_push_token,
       job.id,
       job.lock_token,
+      device.binding_version,
+      device.binding_updated_at,
+      notificationId,
     ]
   );
 
@@ -506,29 +551,67 @@ export async function sendNextVolunteerPushDevice(
 
   try {
 
-    const data =
-      typeof notification.data === 'string'
-        ? JSON.parse(notification.data)
-        : notification.data;
+    const current = currentDevice.rows[0];
+    const publicEvents = new Set<string>([
+      'registration_opened',
+      'registration_extended',
+      'registration_closing_reminder',
+    ]);
+    const isVerifiedPublic =
+      current.target_type === 'all' &&
+      current.notification_target_type === 'all' &&
+      job.target_type === 'all' &&
+      current.recipient_user_id === null &&
+      current.registration_id === null &&
+      current.member_id === null &&
+      current.assignment_id === null &&
+      publicEvents.has(current.event_type) &&
+      current.event_type === job.event_type &&
+      Number.isSafeInteger(current.opportunity_id) &&
+      current.opportunity_id > 0 &&
+      current.opportunity_id === job.opportunity_id &&
+      currentContent.data.type === 'volunteer_seva' &&
+      currentContent.data.event === current.event_type &&
+      currentContent.data.screen === '/seva-registration' &&
+      currentContent.data.opportunityId === current.opportunity_id;
+    const localizedPublicContent = isVerifiedPublic
+      ? getPublicSevaPushContent(
+          current.event_type,
+          currentContent.data.opportunityTitle,
+          currentContent.data.registrationDeadline,
+          current.preferred_language
+        )
+      : null;
+    const content = isVerifiedPublic
+      ? {
+          title: localizedPublicContent?.title ?? currentContent.title,
+          body: localizedPublicContent?.body ?? currentContent.body,
+          data: {
+            type: 'volunteer_seva',
+            event: current.event_type,
+            screen: '/seva-registration',
+            opportunityId: current.opportunity_id,
+            notificationId,
+          },
+        }
+      : getPrivatePushContent(
+          current.preferred_language
+        );
 
     const tickets =
       await expo.sendPushNotificationsAsync([
         {
           to: device.expo_push_token,
 
-          title: notification.title,
+          title: content.title,
 
-          body: notification.body,
+          body: content.body,
 
           sound: 'default',
 
           channelId: 'default',
 
-          data: {
-            ...data,
-            type: 'volunteer_seva',
-            notificationId,
-          },
+          data: content.data,
         },
       ]);
 

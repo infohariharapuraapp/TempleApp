@@ -183,6 +183,7 @@ export const getAdminDharmaAnswers = async (
         a.status,
         a.created_at,
         a.updated_at,
+        a.revision,
         COALESCE(u.full_name, 'Deleted Devotee') AS devotee_name,
         q.title AS question_title
       FROM dharma_answers a
@@ -217,52 +218,119 @@ export const getAdminDharmaAnswers = async (
 // ========================================
 
 export const moderateDharmaAnswer = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ) => {
+  const adminId = req.user?.userId;
   const answerId = parseId(req.params.id);
   const status = getModerationStatus(req.body?.status);
-
-  if (!answerId || !status) {
-    return res.status(400).json({
+  const revision = req.body?.revision;
+  if (!adminId || !Number.isSafeInteger(adminId) || adminId <= 0) {
+    return res.status(401).json({
       success: false,
-      message: 'Valid answer ID and status are required',
+      message: 'Authentication required',
     });
   }
-
-  try {
-    const result = await pool.query(
-      `
-      UPDATE dharma_answers
-      SET
-        status = $1,
-        updated_at = NOW()
-      WHERE id = $2
-      RETURNING
-        id,
-        question_id,
-        answer_type,
-        status,
-        updated_at
-      `,
-      [status, answerId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Answer not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: `Answer ${status} successfully`,
-      answer: result.rows[0],
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required',
     });
-  } catch (error) {
-    console.error('Moderate Dharma answer error:', error);
-
+  }
+  if (
+    !answerId ||
+    !status ||
+    typeof revision !== 'number' ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0 ||
+    revision >= 2147483647
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Valid answer ID, status and revision are required. Refresh the admin panel.',
+    });
+  }
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Lock the question before modifying its answer.
+      const questionResult = await client.query(
+        `
+        SELECT q.id, q.status
+        FROM dharma_questions q
+        JOIN dharma_answers a
+          ON a.question_id = q.id
+        WHERE a.id = $1
+          AND a.answer_type = 'community'
+        FOR UPDATE OF q
+        `,
+        [answerId]
+      );
+      if (questionResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          message: 'Community answer not found',
+        });
+      }
+      if (
+        status === 'approved' &&
+        questionResult.rows[0].status !== 'approved'
+      ) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'The question must be approved before approving its answer',
+        });
+      }
+      const result = await client.query(
+        `
+        UPDATE dharma_answers AS a
+        SET
+          status = $1,
+          revision = revision + 1,
+          updated_at = NOW()
+        WHERE a.id = $2
+          AND a.revision = $3
+          AND a.answer_type = 'community'
+          AND EXISTS (
+            SELECT 1
+            FROM users
+            WHERE id = $4
+              AND role = 'admin'
+          )
+        RETURNING
+          a.id,
+          a.question_id,
+          a.answer_type,
+          a.status,
+          a.revision,
+          a.updated_at
+        `,
+        [status, answerId, revision, adminId]
+      );
+      if (result.rows.length !== 1) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'Answer has changed or is unavailable. Refresh and review the latest answer before moderating.',
+        });
+      }
+      await client.query('COMMIT');
+      return res.json({
+        success: true,
+        message: `Answer ${status} successfully`,
+        answer: result.rows[0],
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch {
+    console.error('Moderate Dharma answer failed');
     return res.status(500).json({
       success: false,
       message: 'Failed to moderate answer',
@@ -431,5 +499,74 @@ if (existing.rows.length > 0) {
     });
   } finally {
     client.release();
+  }
+};
+// ========================================
+// DELETE OFFICIAL TEMPLE ANSWER
+// ========================================
+export const deleteOfficialDharmaAnswer = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  const adminId = req.user?.userId;
+  const answerId = Number(req.params.id);
+  if (
+    !adminId ||
+    !Number.isSafeInteger(adminId) ||
+    adminId <= 0
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required',
+    });
+  }
+  if (
+    !Number.isSafeInteger(answerId) ||
+    answerId <= 0
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid official answer ID',
+    });
+  }
+  try {
+    const result = await pool.query(
+      `
+      DELETE FROM public.dharma_answers AS a
+      WHERE a.id = $1
+        AND a.answer_type = 'official'
+        AND EXISTS (
+          SELECT 1
+          FROM public.users
+          WHERE id = $2
+            AND role = 'admin'
+        )
+      RETURNING a.id, a.question_id
+      `,
+      [answerId, adminId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Official answer not found or access denied',
+      });
+    }
+    return res.json({
+      success: true,
+      message: 'Official answer deleted successfully',
+      answer: result.rows[0],
+    });
+  } catch {
+    console.error('Official Dharma answer deletion failed');
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete official answer',
+    });
   }
 };

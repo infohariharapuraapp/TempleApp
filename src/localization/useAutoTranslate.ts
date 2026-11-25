@@ -17,7 +17,11 @@ const MAX_TEXT_LENGTH = 500;
 // current limit of 10 per minute.
 const REQUEST_INTERVAL_MS = 6500;
 
+const MAX_CACHE_ENTRIES = 3000;
+const MAX_PENDING_ITEMS = 500;
+const FETCH_TIMEOUT_MS = 12000;
 const translationCache = new Map<string, string>();
+const inFlight = new Set<string>();
 
 const listeners = new Map<
   string,
@@ -51,7 +55,13 @@ function normalizeLanguage(value: string): Language {
 }
 
 function publish(key: string, value: string) {
+  translationCache.delete(key);
   translationCache.set(key, value);
+  while (translationCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = translationCache.keys().next().value;
+    if (oldest === undefined) break;
+    translationCache.delete(oldest);
+  }
 
   listeners.get(key)?.forEach((callback) => {
     callback(value);
@@ -72,6 +82,7 @@ function subscribe(
 
     if (group.size === 0) {
       listeners.delete(key);
+      pending.delete(key);
     }
   };
 }
@@ -134,18 +145,26 @@ async function processQueue() {
   }
 
   for (const item of batch) {
-    pending.delete(getKey(item.text, item.language));
+    const key = getKey(item.text, item.language);
+    pending.delete(key);
+    inFlight.add(key);
   }
 
   // Reserve the next request slot before
   // making the network request.
   nextRequestAt = Date.now() + REQUEST_INTERVAL_MS;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    FETCH_TIMEOUT_MS
+  );
   try {
     const response = await fetch(
       `${API_BASE_URL}/translate/public-batch`,
       {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -181,7 +200,8 @@ async function processQueue() {
 
       if (
         typeof translated === 'string' &&
-        translated.trim()
+        translated.trim() &&
+        translated !== item.text
       ) {
         publish(
           getKey(item.text, item.language),
@@ -190,12 +210,18 @@ async function processQueue() {
       }
     });
   } catch (error) {
-    console.warn('Batch translation unavailable:', error);
+    console.warn('Batch translation unavailable.');
 
     // Keep original text visible.
     // Failed requests are not automatically retried
     // to avoid exhausting the provider quota.
   } finally {
+    clearTimeout(timeout);
+    for (const item of batch) {
+      inFlight.delete(
+        getKey(item.text, item.language)
+      );
+    }
     processing = false;
 
     if (pending.size > 0) {
@@ -222,7 +248,9 @@ function requestTranslation(
 
   if (
     translationCache.has(key) ||
-    pending.has(key)
+    pending.has(key) ||
+    inFlight.has(key) ||
+    pending.size >= MAX_PENDING_ITEMS
   ) {
     return;
   }

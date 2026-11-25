@@ -253,10 +253,13 @@ export default function NearbyScreen() {
     }
   }, [language]);
 
-  const loadPlaces = useCallback(async (categoryId: number) => {
+  const loadPlaces = useCallback(async (
+    categoryId: number,
+    background = false
+  ) => {
     const currentRequest = ++requestId.current;
 
-    setPlacesLoading(true);
+    setPlacesLoading(!background);
     setPlacesError('');
 
     try {
@@ -281,8 +284,10 @@ export default function NearbyScreen() {
       );
     } catch (err) {
       if (currentRequest !== requestId.current) return;
-      setPlaces([]);
-      setPlacesError(getMessage(err, 'Unable to load places'));
+      if (!background) {
+        setPlaces([]);
+        setPlacesError(getMessage(err, 'Unable to load places'));
+      }
     } finally {
       if (currentRequest === requestId.current) {
         setPlacesLoading(false);
@@ -353,14 +358,18 @@ export default function NearbyScreen() {
   };
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
+      setLoading(previous =>
+        selectionRef.current.mode === 'categories'
+          ? previous
+          : false
+      );
       void loadCategories();
       const selected = selectionRef.current;
       if (
         selected.mode !== 'categories' &&
         selected.category
       ) {
-        void loadPlaces(selected.category.id);
+        void loadPlaces(selected.category.id, true);
       }
       if (
         selected.mode === 'details' &&

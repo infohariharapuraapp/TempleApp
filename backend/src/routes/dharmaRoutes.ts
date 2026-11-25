@@ -7,6 +7,8 @@ import {
   getDharmaQuestionById,
   createDharmaQuestion,
   createDharmaAnswer,
+  getMyDharmaAnswer,
+  updateMyDharmaAnswer,
     toggleDharmaHelpfulVote,
       reportDharmaContent,
        reviewDharmaReport,
@@ -96,4 +98,14 @@ router.post(
   createDharmaQuestion
 );
 
+router.get(
+  '/questions/:id/my-answer',
+  authenticateToken,
+  getMyDharmaAnswer
+);
+router.patch(
+  '/questions/:id/my-answer',
+  authenticateToken,
+  updateMyDharmaAnswer
+);
 export default router;

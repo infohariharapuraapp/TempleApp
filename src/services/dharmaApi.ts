@@ -181,12 +181,19 @@ export async function submitDharmaQuestion(data: {
 
 export async function submitDharmaAnswer(
   questionId: number,
-  answer: string
+  answer: string,
+  expectedToken: string
 ) {
-  return authenticatedDharmaRequest(
+  if (!expectedToken || (await getToken()) !== expectedToken) {
+    throw new Error('Please log in to continue.');
+  }
+  return apiRequest(
     `/dharma/questions/${questionId}/answers`,
-    'POST',
-    { answer }
+    {
+      method: 'POST',
+      token: expectedToken,
+      body: { answer },
+    }
   );
 }
 
@@ -217,5 +224,77 @@ export async function reportDharmaContent(data: {
     '/dharma/reports',
     'POST',
     data
+  );
+}
+// ========================================
+// OWN COMMUNITY ANSWER
+// ========================================
+export type MyDharmaAnswer = {
+  id: number;
+  question_id: number;
+  answer: string;
+  status: 'pending' | 'approved' | 'rejected' | 'hidden';
+  revision: number;
+  created_at: string;
+  updated_at: string;
+};
+export type MyDharmaAnswerResponse = {
+  success: boolean;
+  message?: string;
+  answer: MyDharmaAnswer | null;
+};
+export async function fetchMyDharmaAnswer(
+  questionId: number,
+  expectedToken: string
+): Promise<MyDharmaAnswerResponse> {
+  if (!Number.isSafeInteger(questionId) || questionId <= 0) {
+    throw new Error('Invalid question ID');
+  }
+  const token = expectedToken;
+  if (!token || (await getToken()) !== token) {
+    throw new Error('Please log in to continue.');
+  }
+  return apiRequest<MyDharmaAnswerResponse>(
+    `/dharma/questions/${questionId}/my-answer`,
+    {
+      method: 'GET',
+      token,
+    }
+  );
+}
+export async function editMyDharmaAnswer(
+  questionId: number,
+  answer: string,
+  revision: number,
+  expectedToken: string
+): Promise<MyDharmaAnswerResponse> {
+  if (!Number.isSafeInteger(questionId) || questionId <= 0) {
+    throw new Error('Invalid question ID');
+  }
+  if (
+    !Number.isSafeInteger(revision) ||
+    revision <= 0 ||
+    revision >= 2147483647
+  ) {
+    throw new Error('Invalid answer revision');
+  }
+  const text = answer.trim();
+  if (text.length < 10 || text.length > 2000) {
+    throw new Error('Answer must contain 10 to 2000 characters');
+  }
+  const token = expectedToken;
+  if (!token || (await getToken()) !== token) {
+    throw new Error('Please log in to continue.');
+  }
+  return apiRequest<MyDharmaAnswerResponse>(
+    `/dharma/questions/${questionId}/my-answer`,
+    {
+      method: 'PATCH',
+      token,
+      body: {
+        answer: text,
+        revision,
+      },
+    }
   );
 }

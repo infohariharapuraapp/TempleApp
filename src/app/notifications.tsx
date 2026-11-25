@@ -22,6 +22,7 @@ import { router, useFocusEffect } from 'expo-router';
 
 import { apiRequest } from '@/services/api';
 import { getToken } from '@/services/authStorage';
+import { subscribeAuth } from '@/services/authSession';
 import { openVolunteerSevaNotification } from '@/services/volunteerNotificationNavigation';
 
 type NotificationItem = {
@@ -84,6 +85,18 @@ export default function NotificationsScreen() {
     'en'
   ).toLowerCase().split('-')[0];
   const requestVersion = useRef(0);
+  const notificationSessionToken = useRef<string | null>(null);
+  const isCurrentSession = async (
+    token: string,
+    version: number
+  ): Promise<boolean> => {
+    const currentToken = await getToken();
+    return (
+      currentToken === token &&
+      notificationSessionToken.current === token &&
+      requestVersion.current === version
+    );
+  };
 
   const [notifications, setNotifications] = useState<
     NotificationItem[]
@@ -96,6 +109,7 @@ export default function NotificationsScreen() {
     showLoading = true
   ) => {
     const version = ++requestVersion.current;
+    let sessionToken: string | null = null;
     try {
       if (showLoading) {
         setLoading(true);
@@ -108,6 +122,12 @@ export default function NotificationsScreen() {
         return;
       }
 
+      if (version !== requestVersion.current) return;
+      if (notificationSessionToken.current !== token) {
+        setNotifications([]);
+      }
+      notificationSessionToken.current = token;
+      sessionToken = token;
       const response = await apiRequest(
         '/notifications?lang=' + encodeURIComponent(language),
         {
@@ -116,7 +136,7 @@ export default function NotificationsScreen() {
         }
       );
 
-      if (version !== requestVersion.current) return;
+      if (!(await isCurrentSession(token, version))) return;
       if (response.success) {
         setNotifications(response.data || []);
         return;
@@ -128,10 +148,12 @@ export default function NotificationsScreen() {
       );
     } catch (error: any) {
       if (version !== requestVersion.current) return;
-      console.error(
-        'Load notifications error:',
-        error
-      );
+      if (
+        sessionToken &&
+        !(await isCurrentSession(sessionToken, version).catch(() => false))
+      ) return;
+      setNotifications([]);
+      console.warn('Unable to load notifications.');
 
       Alert.alert(
         tr("Unable to Load Notifications"),
@@ -148,9 +170,29 @@ export default function NotificationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadNotifications();
-      return () => {
+      notificationSessionToken.current = null;
+      setNotifications([]);
+      setLoading(true);
+      const unsubscribe = subscribeAuth((authenticated) => {
         requestVersion.current += 1;
+        notificationSessionToken.current = null;
+        setNotifications([]);
+        setRefreshing(false);
+        setLoading(true);
+        if (authenticated) {
+          void loadNotifications();
+        } else {
+          router.replace('/login');
+        }
+      });
+      void loadNotifications();
+      return () => {
+        unsubscribe();
+        requestVersion.current += 1;
+        notificationSessionToken.current = null;
+        setNotifications([]);
+        setRefreshing(false);
+        setLoading(true);
       };
     }, [language])
   );
@@ -163,6 +205,8 @@ export default function NotificationsScreen() {
 const handleNotificationPress = async (
   item: NotificationItem
 ) => {
+  const version = requestVersion.current;
+  const expectedToken = notificationSessionToken.current;
   try {
     const token = await getToken();
 
@@ -171,6 +215,11 @@ const handleNotificationPress = async (
       return;
     }
 
+    if (
+      !expectedToken ||
+      token !== expectedToken ||
+      !(await isCurrentSession(token, version))
+    ) return;
     // Mark as read only when currently unread
     if (!item.is_read) {
       const response = await apiRequest(
@@ -188,6 +237,7 @@ const handleNotificationPress = async (
         );
       }
 
+      if (!(await isCurrentSession(token, version))) return;
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === item.id
@@ -215,6 +265,7 @@ const data =
     ? JSON.parse(item.data)
     : item.data || {};
 
+if (!(await isCurrentSession(token, version))) return;
 const notificationType =
   data.type || item.notification_type;
 
@@ -267,10 +318,7 @@ switch (notificationType) {
         },
       });
     } else {
-      console.warn(
-        'Announcement notification missing announcement ID:',
-        item
-      );
+      console.warn('Announcement notification missing ID.');
 
       Alert.alert(
         tr("Announcement Unavailable"),
@@ -289,10 +337,12 @@ switch (notificationType) {
 }
 
   } catch (error: any) {
-    console.error(
-      'Notification press error:',
-      error
-    );
+    if (
+      version !== requestVersion.current ||
+      !expectedToken ||
+      !(await isCurrentSession(expectedToken, version).catch(() => false))
+    ) return;
+    console.warn('Unable to open notification.');
 
     Alert.alert(
       tr("Unable to Open Notification"),
@@ -302,6 +352,8 @@ switch (notificationType) {
 };
 
   const handleMarkAllRead = async () => {
+    const version = requestVersion.current;
+    const expectedToken = notificationSessionToken.current;
     try {
       const token = await getToken();
 
@@ -310,6 +362,11 @@ switch (notificationType) {
         return;
       }
 
+      if (
+        !expectedToken ||
+        token !== expectedToken ||
+        !(await isCurrentSession(token, version))
+      ) return;
       const response = await apiRequest(
         '/notifications/read-all',
         {
@@ -325,6 +382,7 @@ switch (notificationType) {
         );
       }
 
+      if (!(await isCurrentSession(token, version))) return;
       const readTime = new Date().toISOString();
 
       setNotifications((current) =>
@@ -336,10 +394,12 @@ switch (notificationType) {
         }))
       );
     } catch (error: any) {
-      console.error(
-        'Mark all read error:',
-        error
-      );
+      if (
+        version !== requestVersion.current ||
+        !expectedToken ||
+        !(await isCurrentSession(expectedToken, version).catch(() => false))
+      ) return;
+      console.warn('Unable to mark notifications as read.');
 
       Alert.alert(
         tr("Unable to Update"),

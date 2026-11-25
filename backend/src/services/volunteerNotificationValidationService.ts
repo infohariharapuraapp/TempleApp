@@ -338,8 +338,9 @@ async function validateBroadcastEvent(
       event: job.event_type,
 
       screen: '/seva-registration',
-
       opportunityId: opportunity.id,
+      opportunityTitle: opportunity.title,
+      registrationDeadline: deadline,
     },
   };
 }

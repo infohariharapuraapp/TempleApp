@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import dharmaI18n from '@/localization/i18n';
+import { getToken } from '@/services/authStorage';
 
   import React, {
     useCallback,
@@ -38,6 +39,9 @@ import dharmaI18n from '@/localization/i18n';
 
   import {
     fetchDharmaQuestionById,
+    fetchMyDharmaAnswer,
+    editMyDharmaAnswer,
+    type MyDharmaAnswer,
     submitDharmaAnswer,
     toggleDharmaHelpful,
     type DharmaAnswer,
@@ -135,6 +139,17 @@ const COLORS = {
     const [maxAnswers, setMaxAnswers] =
       useState(DEFAULT_MAX_ANSWERS);
 
+    const [myAnswer, setMyAnswer] =
+      useState<MyDharmaAnswer | null>(null);
+    const [myAnswerReady, setMyAnswerReady] = useState(false);
+    const [myAnswerFailed, setMyAnswerFailed] = useState(false);
+    const [myAnswerQuestionId, setMyAnswerQuestionId] =
+      useState<number | null>(null);
+    const [editingMyAnswer, setEditingMyAnswer] = useState(false);
+    const [editAnswerText, setEditAnswerText] = useState('');
+    const [savingMyAnswer, setSavingMyAnswer] = useState(false);
+    const myAnswerSessionRef = useRef<string | null>(null);
+    const savingMyAnswerRef = useRef(false);
     const [answerText, setAnswerText] = useState('');
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
@@ -238,6 +253,11 @@ const COLORS = {
     const loadQuestion = useCallback(
       async (isRefresh = false) => {
         const requestId = ++requestRef.current;
+        setMyAnswerReady(false);
+        setMyAnswerFailed(false);
+        setMyAnswer(null);
+        setMyAnswerQuestionId(null);
+        myAnswerSessionRef.current = null;
 
         if (
           !Number.isSafeInteger(questionId) ||
@@ -261,7 +281,7 @@ const COLORS = {
 
         try {
           const response =
-            await fetchDharmaQuestionById(questionId);
+                        await fetchDharmaQuestionById(questionId);
 
           if (requestId !== requestRef.current) {
             return;
@@ -271,11 +291,12 @@ const COLORS = {
             throw new Error('Question not found.');
           }
 try {
+    const sessionToken = await getToken();
   const profile = await apiRequest<{
     success: boolean;
     data?: { id: number };
     user?: { id: number };
-  }>('/auth/me');
+  }>('/auth/me', { token: sessionToken ?? '' });
 
   if (requestId !== requestRef.current) {
     return;
@@ -288,13 +309,55 @@ try {
       ? Number(loggedInUser.id)
       : null;
 
-  setCurrentUserId(
+    const validUserId =
     userId !== null &&
     Number.isSafeInteger(userId) &&
     userId > 0
       ? userId
-      : null
-  );
+      : null;
+  const activeToken = await getToken();
+  if (requestId !== requestRef.current) {
+    return;
+  }
+  if (!sessionToken || activeToken !== sessionToken) {
+    setCurrentUserId(null);
+    setEditingMyAnswer(false);
+    setEditAnswerText('');
+    return;
+  }
+  setCurrentUserId(validUserId);
+  if (validUserId !== null) {
+    try {
+      const own = await fetchMyDharmaAnswer(questionId, sessionToken);
+      const latestToken = await getToken();
+      if (requestId !== requestRef.current) {
+        return;
+      }
+      if (latestToken !== sessionToken) {
+        setCurrentUserId(null);
+        setEditingMyAnswer(false);
+        setEditAnswerText('');
+        return;
+      }
+      if (
+        !own.success ||
+        (own.answer && own.answer.question_id !== questionId)
+      ) {
+        throw new Error('Failed to fetch your answer');
+      }
+      myAnswerSessionRef.current = sessionToken;
+      setMyAnswer(own.answer);
+      setMyAnswerQuestionId(questionId);
+      setMyAnswerReady(true);
+      setMyAnswerFailed(false);
+    } catch {
+      if (requestId === requestRef.current) {
+        setMyAnswer(null);
+        setMyAnswerReady(false);
+        setMyAnswerFailed(true);
+      }
+    }
+  }
 } catch (error) {
   console.error('Unable to load logged-in user:', error);
 
@@ -367,6 +430,16 @@ setVotedIds(
 
         return () => {
           requestRef.current += 1;
+          myAnswerSessionRef.current = null;
+          setMyAnswer(null);
+          setMyAnswerReady(false);
+          setMyAnswerQuestionId(null);
+          setEditingMyAnswer(false);
+          setEditAnswerText('');
+          setAnswerText('');
+          setReportTarget(null);
+          setVotedIds([]);
+          setCurrentUserId(null);
         };
       }, [loadQuestion])
     );
@@ -375,9 +448,177 @@ setVotedIds(
     // SUBMIT ANSWER
     // ========================================
 
+    const canEditMyAnswer =
+      myAnswerReady &&
+      myAnswerQuestionId === questionId &&
+      currentUserId !== null &&
+      myAnswer !== null &&
+      myAnswer.status !== 'hidden';
+    const startEditingMyAnswer = async () => {
+      if (!canEditMyAnswer || !myAnswer || savingMyAnswerRef.current) {
+        return;
+      }
+      const requestId = requestRef.current;
+      const session = myAnswerSessionRef.current;
+      const token = await getToken();
+      if (
+        !session ||
+        token !== session ||
+        requestId !== requestRef.current
+      ) {
+        return;
+      }
+      setEditAnswerText(myAnswer.answer);
+      setEditingMyAnswer(true);
+    };
+    const cancelEditingMyAnswer = () => {
+      if (savingMyAnswerRef.current) return;
+      Keyboard.dismiss();
+      setEditingMyAnswer(false);
+      setEditAnswerText('');
+    };
+    const handleSaveMyAnswer = async () => {
+      if (
+        !canEditMyAnswer ||
+        !myAnswer ||
+        savingMyAnswerRef.current
+      ) {
+        return;
+      }
+      const text = editAnswerText.trim();
+      if (text.length < 10) {
+        Alert.alert(
+          t('dharmaLocal.invalid_answer'),
+          t('dharmaLocal.please_enter_at_least_10_characters')
+        );
+        return;
+      }
+      if (text.length > 2000) {
+        Alert.alert(
+          t('dharmaLocal.answer_too_long'),
+          t('dharmaLocal.your_answer_must_not_exceed_2000_characters')
+        );
+        return;
+      }
+      if (text === myAnswer.answer.trim()) {
+        Alert.alert(t('dharmaLocal.no_answer_changes', {
+          defaultValue: 'No changes were made.'
+        }));
+        return;
+      }
+      const requestId = requestRef.current;
+      const session = myAnswerSessionRef.current;
+      const revision = myAnswer.revision;
+      const answerId = myAnswer.id;
+      const save = async () => {
+        if (savingMyAnswerRef.current) return;
+        if (
+          !session ||
+          requestId !== requestRef.current ||
+          myAnswerSessionRef.current !== session
+        ) {
+          return;
+        }
+        savingMyAnswerRef.current = true;
+        setSavingMyAnswer(true);
+        Keyboard.dismiss();
+        try {
+          const token = await getToken();
+          if (
+            token !== session ||
+            requestId !== requestRef.current
+          ) {
+            return;
+          }
+          const result = await editMyDharmaAnswer(
+            questionId,
+            text,
+            revision,
+            session
+          );
+          const latestToken = await getToken();
+          if (
+            latestToken !== session ||
+            requestId !== requestRef.current
+          ) {
+            return;
+          }
+          if (
+            !result.success ||
+            !result.answer ||
+            result.answer.id !== answerId ||
+            result.answer.question_id !== questionId
+          ) {
+            throw new Error('Failed to update your answer');
+          }
+          setMyAnswer(result.answer);
+          setEditingMyAnswer(false);
+          setEditAnswerText('');
+          // Immediately remove the old approved public version.
+          setAnswers(previous =>
+            previous.filter(item => item.id !== answerId)
+          );
+          await loadQuestion(true);
+          Alert.alert(
+            t('dharmaLocal.answer_submitted'),
+            t('dharmaLocal.your_answer_has_been_submitted_for_temple_admin_review_it_will_appear_publicly_after_approval')
+          );
+        } catch (error) {
+          if (
+            requestId === requestRef.current &&
+            myAnswerSessionRef.current === session
+          ) {
+            const message = getErrorMessage(error);
+            if (message.toLowerCase().includes('answer has changed')) {
+              setMyAnswerReady(false);
+              Alert.alert(
+                t('dharmaLocal.answer_revision_conflict', {
+                  defaultValue: 'Your answer has changed. Refresh and review it before saving again.'
+                })
+              );
+            } else {
+              Alert.alert(
+                t('dharmaLocal.submission_failed'),
+                localizeDharmaError(message)
+              );
+            }
+          }
+        } finally {
+          savingMyAnswerRef.current = false;
+          setSavingMyAnswer(false);
+        }
+      };
+      Alert.alert(
+        t('dharmaLocal.save_answer_changes', {
+          defaultValue: 'Save Changes'
+        }),
+        t('dharmaLocal.answer_reapproval_notice', {
+          defaultValue: 'Your edited answer will require temple admin approval before becoming publicly visible again.'
+        }),
+        [
+          {
+            text: t('dharmaLocal.cancel'),
+            style: 'cancel',
+          },
+          {
+            text: t('dharmaLocal.save_answer_changes', {
+              defaultValue: 'Save Changes'
+            }),
+            onPress: () => { void save(); },
+          },
+        ]
+      );
+    };
     const handleSubmitAnswer = async () => {
       Keyboard.dismiss();
-      if (submittingRef.current || !question) {
+      if (
+        submittingRef.current ||
+        savingMyAnswerRef.current ||
+        !question ||
+        !myAnswerReady ||
+        myAnswerQuestionId !== questionId ||
+        myAnswer !== null
+      ) {
         return;
       }
 
@@ -405,9 +646,14 @@ setVotedIds(
       setSubmitting(true);
 
       try {
+        const session = myAnswerSessionRef.current;
+        if (!session || (await getToken()) !== session) {
+          return;
+        }
         const response = await submitDharmaAnswer(
           questionId,
-          text
+          text,
+          session
         ) as {
           success: boolean;
           message?: string;
@@ -427,9 +673,25 @@ setVotedIds(
         Alert.alert(t('dharmaLocal.answer_submitted'), t('dharmaLocal.your_answer_has_been_submitted_for_temple_admin_review_it_will_appear_publicly_after_approval')
         );
       } catch (err) {
-        Alert.alert(t('dharmaLocal.submission_failed'),
-          localizeDharmaError(getErrorMessage(err))
-        );
+        const message = getErrorMessage(err);
+        const normalizedMessage = message
+          .trim()
+          .toLowerCase()
+          .replace(/[.!]+$/, '');
+        if (
+          normalizedMessage ===
+          'you have already answered this question'
+        ) {
+          Alert.alert(
+            t('dharmaLocal.already_answered'),
+            t('dharmaLocal.you_have_already_answered_this_question')
+          );
+        } else {
+          Alert.alert(
+            t('dharmaLocal.submission_failed'),
+            localizeDharmaError(message)
+          );
+        }
       } finally {
         submittingRef.current = false;
         setSubmitting(false);
@@ -908,8 +1170,164 @@ setVotedIds(
                       SHARE YOUR ANSWER
                   ======================================== */}
 
-                 {currentUserId !== null &&
-  Number(question.user_id) !== currentUserId && (
+                                   {/* PRIVATE OWN ANSWER */}
+                  {currentUserId !== null &&
+                    myAnswerReady &&
+                    myAnswerQuestionId === questionId &&
+                    myAnswer && (
+                    <View style={styles.answerCard}>
+                      <Text style={styles.sectionTitle}>
+                        {t('dharmaLocal.my_answer', {
+                          defaultValue: 'My Answer'
+                        })}
+                      </Text>
+                      <Text style={{
+                        fontWeight: '700',
+                        marginVertical: 12,
+                        color:
+                          myAnswer.status === 'approved'
+                            ? COLORS.green
+                            : myAnswer.status === 'pending'
+                              ? '#946B16'
+                              : COLORS.maroon,
+                      }}>
+                        {t('dharmaLocal.answer_status_' + myAnswer.status, {
+                          defaultValue: ({
+                            approved: 'Approved',
+                            pending: 'Pending Approval',
+                            rejected: 'Rejected',
+                            hidden: 'Hidden',
+                          })[myAnswer.status]
+                        })}
+                      </Text>
+                      {editingMyAnswer && canEditMyAnswer ? (
+                        <>
+                          <TextInput
+                            style={styles.answerInput}
+                            multiline
+                            textAlignVertical="top"
+                            value={editAnswerText}
+                            onChangeText={setEditAnswerText}
+                            maxLength={2000}
+                            editable={!savingMyAnswer}
+                          />
+                          <Text style={styles.characterCount}>
+                            {editAnswerText.length}/2000
+                          </Text>
+                          <TouchableOpacity
+                            style={[
+                              styles.submitButton,
+                              savingMyAnswer && styles.disabledButton,
+                            ]}
+                            disabled={savingMyAnswer}
+                            onPress={handleSaveMyAnswer}
+                          >
+                            {savingMyAnswer ? (
+                              <ActivityIndicator color={COLORS.white} />
+                            ) : (
+                              <Ionicons
+                                name="checkmark-circle-outline"
+                                size={20}
+                                color={COLORS.white}
+                              />
+                            )}
+                            <Text style={styles.submitButtonText}>
+                              {savingMyAnswer
+                                ? t('dharmaLocal.submitting')
+                                : t('dharmaLocal.save_answer_changes', {
+                                    defaultValue: 'Save Changes'
+                                  })}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            disabled={savingMyAnswer}
+                            onPress={cancelEditingMyAnswer}
+                            style={{
+                              padding: 15,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{
+                              color: COLORS.maroon,
+                              fontWeight: '700',
+                            }}>
+                              {t('dharmaLocal.cancel')}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.answerBody}>
+                            {myAnswer.answer}
+                          </Text>
+                          {canEditMyAnswer && (
+                            <TouchableOpacity
+                              style={styles.submitButton}
+                              onPress={startEditingMyAnswer}
+                              disabled={savingMyAnswer}
+                            >
+                              <Ionicons
+                                name="pencil-outline"
+                                size={19}
+                                color={COLORS.white}
+                              />
+                              <Text style={styles.submitButtonText}>
+                                {t('dharmaLocal.edit_my_answer', {
+                                  defaultValue: 'Edit My Answer'
+                                })}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                      <Text style={{
+                        ...styles.sectionSubtitle,
+                        marginTop: 12,
+                        lineHeight: 19,
+                      }}>
+                        {myAnswer.status === 'hidden'
+                          ? t('dharmaLocal.answer_editing_unavailable', {
+                              defaultValue: 'Editing is unavailable for hidden answers.'
+                            })
+                          : t('dharmaLocal.answer_reapproval_notice', {
+                              defaultValue: 'Your edited answer will require temple admin approval before becoming publicly visible again.'
+                            })}
+                      </Text>
+                    </View>
+                  )}
+                  {currentUserId !== null &&
+                    !myAnswerReady &&
+                    !loading &&
+                    !refreshing && (
+                    <View style={styles.answerCard}>
+                      <Text style={styles.sectionSubtitle}>
+                        {myAnswerFailed
+                          ? t('dharmaLocal.my_answer_load_failed', {
+                              defaultValue: 'Unable to load your answer. Please try again.'
+                            })
+                          : t('dharmaLocal.answer_revision_conflict', {
+                              defaultValue: 'Refresh your answer before continuing.'
+                            })}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.retryButton, { marginTop: 12 }]}
+                        onPress={() => {
+                          setEditingMyAnswer(false);
+                          setEditAnswerText('');
+                          void loadQuestion(true);
+                        }}
+                      >
+                        <Text style={styles.retryText}>
+                          {t('dharmaLocal.try_again')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {currentUserId !== null &&
+                    myAnswerReady &&
+                    myAnswerQuestionId === questionId &&
+                    myAnswer === null &&
+                    Number(question.user_id) !== currentUserId && (
     <View
       style={styles.submitSection}
       onLayout={(event) => {

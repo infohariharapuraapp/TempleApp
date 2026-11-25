@@ -136,8 +136,8 @@ export default function RegisterScreen() {
     return key ? String(t(key)) : fallback;
   };
 
-  const { width } = useWindowDimensions();
-  const small = width < 360;
+  const { width, height } = useWindowDimensions();
+  const small = width < 360 || height < 500;
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -151,6 +151,31 @@ export default function RegisterScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+  const nameRef = useRef<TextInput>(null);
+  const focusedInputRef = useRef<TextInput | null>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ensureFocusedInputVisible = React.useCallback(() => {
+    if (scrollTimer.current !== null) {
+      clearTimeout(scrollTimer.current);
+    }
+    scrollTimer.current = setTimeout(() => {
+      scrollTimer.current = null;
+      const input = focusedInputRef.current;
+      const scroll = scrollRef.current;
+      if (!input || !scroll || !input.isFocused()) return;
+      scroll.getScrollResponder()?.scrollResponderScrollNativeHandleToKeyboard(
+        input,
+        24,
+        true
+      );
+    }, 120);
+  }, []);
+  const handleInputFocus = (
+    ref: React.RefObject<TextInput | null>
+  ) => {
+    focusedInputRef.current = ref.current;
+    ensureFocusedInputVisible();
+  };
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -159,17 +184,36 @@ export default function RegisterScreen() {
   React.useEffect(() => {
     const show = Keyboard.addListener(
       'keyboardDidShow',
-      () => setKeyboardVisible(true)
+      () => {
+        setKeyboardVisible(true);
+        ensureFocusedInputVisible();
+      }
     );
     const hide = Keyboard.addListener(
       'keyboardDidHide',
-      () => setKeyboardVisible(false)
+      () => {
+        setKeyboardVisible(false);
+        if (scrollTimer.current !== null) {
+          clearTimeout(scrollTimer.current);
+          scrollTimer.current = null;
+        }
+      }
     );
+    const frame = Platform.OS === 'ios'
+      ? Keyboard.addListener(
+          'keyboardDidChangeFrame',
+          ensureFocusedInputVisible
+        )
+      : null;
     return () => {
       show.remove();
       hide.remove();
+      frame?.remove();
+      if (scrollTimer.current !== null) {
+        clearTimeout(scrollTimer.current);
+      }
     };
-  }, []);
+  }, [ensureFocusedInputVisible]);
 
 
   const getRegistrationError = (error: unknown): string => {
@@ -326,6 +370,11 @@ export default function RegisterScreen() {
       >
         <ScrollView
           ref={scrollRef}
+          onLayout={() => {
+            if (keyboardVisible || Keyboard.isVisible()) {
+              ensureFocusedInputVisible();
+            }
+          }}
           style={styles.flex}
           contentContainerStyle={[
             styles.content,
@@ -333,9 +382,9 @@ export default function RegisterScreen() {
             keyboardVisible && styles.keyboardContent,
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+          showsVerticalScrollIndicator={keyboardVisible}
+          automaticallyAdjustKeyboardInsets={false}
         >
           <View style={[
             styles.form,
@@ -363,6 +412,8 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               style={styles.input}
+              ref={nameRef}
+              onFocus={() => handleInputFocus(nameRef)}
               value={fullName}
               onChangeText={setFullName}
               placeholder={t('authLocal.enter_your_full_name')}
@@ -371,6 +422,7 @@ export default function RegisterScreen() {
               autoCorrect={false}
               autoComplete="name"
               returnKeyType="next"
+              submitBehavior="submit"
               onSubmitEditing={() => focusNext(phoneRef)}
               editable={!loading}
             />
@@ -380,6 +432,10 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               ref={phoneRef}
+              onFocus={() => handleInputFocus(phoneRef)}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => focusNext(emailRef)}
               style={styles.input}
               value={phone}
               onChangeText={setPhone}
@@ -396,6 +452,7 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               ref={emailRef}
+              onFocus={() => handleInputFocus(emailRef)}
               style={styles.input}
               value={email}
               onChangeText={setEmail}
@@ -406,6 +463,7 @@ export default function RegisterScreen() {
               autoCorrect={false}
               autoComplete="email"
               returnKeyType="next"
+              submitBehavior="submit"
               onSubmitEditing={() => focusNext(passwordRef)}
               editable={!loading}
             />
@@ -416,6 +474,7 @@ export default function RegisterScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={passwordRef}
+                onFocus={() => handleInputFocus(passwordRef)}
                 style={styles.passwordInput}
                 value={password}
                 onChangeText={setPassword}
@@ -426,6 +485,7 @@ export default function RegisterScreen() {
                 autoCorrect={false}
                 autoComplete="new-password"
                 returnKeyType="next"
+                submitBehavior="submit"
                 onSubmitEditing={() => focusNext(confirmRef)}
                 editable={!loading}
               />
@@ -452,6 +512,7 @@ export default function RegisterScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={confirmRef}
+                onFocus={() => handleInputFocus(confirmRef)}
                 style={styles.passwordInput}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -536,7 +597,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 40,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   smallContent: {
     paddingHorizontal: 12,
@@ -545,7 +606,7 @@ const styles = StyleSheet.create({
   },
   keyboardContent: {
     justifyContent: 'flex-start',
-    paddingBottom: 90,
+    paddingBottom: 32,
   },
   form: {
     width: '100%',

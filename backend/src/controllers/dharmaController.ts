@@ -1313,6 +1313,27 @@ return res.json({
       let newStatus: 'reviewed' | 'dismissed';
 
       if (action === 'hide_content') {
+        // Lock the parent question before changing an answer.
+        if (report.answer_id !== null) {
+          const parent = await client.query(
+            `
+            SELECT q.id
+            FROM dharma_questions q
+            JOIN dharma_answers a
+              ON a.question_id = q.id
+            WHERE a.id = $1
+            FOR UPDATE OF q
+            `,
+            [report.answer_id]
+          );
+          if (parent.rows.length !== 1) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({
+              success: false,
+              message: 'Reported content no longer exists',
+            });
+          }
+        }
         // Hide the exact content that was reported.
         const updateResult = report.question_id !== null
           ? await client.query(
@@ -1327,7 +1348,9 @@ return res.json({
           : await client.query(
               `
               UPDATE dharma_answers
-              SET status = 'hidden', updated_at = NOW()
+              SET status = 'hidden',
+                  revision = revision + 1,
+                  updated_at = NOW()
               WHERE id = $1
               RETURNING id
               `,
@@ -1387,3 +1410,219 @@ return res.json({
       client.release();
     }
   };
+// ========================================
+// GET OWN COMMUNITY ANSWER
+// ========================================
+export const getMyDharmaAnswer = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  const userId = req.user?.userId;
+  const questionId = Number(req.params.id);
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!userId || !Number.isSafeInteger(userId) || userId <= 0) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+  if (!Number.isSafeInteger(questionId) || questionId <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid question ID',
+    });
+  }
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        a.id,
+        a.question_id,
+        a.answer,
+        a.status,
+        a.revision,
+        a.created_at,
+        a.updated_at
+      FROM dharma_answers a
+      JOIN dharma_questions q
+        ON q.id = a.question_id
+      WHERE a.question_id = $1
+        AND a.user_id = $2
+        AND a.answer_type = 'community'
+        AND q.status = 'approved'
+      LIMIT 1
+      `,
+      [questionId, userId]
+    );
+    return res.json({
+      success: true,
+      answer: result.rows[0] ?? null,
+    });
+  } catch {
+    console.error('Get own Dharma answer failed');
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch your answer',
+    });
+  }
+};
+// ========================================
+// EDIT OWN COMMUNITY ANSWER
+// ========================================
+export const updateMyDharmaAnswer = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  const userId = req.user?.userId;
+  const questionId = Number(req.params.id);
+  const answer = req.body?.answer;
+  const revision = req.body?.revision;
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!userId || !Number.isSafeInteger(userId) || userId <= 0) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+    });
+  }
+  if (!Number.isSafeInteger(questionId) || questionId <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid question ID',
+    });
+  }
+  if (
+    typeof revision !== 'number' ||
+    !Number.isSafeInteger(revision) ||
+    revision <= 0 ||
+    revision >= 2147483647
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid answer revision',
+    });
+  }
+  if (
+    typeof answer !== 'string' ||
+    answer.trim().length < 10 ||
+    answer.trim().length > 2000
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Answer must contain 10 to 2000 characters',
+    });
+  }
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Lock question before answer to match submission flow.
+      const questionResult = await client.query(
+        `
+        SELECT id, status
+        FROM dharma_questions
+        WHERE id = $1
+        FOR UPDATE
+        `,
+        [questionId]
+      );
+      if (
+        questionResult.rows.length === 0 ||
+        questionResult.rows[0].status !== 'approved'
+      ) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          message: 'Question not found or unavailable',
+        });
+      }
+      const existingResult = await client.query(
+        `
+        SELECT id, answer, status, revision
+        FROM dharma_answers
+        WHERE question_id = $1
+          AND user_id = $2
+          AND answer_type = 'community'
+        FOR UPDATE
+        `,
+        [questionId, userId]
+      );
+      if (existingResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          message: 'Your answer was not found',
+        });
+      }
+      const existing = existingResult.rows[0];
+      if (!['approved', 'pending', 'rejected'].includes(existing.status)) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({
+          success: false,
+          message: 'This answer cannot be edited',
+        });
+      }
+      if (existing.revision !== revision) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'Answer has changed. Refresh and try again',
+        });
+      }
+      if (existing.answer === answer.trim()) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: 'No changes were made to your answer',
+        });
+      }
+      const result = await client.query(
+        `
+        UPDATE dharma_answers
+        SET
+          answer = $1,
+          status = 'pending',
+          revision = revision + 1,
+          updated_at = NOW()
+        WHERE id = $2
+          AND user_id = $3
+          AND answer_type = 'community'
+          AND revision = $4
+          AND status IN ('approved', 'pending', 'rejected')
+        RETURNING
+          id,
+          question_id,
+          answer,
+          status,
+          revision,
+          created_at,
+          updated_at
+        `,
+        [answer.trim(), existing.id, userId, revision]
+      );
+      if (result.rows.length !== 1) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'Answer has changed. Refresh and try again',
+        });
+      }
+      await client.query('COMMIT');
+      return res.json({
+        success: true,
+        message: 'Updated answer submitted for admin approval',
+        answer: result.rows[0],
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch {
+    console.error('Update own Dharma answer failed');
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update your answer',
+    });
+  }
+};

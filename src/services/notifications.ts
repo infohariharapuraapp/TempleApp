@@ -8,6 +8,8 @@ import { openVolunteerSevaNotification } from './volunteerNotificationNavigation
 
 import { subscribeAuth } from './authSession';
 import { getToken } from './authStorage';
+import { getInstallationSecret } from './installationIdentity';
+import { nextDeviceBindingVersion } from './deviceBindingVersion';
 
 // ========================================
 // EXPO GO DETECTION
@@ -178,16 +180,17 @@ export async function initializeNotificationHandler() {
 
   Notifications.setNotificationHandler({
 
-    handleNotification: async () => ({
-
-      shouldShowBanner: true,
-
-      shouldShowList: true,
-
-      shouldPlaySound: true,
-
-      shouldSetBadge: true,
-    }),
+    handleNotification: async notification => {
+      const recovery =
+        notification.request.content.data?.type ===
+        'device_binding_recovery';
+      return {
+        shouldShowBanner: !recovery,
+        shouldShowList: !recovery,
+        shouldPlaySound: !recovery,
+        shouldSetBadge: !recovery,
+      };
+    },
   });
 
   notificationHandlerInitialized = true;
@@ -453,11 +456,176 @@ export async function registerForPushNotificationsAsync():
 // PERFORM PUSH REGISTRATION
 // ========================================
 
+async function recoverDeviceBinding(
+  expoPushToken: string,
+  installationSecret: string,
+  bindingVersion: number,
+  jwtToken: string,
+  sessionVersion: number
+): Promise<boolean> {
+  let subscription:
+    { remove(): void } | undefined;
+  let timeout:
+    ReturnType<typeof setTimeout> | undefined;
+  let unsubscribeAuth:
+    (() => void) | undefined;
+  const received = new Map<string, string>();
+  let expectedId: string | null = null;
+  let resolveChallenge:
+    (value: string | null) => void = () => {};
+  const challengePromise = new Promise<string | null>(
+    resolve => {
+      resolveChallenge = resolve;
+    }
+  );
+  const sessionValid = async (): Promise<boolean> =>
+    isRegistrationSessionValid(sessionVersion) &&
+    (await getAuthTokenWithTimeout()) === jwtToken &&
+    isRegistrationSessionValid(sessionVersion);
+  try {
+    if (!(await sessionValid())) return false;
+    const Notifications =
+      await import('expo-notifications');
+    unsubscribeAuth = subscribeAuth(() => {
+      resolveChallenge(null);
+    });
+    timeout = setTimeout(
+      () => resolveChallenge(null),
+      20000
+    );
+    subscription =
+      Notifications.addNotificationReceivedListener(
+        notification => {
+          const data =
+            notification.request.content.data;
+          if (
+            data?.type !== 'device_binding_recovery' ||
+            !isRegistrationSessionValid(sessionVersion)
+          ) {
+            return;
+          }
+          const id = data.recoveryId;
+          const challenge = data.challenge;
+          if (
+            typeof id !== 'string' ||
+            !/^[1-9][0-9]{0,18}$/.test(id) ||
+            typeof challenge !== 'string' ||
+            challenge.length !== 64 ||
+            !/^[a-f0-9]{64}$/.test(challenge)
+          ) {
+            return;
+          }
+          if (expectedId === id) {
+            resolveChallenge(challenge);
+          } else if (
+            expectedId === null &&
+            received.size < 8
+          ) {
+            received.set(id, challenge);
+          }
+        }
+      );
+    if (!(await sessionValid())) return false;
+    const credentials = {
+      expoPushToken,
+      installationSecret,
+      bindingVersion,
+    };
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${jwtToken}`,
+    };
+    const requested = await fetchWithPushTimeout(
+      `${API_BASE_URL}/notifications/recover-device/request`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(credentials),
+      },
+      15000
+    );
+    if (
+      !requested.response.ok ||
+      !(await sessionValid())
+    ) {
+      return false;
+    }
+    const result = JSON.parse(requested.responseText);
+    const recoveryId = result?.data?.recoveryId;
+    if (
+      result?.success !== true ||
+      typeof recoveryId !== 'string' ||
+      !/^[1-9][0-9]{0,18}$/.test(recoveryId)
+    ) {
+      return false;
+    }
+    expectedId = recoveryId;
+    const earlyChallenge = received.get(recoveryId);
+    if (earlyChallenge) {
+      resolveChallenge(earlyChallenge);
+    }
+    received.clear();
+    const challenge = await challengePromise;
+    if (
+      !challenge ||
+      !(await sessionValid())
+    ) {
+      return false;
+    }
+    const confirmed = await fetchWithPushTimeout(
+      `${API_BASE_URL}/notifications/recover-device/confirm`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ...credentials,
+          recoveryId,
+          challenge,
+        }),
+      },
+      15000
+    );
+    if (
+      !confirmed.response.ok ||
+      !(await sessionValid())
+    ) {
+      return false;
+    }
+    const confirmation =
+      JSON.parse(confirmed.responseText);
+    return (
+      confirmation?.success === true &&
+      confirmation?.data?.recovered === true &&
+      confirmation?.data?.registrationRequired === true
+    );
+  } catch {
+    console.warn('Secure device recovery unavailable.');
+    return false;
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+    subscription?.remove();
+    unsubscribeAuth?.();
+    received.clear();
+    resolveChallenge(null);
+  }
+}
 async function performPushRegistration(
   sessionVersion: number
 ): Promise<string | null> {
-
   try {
+    if (!isRegistrationSessionValid(sessionVersion)) {
+      return null;
+    }
+    const bindingVersion = await withTimeout(
+      nextDeviceBindingVersion(),
+      NOTIFICATION_SETUP_TIMEOUT_MS,
+      'Device binding version'
+    );
+    if (!isRegistrationSessionValid(sessionVersion)) {
+      return null;
+    }
 
     const initialJwtToken =
       await getAuthTokenWithTimeout();
@@ -638,9 +806,13 @@ async function performPushRegistration(
     // REVALIDATE AUTHENTICATION SESSION
     // ========================================
 
+    const installationSecret = await withTimeout(
+      getInstallationSecret(),
+      NOTIFICATION_SETUP_TIMEOUT_MS,
+      'Secure installation identity'
+    );
     const jwtToken =
       await getAuthTokenWithTimeout();
-
     if (
       !jwtToken ||
       jwtToken !== initialJwtToken ||
@@ -681,7 +853,8 @@ async function performPushRegistration(
         body: JSON.stringify({
 
           expoPushToken,
-
+          installationSecret,
+          bindingVersion,
           platform: Platform.OS,
 
           deviceName:
@@ -722,15 +895,86 @@ async function performPushRegistration(
     }
 
     if (
+      response.status === 409 &&
+      responseData?.code === 'DEVICE_BINDING_CONFLICT'
+    ) {
+      if (!isRegistrationSessionValid(sessionVersion)) {
+        return null;
+      }
+      const nextVersion = await withTimeout(
+        nextDeviceBindingVersion(),
+        NOTIFICATION_SETUP_TIMEOUT_MS,
+        'Recovered device binding version'
+      );
+      if (
+        (await getAuthTokenWithTimeout()) !== jwtToken ||
+        !isRegistrationSessionValid(sessionVersion)
+      ) {
+        return null;
+      }
+      const recovered = await recoverDeviceBinding(
+        expoPushToken,
+        installationSecret,
+        bindingVersion,
+        jwtToken,
+        sessionVersion
+      );
+      if (
+        !recovered ||
+        !isRegistrationSessionValid(sessionVersion) ||
+        (await getAuthTokenWithTimeout()) !== jwtToken
+      ) {
+        return null;
+      }
+
+      if (
+        !isRegistrationSessionValid(sessionVersion) ||
+        (await getAuthTokenWithTimeout()) !== jwtToken
+      ) {
+        return null;
+      }
+      const retry = await fetchWithPushTimeout(
+        `${API_BASE_URL}/notifications/register-device`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${jwtToken}`,
+          },
+          body: JSON.stringify({
+            expoPushToken,
+            installationSecret,
+            bindingVersion: nextVersion,
+            platform: Platform.OS,
+            deviceName: Device.deviceName ?? null,
+            preferredLanguage: (
+              i18n.resolvedLanguage ||
+              i18n.language ||
+              'en'
+            ).toLowerCase().split('-')[0],
+          }),
+        },
+        PUSH_REGISTRATION_TIMEOUT_MS
+      );
+      if (
+        !retry.response.ok ||
+        JSON.parse(retry.responseText)?.success !== true ||
+        (await getAuthTokenWithTimeout()) !== jwtToken ||
+        !isRegistrationSessionValid(sessionVersion)
+      ) {
+        return null;
+      }
+      currentExpoPushToken = expoPushToken;
+      return expoPushToken;
+    }
+    if (
       !response.ok ||
       responseData?.success !== true
     ) {
-
       console.error(
         'Push device registration failed:',
         response.status
       );
-
       return null;
     }
 
@@ -762,8 +1006,7 @@ async function performPushRegistration(
   } catch (error) {
 
     console.error(
-      'Push registration failed:',
-      error
+      'Push registration failed.'
     );
 
     return null;
@@ -895,8 +1138,18 @@ async function performPushUnregistration(
   sessionVersion: number,
   isOperationValid: () => boolean
 ): Promise<boolean> {
-
   try {
+    if (!isOperationValid()) {
+      return false;
+    }
+    const bindingVersion = await withTimeout(
+      nextDeviceBindingVersion(),
+      NOTIFICATION_SETUP_TIMEOUT_MS,
+      'Device binding version'
+    );
+    if (!isOperationValid()) {
+      return false;
+    }
 
     // Capture JWT before asynchronous waiting.
 
@@ -1009,9 +1262,13 @@ async function performPushUnregistration(
     // REVALIDATE CURRENT JWT
     // ========================================
 
+    const installationSecret = await withTimeout(
+      getInstallationSecret(),
+      NOTIFICATION_SETUP_TIMEOUT_MS,
+      'Secure installation identity'
+    );
     const currentJwtToken =
       await getAuthTokenWithTimeout();
-
     if (
       currentJwtToken !== jwtToken ||
       !isOperationValid()
@@ -1042,8 +1299,9 @@ async function performPushUnregistration(
         },
 
         body: JSON.stringify({
-
           expoPushToken,
+          installationSecret,
+          bindingVersion,
         }),
       },
 
@@ -1085,8 +1343,22 @@ async function performPushUnregistration(
       return false;
     }
 
-    if (responseData?.success !== true) {
-
+    if (
+      responseData?.success !== true ||
+      responseData?.data?.bindingRecorded !== true ||
+      responseData?.data?.requestedTokenConflict !== false
+    ) {
+      console.warn(
+        'Secure device unregistration could not be confirmed.'
+      );
+      return false;
+    }
+    const confirmedJwtToken =
+      await getAuthTokenWithTimeout();
+    if (
+      confirmedJwtToken !== jwtToken ||
+      !isOperationValid()
+    ) {
       return false;
     }
 
@@ -1183,20 +1455,57 @@ export function handleNotificationResponse(
       }
     }
 
-    console.log(
-      'FULL NOTIFICATION DATA:',
-      JSON.stringify(data, null, 2)
-    );
+    // Notification payloads must not be logged.
 
     // ========================================
     // ANNOUNCEMENT
     // ========================================
 
+    if (data.type === 'device_binding_recovery') {
+      return;
+    }
+    if (data.type === 'private_update') {
+      router.push('/notifications');
+      return;
+    }
+    if (
+      data.type === 'event' ||
+      data.type === 'event_reminder'
+    ) {
+      router.push('/events');
+      return;
+    }
     if (data.type === 'volunteer_seva') {
       openVolunteerSevaNotification(data);
       return;
     }
+    if (data.type === 'gallery') {
+      router.push('/gallery');
+      return;
+    }
+    if (data.type === 'publication') {
+      router.push('/publications');
+      return;
+    }
+    if (data.type === 'darshan') {
+      router.push('/darshan');
+      return;
+    }
     if (data.type === 'announcement') {
+      const rawId =
+        data.announcementId ?? data.announcement_id;
+      const id =
+        typeof rawId === 'number' ||
+        typeof rawId === 'string'
+          ? String(rawId)
+          : '';
+      if (
+        !/^[1-9]\d{0,9}$/.test(id) ||
+        Number(id) > 2147483647
+      ) {
+        router.push('/announcements');
+        return;
+      }
 
       router.push({
 
@@ -1205,9 +1514,7 @@ export function handleNotificationResponse(
 
         params: {
 
-          id: String(
-            data.announcementId ?? ''
-          ),
+          id,
         },
       });
 
@@ -1245,6 +1552,19 @@ export function handleNotificationResponse(
     // ========================================
 
     if (data.type === 'deity') {
+      const rawId = data.deityId;
+      const id =
+        typeof rawId === 'number' ||
+        typeof rawId === 'string'
+          ? String(rawId)
+          : '';
+      if (
+        !/^[1-9]\d{0,9}$/.test(id) ||
+        Number(id) > 2147483647
+      ) {
+        router.push('/(tabs)/deities');
+        return;
+      }
 
       router.push({
 
@@ -1253,9 +1573,7 @@ export function handleNotificationResponse(
 
         params: {
 
-          id: String(
-            data.deityId ?? ''
-          ),
+          id,
         },
       });
 
@@ -1278,22 +1596,49 @@ export function handleNotificationResponse(
     // VOLUNTEER SEVA NOTIFICATIONS
     // ========================================
 
-    if (
-      typeof data.screen === 'string' &&
-      data.screen.startsWith('/') &&
-      !data.screen.startsWith('//')
-    ) {
-
-      router.push(
-        data.screen as any
-      );
+    switch (data.screen) {
+      case '/notifications':
+        router.push('/notifications');
+        break;
+      case '/events':
+        router.push('/events');
+        break;
+      case 'announcements':
+      case '/announcements':
+        router.push('/announcements');
+        break;
+      case '/gallery':
+        router.push('/gallery');
+        break;
+      case '/publications':
+        router.push('/publications');
+        break;
+      case '/(tabs)/deities':
+        router.push('/(tabs)/deities');
+        break;
+      case '/darshan':
+        router.push('/darshan');
+        break;
+      case '/darshan-videos':
+        router.push('/darshan-videos');
+        break;
+      case '/my-sevas':
+        router.push('/my-sevas');
+        break;
+      case '/seva-registration':
+        router.push('/seva-registration');
+        break;
+      case '/(tabs)':
+        router.push('/(tabs)');
+        break;
+      default:
+        router.push('/notifications');
     }
 
   } catch (error) {
 
     console.error(
-      'Notification tap handling error:',
-      error
+      'Notification tap handling failed.'
     );
   }
 }

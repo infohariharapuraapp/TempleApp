@@ -39,6 +39,10 @@ const upload = multer({
 
   limits: {
     fileSize: 5 * 1024 * 1024,
+    files: 1,
+    fields: 5,
+    parts: 6,
+    fieldSize: 16 * 1024,
   },
 
   fileFilter: (_req, file, callback) => {
@@ -89,6 +93,31 @@ router.post(
           });
         }
 
+        const imageBuffer = req.file.buffer;
+        const mime = req.file.mimetype;
+        const validJpeg =
+          mime === 'image/jpeg' &&
+          imageBuffer.length >= 4 &&
+          imageBuffer[0] === 0xff &&
+          imageBuffer[1] === 0xd8 &&
+          imageBuffer[2] === 0xff;
+        const validPng =
+          mime === 'image/png' &&
+          imageBuffer.length >= 24 &&
+          imageBuffer.subarray(0, 8).equals(
+            Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+          );
+        const validWebp =
+          mime === 'image/webp' &&
+          imageBuffer.length >= 16 &&
+          imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
+          imageBuffer.toString('ascii', 8, 12) === 'WEBP';
+        if (!validJpeg && !validPng && !validWebp) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid or unsupported image file',
+          });
+        }
         try {
           const result = await new Promise<{
             secure_url: string;
@@ -210,6 +239,10 @@ const uploadPdf = multer({
 
   limits: {
     fileSize: 10 * 1024 * 1024,
+    files: 1,
+    fields: 5,
+    parts: 6,
+    fieldSize: 16 * 1024,
   },
 
   fileFilter: (_req, file, callback) => {

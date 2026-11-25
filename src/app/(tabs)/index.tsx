@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { apiRequest } from '@/services/api';
 
 // HOME_DARSHAN_CATEGORIES_V1
@@ -90,7 +91,7 @@ type Guru = {
 
 const QUICK_ACTIONS = [
   { icon: '🙏', titleKey: 'home.quickDarshan', route: '/darshan' },
-  { icon: '📅', titleKey: 'home.quickEvents', route: '/events' },
+  { icon: 'events-calendar', titleKey: 'home.quickEvents', route: '/events' },
   { icon: '💰', titleKey: 'home.quickDonations', route: '/donations' },
   { icon: '🖼️', titleKey: 'home.gallery', route: '/gallery' },
  {
@@ -98,11 +99,6 @@ const QUICK_ACTIONS = [
   titleKey: 'home.volunteerSeva',
   route: '/volunteer',
   comingSoon: false,
-},
-{
-  icon: '📋',
-  titleKey: 'home.mySevas',
-  route: '/my-sevas',
 },
   {
     icon: '🛕',
@@ -120,7 +116,7 @@ const QUICK_ACTIONS = [
     route: '/pravachanas',
   },
   {
-    icon: '📅',
+    icon: 'programmes-calendar',
     titleKey: 'home.mahaswamijiProgrammes',
     route: '/mahaswamiji-programmes',
   },
@@ -790,8 +786,6 @@ export default function HomeScreen() {
 const fallbackTitle =
   item.titleKey === 'home.volunteerSeva'
     ? 'Volunteer Seva'
-    : item.titleKey === 'home.mySevas'
-      ? 'My Sevas'
       : item.titleKey === 'home.divyakshetraUpdates'
         ? 'Divyakshetra Updates'
         : item.titleKey === 'home.mahaswamijiProgrammes'
@@ -1637,7 +1631,21 @@ function AnimatedQuickAction({
       >
         <View style={styles.actionShine} />
         <View style={styles.actionIconWrap}>
-          <Text style={styles.actionIcon}>{icon}</Text>
+          {icon === 'events-calendar' ? (
+            <Ionicons
+              name="calendar-outline"
+              size={28}
+              color={COLORS.brown}
+            />
+          ) : icon === 'programmes-calendar' ? (
+            <Ionicons
+              name="calendar-number-outline"
+              size={28}
+              color={COLORS.brown}
+            />
+          ) : (
+            <Text style={styles.actionIcon}>{icon}</Text>
+          )}
         </View>
         <Text style={styles.actionTitle}>{title}</Text>
         <Text style={styles.actionArrow}>›</Text>
