@@ -1,3 +1,4 @@
+import { KeyboardProvider, KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -6,9 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +20,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiRequest } from '@/services/api';
 
 export default function RegisterScreen() {
+  return (
+    <KeyboardProvider>
+      <RegisterContent />
+    </KeyboardProvider>
+  );
+}
+function RegisterContent() {
   // AUTH_LANGUAGE_V1
   const { t } = useTranslation();
   // Only known, static authentication messages
@@ -148,73 +154,12 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
   const [loading, setLoading] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  const scrollRef = useRef<ScrollView>(null);
   const nameRef = useRef<TextInput>(null);
-  const focusedInputRef = useRef<TextInput | null>(null);
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ensureFocusedInputVisible = React.useCallback(() => {
-    if (scrollTimer.current !== null) {
-      clearTimeout(scrollTimer.current);
-    }
-    scrollTimer.current = setTimeout(() => {
-      scrollTimer.current = null;
-      const input = focusedInputRef.current;
-      const scroll = scrollRef.current;
-      if (!input || !scroll || !input.isFocused()) return;
-      scroll.getScrollResponder()?.scrollResponderScrollNativeHandleToKeyboard(
-        input,
-        24,
-        true
-      );
-    }, 120);
-  }, []);
-  const handleInputFocus = (
-    ref: React.RefObject<TextInput | null>
-  ) => {
-    focusedInputRef.current = ref.current;
-    ensureFocusedInputVisible();
-  };
   const phoneRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
-
-  React.useEffect(() => {
-    const show = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        setKeyboardVisible(true);
-        ensureFocusedInputVisible();
-      }
-    );
-    const hide = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardVisible(false);
-        if (scrollTimer.current !== null) {
-          clearTimeout(scrollTimer.current);
-          scrollTimer.current = null;
-        }
-      }
-    );
-    const frame = Platform.OS === 'ios'
-      ? Keyboard.addListener(
-          'keyboardDidChangeFrame',
-          ensureFocusedInputVisible
-        )
-      : null;
-    return () => {
-      show.remove();
-      hide.remove();
-      frame?.remove();
-      if (scrollTimer.current !== null) {
-        clearTimeout(scrollTimer.current);
-      }
-    };
-  }, [ensureFocusedInputVisible]);
-
 
   const getRegistrationError = (error: unknown): string => {
     const err = error as {
@@ -364,28 +309,19 @@ export default function RegisterScreen() {
       style={styles.container}
       edges={['top', 'bottom']}
     >
-      <KeyboardAvoidingView
+      <KeyboardAwareScrollView
+        bottomOffset={32}
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        contentContainerStyle={[
+          styles.content,
+          small && styles.smallContent,
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={
+          Platform.OS === 'ios' ? 'interactive' : 'none'
+        }
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          ref={scrollRef}
-          onLayout={() => {
-            if (keyboardVisible || Keyboard.isVisible()) {
-              ensureFocusedInputVisible();
-            }
-          }}
-          style={styles.flex}
-          contentContainerStyle={[
-            styles.content,
-            small && styles.smallContent,
-            keyboardVisible && styles.keyboardContent,
-          ]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
-          showsVerticalScrollIndicator={keyboardVisible}
-          automaticallyAdjustKeyboardInsets={false}
-        >
           <View style={[
             styles.form,
             small && styles.smallForm,
@@ -413,7 +349,6 @@ export default function RegisterScreen() {
             <TextInput
               style={styles.input}
               ref={nameRef}
-              onFocus={() => handleInputFocus(nameRef)}
               value={fullName}
               onChangeText={setFullName}
               placeholder={t('authLocal.enter_your_full_name')}
@@ -432,7 +367,6 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               ref={phoneRef}
-              onFocus={() => handleInputFocus(phoneRef)}
               returnKeyType="next"
               submitBehavior="submit"
               onSubmitEditing={() => focusNext(emailRef)}
@@ -452,7 +386,6 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               ref={emailRef}
-              onFocus={() => handleInputFocus(emailRef)}
               style={styles.input}
               value={email}
               onChangeText={setEmail}
@@ -474,7 +407,6 @@ export default function RegisterScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={passwordRef}
-                onFocus={() => handleInputFocus(passwordRef)}
                 style={styles.passwordInput}
                 value={password}
                 onChangeText={setPassword}
@@ -512,7 +444,6 @@ export default function RegisterScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 ref={confirmRef}
-                onFocus={() => handleInputFocus(confirmRef)}
                 style={styles.passwordInput}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -580,8 +511,7 @@ export default function RegisterScreen() {
               <Text style={styles.footerText}>{t('authLocal.stay_connected_with_hariharipura_temple')}</Text>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -603,10 +533,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 24,
-  },
-  keyboardContent: {
-    justifyContent: 'flex-start',
-    paddingBottom: 32,
   },
   form: {
     width: '100%',

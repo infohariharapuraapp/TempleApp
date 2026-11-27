@@ -1,3 +1,4 @@
+import { KeyboardProvider, KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import React, {
   useEffect,
   useRef,
@@ -7,7 +8,6 @@ import React, {
 import {
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -86,6 +86,13 @@ const ACTIVE_STATUSES = [
 ];
 
 export default function VolunteerRegisterScreen() {
+  return (
+    <KeyboardProvider>
+      <VolunteerRegisterContent />
+    </KeyboardProvider>
+  );
+}
+function VolunteerRegisterContent() {
   const { t } = useTranslation();
 
   const params = useLocalSearchParams<{
@@ -160,59 +167,7 @@ export default function VolunteerRegisterScreen() {
 
   const mounted = useRef(false);
   const version = useRef(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const keyboardScrollTimer = useRef<
-    ReturnType<typeof setTimeout> | null
-  >(null);
-  const ensureFocusedInputVisible = React.useCallback(() => {
-    if (keyboardScrollTimer.current !== null) {
-      clearTimeout(keyboardScrollTimer.current);
-    }
-    keyboardScrollTimer.current = setTimeout(() => {
-      keyboardScrollTimer.current = null;
-      const input =
-        TextInput.State.currentlyFocusedInput();
-      const scroll = scrollRef.current;
-      if (!mounted.current || !input || !scroll) return;
-      scroll
-        .getScrollResponder()
-        ?.scrollResponderScrollNativeHandleToKeyboard(
-          input,
-          24,
-          true
-        );
-    }, 120);
-  }, []);
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      'keyboardDidShow',
-      ensureFocusedInputVisible
-    );
-    const frame = Platform.OS === 'ios'
-      ? Keyboard.addListener(
-          'keyboardDidChangeFrame',
-          ensureFocusedInputVisible
-        )
-      : null;
-    const hide = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        if (keyboardScrollTimer.current !== null) {
-          clearTimeout(keyboardScrollTimer.current);
-          keyboardScrollTimer.current = null;
-        }
-      }
-    );
-    return () => {
-      show.remove();
-      frame?.remove();
-      hide.remove();
-      if (keyboardScrollTimer.current !== null) {
-        clearTimeout(keyboardScrollTimer.current);
-        keyboardScrollTimer.current = null;
-      }
-    };
-  }, [ensureFocusedInputVisible]);
+  const scrollRef = useRef<React.ComponentRef<typeof KeyboardAwareScrollView>>(null);
   const inputRefs = useRef<
     Partial<Record<TextField, TextInput | null>>
   >({});
@@ -793,7 +748,6 @@ export default function VolunteerRegisterScreen() {
           placeholder={placeholder}
           placeholderTextColor={C.muted}
           editable={!submitting && !uncertain && !photoBusy}
-          onFocus={ensureFocusedInputVisible}
           keyboardType={keyboardType}
           multiline={multiline}
           maxLength={maxLength}
@@ -891,29 +845,15 @@ export default function VolunteerRegisterScreen() {
           onRetry={() => void load()}
         />
       ) : (
-        <KeyboardAvoidingView
-          style={styles.keyboardContainer}
-          behavior={
-            Platform.OS === 'ios'
-              ? 'padding'
-              : 'height'
-          }
-          keyboardVerticalOffset={0}
-        >
-        <ScrollView
+        <KeyboardAwareScrollView
           ref={scrollRef}
+          bottomOffset={32}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={
             Platform.OS === 'ios'
               ? 'interactive'
               : 'none'
           }
-          automaticallyAdjustKeyboardInsets={false}
-          onLayout={() => {
-            if (Keyboard.isVisible()) {
-              ensureFocusedInputVisible();
-            }
-          }}
           showsVerticalScrollIndicator={false}
           style={styles.keyboardContainer}
           contentContainerStyle={styles.content}
@@ -988,7 +928,6 @@ export default function VolunteerRegisterScreen() {
                 <TextInput
                   style={styles.input}
                   value={groupName}
-                  onFocus={ensureFocusedInputVisible}
                   returnKeyType="next"
                   submitBehavior="submit"
                   onSubmitEditing={() =>
@@ -1566,8 +1505,7 @@ export default function VolunteerRegisterScreen() {
               {t('volunteer.approvalNote')}
             </Text>
           </View>
-        </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
       )}
     </VolunteerScreen>
   );
