@@ -106,3 +106,43 @@ ios/Pods/
 **/*.p8
 # Required Firebase Android configuration
 !/google-services.json
+# MOBILE CLOUD BUILD SECURITY V2
+/backend/
+/admin/
+/eas-inspect/
+/.claude/
+/.vscode/
+/ProjectHandover/
+# Local source archives and database exports
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz
+*.dump
+*.sql
+*.ipa
+# Local diagnostic reports
+/frontend_structure.txt
+/index-code.txt
+/root_files.txt
+/translation_*.txt
+/.easignore.txt
+# Accidental PowerShell output files
+/rcapp -Recurse*
+/tatus --short
+/t *GIT FORMATTING PASSED*
+/utput *
+/admin and temple app improvements*
+# Sensitive configuration
+**/.env
+**/.env.*
+**/*.pfx
+**/*.keystore
+**/*.mobileprovision
+**/credentials.json
+**/service-account*.json
+# Preserve required Android Firebase configuration
+!/google-services.json
+# MOBILE ASSET OPTIMIZATION V3
+/TEMPLE IMAGES/

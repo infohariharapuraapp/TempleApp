@@ -324,9 +324,7 @@ export const getAvailableOpportunities = async (
         )
       )
 
-      ORDER BY
-        o.registration_start_at ASC,
-        o.id DESC
+      ORDER BY o.created_at DESC, o.id DESC
     `, [includeClosed]);
 
     return res.json({

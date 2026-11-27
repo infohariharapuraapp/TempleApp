@@ -328,11 +328,47 @@ export default function RegistrationDetailsScreen() {
     /^[0-6]$/.test(params.milestone)
       ? Number(params.milestone)
       : null;
+  const notificationSectionHandled = useRef('');
+  const notificationSectionScrolled = useRef('');
   useEffect(() => {
-    if (params.section === 'overview') {
-      setSection('overview');
-    }
-  }, [params.section, params.registrationId]);
+    notificationSectionHandled.current = '';
+    notificationSectionScrolled.current = '';
+  }, [params.registrationId, params.section, params.milestone]);
+  useEffect(() => {
+    if (!data || photoLock.current || refreshing) return;
+    const requested = params.section;
+    if (typeof requested !== 'string') return;
+    const allowedSections: readonly string[] = [
+      'overview',
+      'reporting',
+      'duties',
+      'idcard',
+      'accommodation',
+      'attendance',
+      'certificate',
+    ];
+    if (!allowedSections.includes(requested)) return;
+    const key = [
+      params.registrationId,
+      requested,
+      params.milestone,
+    ].join(':');
+    if (notificationSectionHandled.current === key) return;
+    const target: Section =
+      requested === 'accommodation' &&
+      data.registration.accommodation_enabled === false
+        ? 'overview'
+        : requested as Section;
+    notificationSectionHandled.current = key;
+    setSection(target);
+  }, [
+    data,
+    refreshing,
+    photoBusy,
+    params.registrationId,
+    params.section,
+    params.milestone,
+  ]);
   useEffect(() => {
     milestoneScrollHandled.current = '';
     return () => {
@@ -346,7 +382,11 @@ export default function RegistrationDetailsScreen() {
     index: number,
     rowY: number
   ) {
-    if (requestedMilestone !== index || !data) {
+    if (
+      section !== 'overview' ||
+      requestedMilestone !== index ||
+      !data
+    ) {
       return;
     }
     const key = `${rawId}:${requestedMilestone}`;
@@ -1321,6 +1361,23 @@ export default function RegistrationDetailsScreen() {
             onLayout={event => {
               sectionOffset.current =
                 event.nativeEvent.layout.y;
+              if (
+                section !== 'overview' &&
+                params.section === section &&
+                notificationSectionHandled.current &&
+                notificationSectionScrolled.current !==
+                  notificationSectionHandled.current
+              ) {
+                notificationSectionScrolled.current =
+                  notificationSectionHandled.current;
+                journeyScroll.current?.scrollTo({
+                  y: Math.max(
+                    0,
+                    sectionOffset.current - 12
+                  ),
+                  animated: true,
+                });
+              }
             }}
           >
             {section !== 'overview' && (

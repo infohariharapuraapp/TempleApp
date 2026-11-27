@@ -45,16 +45,36 @@ export function openVolunteerSevaNotification(
     typeof data.event === 'string'
       ? data.event
       : '';
-  // Registration submission and public opportunity
-  // announcements should open the Seva listing.
+  // Registration submission opens personal registrations.
+  if (event === 'registration_submitted') {
+    router.push('/my-sevas');
+    return;
+  }
+  // Public announcements open the relevant opportunity.
   if (
-
-    event === 'registration_submitted' ||
     event === 'registration_opened' ||
     event === 'registration_extended' ||
     event === 'registration_closing_reminder'
   ) {
-    router.push('/my-sevas');
+    const rawOpportunityId =
+      data.opportunityId ?? data.opportunity_id;
+    const opportunityId =
+      typeof rawOpportunityId === 'number' ||
+      typeof rawOpportunityId === 'string'
+        ? String(rawOpportunityId)
+        : '';
+    if (
+      /^[1-9]\d*$/.test(opportunityId) &&
+      Number.isSafeInteger(Number(opportunityId)) &&
+      Number(opportunityId) <= 2147483647
+    ) {
+      router.push({
+        pathname: '/volunteer/[id]',
+        params: { id: opportunityId },
+      });
+    } else {
+      router.push('/volunteer');
+    }
     return;
   }
   const rawId = data.registrationId;
@@ -73,7 +93,14 @@ export function openVolunteerSevaNotification(
     router.push('/my-sevas');
     return;
   }
-  const section = 'overview';
+  const section =
+    event.startsWith('id_card_') ? 'idcard' :
+    event.startsWith('reporting_') ? 'reporting' :
+    event.startsWith('duty_') ? 'duties' :
+    event.startsWith('accommodation_') ? 'accommodation' :
+    event.startsWith('attendance_') ? 'attendance' :
+    event.startsWith('certificate_') ? 'certificate' :
+    'overview';
   // The destination screen fetches registration data
   // through the authenticated backend API.
   router.push({

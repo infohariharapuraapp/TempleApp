@@ -1,5 +1,5 @@
 import React, {
-  useCallback,
+
   useEffect,
   useRef,
   useState,
@@ -11,6 +11,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -19,6 +20,12 @@ import {
   GestureDetector,
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedProps,
+} from 'react-native-reanimated';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { ImagePickerAsset } from 'expo-image-picker';
 type Props = {
@@ -32,11 +39,14 @@ type Position = {
   zoom: number;
 };
 const MAX_ZOOM = 4;
+const AnimatedTextInput =
+  Animated.createAnimatedComponent(TextInput);
 function clamp(
   value: number,
   minimum: number,
   maximum: number
 ) {
+  'worklet';
   return Math.max(
     minimum,
     Math.min(maximum, value)
@@ -53,7 +63,7 @@ export default function VolunteerPhotoEditor({
     100,
     Math.min(
       screenWidth - 32,
-      (screenHeight - 230) * 0.75,
+      (screenHeight - 310) * 0.75,
       350
     )
   );
@@ -64,18 +74,14 @@ export default function VolunteerPhotoEditor({
     width: asset.width,
     height: asset.height,
   });
-  const [position, setPosition] = useState<Position>({
+  const position = useSharedValue<Position>({
     x: 0,
     y: 0,
     zoom: 1,
   });
-  const positionRef = useRef<Position>({
-    x: 0,
-    y: 0,
-    zoom: 1,
-  });
-  const panStart = useRef({ x: 0, y: 0 });
-  const pinchStart = useRef(1);
+  const panStart = useSharedValue({ x: 0, y: 0 });
+  const pinchStart = useSharedValue(1);
+  const gestureLocked = useSharedValue(false);
   const workingRef = useRef(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
@@ -118,89 +124,99 @@ export default function VolunteerPhotoEditor({
         frameHeight / height
       )
     : 1;
-  const updatePosition = useCallback(
-    (next: Position) => {
-      const zoom = clamp(next.zoom, 1, MAX_ZOOM);
-      const maxX = Math.max(
-        0,
-        (width * baseScale * zoom - frameWidth) / 2
-      );
-      const maxY = Math.max(
-        0,
-        (height * baseScale * zoom - frameHeight) / 2
-      );
-      const bounded = {
-        x: clamp(next.x, -maxX, maxX),
-        y: clamp(next.y, -maxY, maxY),
-        zoom,
-      };
-      positionRef.current = bounded;
-      setPosition(bounded);
-    },
-    [
-      width,
-      height,
-      baseScale,
-      frameWidth,
-      frameHeight,
-    ]
-  );
+  const updatePosition = (next: Position) => {
+    'worklet';
+    if (gestureLocked.value || !valid) return;
+    const zoom = clamp(next.zoom, 1, MAX_ZOOM);
+    const maxX = Math.max(
+      0,
+      (width * baseScale * zoom - frameWidth) / 2
+    );
+    const maxY = Math.max(
+      0,
+      (height * baseScale * zoom - frameHeight) / 2
+    );
+    position.value = {
+      x: clamp(next.x, -maxX, maxX),
+      y: clamp(next.y, -maxY, maxY),
+      zoom,
+    };
+  };
   const pan = Gesture.Pan()
     .minPointers(1)
     .maxPointers(1)
-    .onBegin(() => {
+    .onStart(() => {
       'worklet';
-      const current = positionRef.current;
-      panStart.current = {
-        x: current.x,
-        y: current.y,
+      panStart.value = {
+        x: position.value.x,
+        y: position.value.y,
       };
     })
     .onUpdate(event => {
       'worklet';
-      const current = positionRef.current;
       updatePosition({
-        x: panStart.current.x + event.translationX,
-        y: panStart.current.y + event.translationY,
-        zoom: current.zoom,
+        x: panStart.value.x + event.translationX,
+        y: panStart.value.y + event.translationY,
+        zoom: position.value.zoom,
       });
-    })
-    .runOnJS(true);
+    });
   const pinch = Gesture.Pinch()
-    .onBegin(() => {
+    .onStart(() => {
       'worklet';
-      pinchStart.current = positionRef.current.zoom;
+      pinchStart.value = position.value.zoom;
     })
     .onUpdate(event => {
       'worklet';
-      const current = positionRef.current;
       updatePosition({
-        x: current.x,
-        y: current.y,
-        zoom: pinchStart.current * event.scale,
+        ...position.value,
+        zoom: pinchStart.value * event.scale,
       });
-    })
-    .runOnJS(true);
+    });
   const gesture = Gesture.Simultaneous(pan, pinch);
+  const animatedPhotoStyle = useAnimatedStyle(() => {
+    const current = position.value;
+    const displayWidth =
+      width * baseScale * current.zoom;
+    const displayHeight =
+      height * baseScale * current.zoom;
+    return {
+      position: 'absolute' as const,
+      width: displayWidth,
+      height: displayHeight,
+      left:
+        (frameWidth - displayWidth) / 2 + current.x,
+      top:
+        (frameHeight - displayHeight) / 2 + current.y,
+    };
+  });
+  const zoomLabelProps = useAnimatedProps(() => {
+    const label =
+      `${Math.round(position.value.zoom * 100)}%`;
+    return {
+      text: label,
+      defaultValue: label,
+    };
+  });
   function zoomBy(amount: number) {
     if (workingRef.current || !valid) return;
+    const current = position.value;
     updatePosition({
-      ...positionRef.current,
-      zoom: positionRef.current.zoom + amount,
+      ...current,
+      zoom: current.zoom + amount,
     });
   }
   function resetPosition() {
-    const next = { x: 0, y: 0, zoom: 1 };
-    positionRef.current = next;
-    setPosition(next);
+    position.value = { x: 0, y: 0, zoom: 1 };
   }
-  async function cropPhoto() {
+
+  async function cropPhoto(confirm = false) {
     if (workingRef.current || !valid) return;
     workingRef.current = true;
+    gestureLocked.value = true;
     setWorking(true);
     setError('');
     try {
-      const current = positionRef.current;
+      const current = position.value;
       const scale = baseScale * current.zoom;
       const cropWidth = Math.min(
         width,
@@ -259,7 +275,7 @@ export default function VolunteerPhotoEditor({
       if (!result.uri || !result.width || !result.height) {
         throw new Error('Invalid cropped photo.');
       }
-      setPhoto({
+      const croppedAsset: ImagePickerAsset = {
         ...photo,
         uri: result.uri,
         width: result.width,
@@ -267,6 +283,15 @@ export default function VolunteerPhotoEditor({
         mimeType: 'image/jpeg',
         fileName: 'volunteer-photo.jpg',
         fileSize: undefined,
+      };
+      if (confirm) {
+        onConfirm(croppedAsset);
+        return;
+      }
+      setPhoto(croppedAsset);
+      setDimensions({
+        width: result.width,
+        height: result.height,
       });
       resetPosition();
       setCropApplied(true);
@@ -276,17 +301,27 @@ export default function VolunteerPhotoEditor({
       );
     } finally {
       workingRef.current = false;
+      gestureLocked.value = false;
       setWorking(false);
     }
   }
   function acceptPhoto() {
     if (workingRef.current || !valid) return;
-    onConfirm(photo);
+    const current = position.value;
+    if (
+      cropApplied &&
+      current.zoom === 1 &&
+      current.x === 0 &&
+      current.y === 0
+    ) {
+      workingRef.current = true;
+    gestureLocked.value = true;
+      onConfirm(photo);
+      return;
+    }
+    void cropPhoto(true);
   }
-  const displayWidth =
-    width * baseScale * position.zoom;
-  const displayHeight =
-    height * baseScale * position.zoom;
+
   return (
     <Modal
       visible
@@ -298,12 +333,20 @@ export default function VolunteerPhotoEditor({
       }}
     >
       <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <SafeAreaView
+            style={styles.root}
+            edges={["top", "bottom", "left", "right"]}
+          >
         <View style={styles.toolbar}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back"
             disabled={working}
-            onPress={onCancel}
+            hitSlop={8}
+            onPress={() => {
+              if (!workingRef.current) onCancel();
+            }}
             style={styles.action}
           >
             <Text style={styles.back}>
@@ -315,6 +358,7 @@ export default function VolunteerPhotoEditor({
               accessibilityRole="button"
               accessibilityLabel="Crop photo"
               disabled={working || !valid}
+              hitSlop={8}
               onPress={() => void cropPhoto()}
               style={styles.action}
             >
@@ -326,6 +370,7 @@ export default function VolunteerPhotoEditor({
               accessibilityRole="button"
               accessibilityLabel="Accept photo"
               disabled={working || !valid}
+              hitSlop={8}
               onPress={acceptPhoto}
               style={styles.action}
             >
@@ -347,20 +392,10 @@ export default function VolunteerPhotoEditor({
               ]}
             >
               {valid && (
-                <Image
+                <Animated.Image
                   source={{ uri: photo.uri }}
                   resizeMode="stretch"
-                  style={{
-                    position: 'absolute',
-                    width: displayWidth,
-                    height: displayHeight,
-                    left:
-                      (frameWidth - displayWidth) / 2 +
-                      position.x,
-                    top:
-                      (frameHeight - displayHeight) / 2 +
-                      position.y,
-                  }}
+                  style={animatedPhotoStyle}
                 />
               )}
               <View
@@ -390,9 +425,15 @@ export default function VolunteerPhotoEditor({
             >
               <Text style={styles.zoomButtonText}>−</Text>
             </Pressable>
-            <Text style={styles.zoomText}>
-              {Math.round(position.zoom * 100)}%
-            </Text>
+            <AnimatedTextInput
+              animatedProps={zoomLabelProps}
+              defaultValue="100%"
+              editable={false}
+              pointerEvents="none"
+              underlineColorAndroid="transparent"
+              style={styles.zoomText}
+              accessibilityLabel="Photo zoom percentage"
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Zoom in"
@@ -426,6 +467,8 @@ export default function VolunteerPhotoEditor({
             />
           )}
         </View>
+          </SafeAreaView>
+        </SafeAreaProvider>
       </GestureHandlerRootView>
     </Modal>
   );
@@ -451,6 +494,8 @@ const styles = StyleSheet.create({
   },
   action: {
     minHeight: 48,
+    minWidth: 48,
+    alignItems: "center",
     paddingHorizontal: 10,
     justifyContent: 'center',
   },
@@ -525,7 +570,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#721D2A',
-    minWidth: 60,
+    minWidth: 70,
+    padding: 0,
     textAlign: 'center',
   },
   help: {

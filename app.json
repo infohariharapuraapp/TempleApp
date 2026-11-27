@@ -9,8 +9,8 @@
     "scheme": "templeapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.bharathkumardhfm.TempleApp",
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.sreemathhariharapura.templeapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -35,6 +35,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withIOSProductionSecurity",
       "expo-router",
       [
         "expo-build-properties",
@@ -55,9 +56,19 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "The secure storage library supports Face ID protection for sensitive information. The current app does not request Face ID authentication."
+        }
+      ],
       "@react-native-community/datetimepicker",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "The included audio library supports microphone access. The current app uses audio playback only and does not request microphone access."
+        }
+      ],
       "expo-sharing",
       [
         "expo-notifications",
@@ -71,13 +82,13 @@
       "expo-asset",
       "expo-image",
       [
-  "expo-image-picker",
-  {
-    "photosPermission": "Allow Divyakshetra Hariharapura to select your volunteer photograph for ID card generation.",
-    "cameraPermission": "Allow Divyakshetra Hariharapura to capture your volunteer photograph.",
-    "microphonePermission": false
-  }
-],
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Divyakshetra Hariharapura to select your volunteer photograph for ID card generation.",
+          "cameraPermission": "Allow Divyakshetra Hariharapura to capture your volunteer photograph.",
+          "microphonePermission": false
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {
