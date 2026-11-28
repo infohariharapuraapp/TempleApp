@@ -658,6 +658,8 @@ export default function DeleteAccountScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardDismissMode="on-drag"
       >
         <Text style={styles.label}>
           {t('accountLocal.account_settings')}
