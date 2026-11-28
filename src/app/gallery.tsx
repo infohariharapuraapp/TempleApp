@@ -1,7 +1,10 @@
+import { getOptimizedGalleryImage } from '@/services/galleryImageOptimization';
+import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import React, {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -11,8 +14,6 @@ import * as MediaLibrary from 'expo-media-library/legacy';
 
 import {
   ActivityIndicator,
-  Dimensions,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -22,17 +23,14 @@ import {
   View,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   apiRequest,
   API_BASE_URL,
 } from '@/services/api';
 
-const {
-  width: SCREEN_WIDTH,
-  height: SCREEN_HEIGHT,
-} = Dimensions.get('window');
+
 
 /* ===================================================== */
 /* TYPES */
@@ -212,129 +210,111 @@ export default function GalleryScreen() {
    * ===================================================
    */
 
-  const loadGallery =
-    useCallback(async () => {
-      try {
+  const galleryRequestRef = useRef(0);
+  const galleryBusyRef = useRef(false);
+  const galleryMountedRef = useRef(false);
+  const galleryViewerOpenRef = useRef(false);
+  const galleryHasLoadedRef = useRef(false);
+  const loadGallery = useCallback(
+    async (silent = false) => {
+      if (!galleryMountedRef.current) {
+        return;
+      }
+      if (
+        silent &&
+        (
+          galleryBusyRef.current ||
+          galleryViewerOpenRef.current ||
+          !galleryHasLoadedRef.current
+        )
+      ) {
+        return;
+      }
+      const requestId = ++galleryRequestRef.current;
+      galleryBusyRef.current = true;
+      const isCurrent = () =>
+        galleryMountedRef.current &&
+        galleryRequestRef.current === requestId;
+      if (!silent) {
         setLoading(true);
         setError(null);
-
-        /*
-         * New grouped gallery API.
-         */
-        const response =
-          await apiRequest<{
-            success: boolean;
-            data: GalleryAlbum[];
-          }>(`/gallery/albums?lang=${encodeURIComponent(currentLanguage)}`);
-
-        if (response.success) {
-          /*
-           * Hide empty headings.
-           *
-           * If Admin creates a heading but
-           * hasn't uploaded a photo yet,
-           * devotees don't see an empty section.
-           */
-          const albumsWithImages =
-            (
-              response.data || []
-            ).filter(
-              (album) =>
-                Array.isArray(
-                  album.images,
-                ) &&
-                album.images.length >
-                  0,
-            );
-
-          /*
-           * Save grouped data.
-           */
-          setGalleryAlbums(
-            albumsWithImages,
-          );
-
-          /*
-           * Create flat array too.
-           */
-          const allImages =
-            albumsWithImages.flatMap(
-              (album) =>
-                album.images,
-            );
-
-          setGalleryItems(
-            allImages,
-          );
-
-          /*
-           * If View All is currently
-           * displaying an album and
-           * gallery refreshes, update
-           * the selected album.
-           */
-          setSelectedAlbum(
-            (
-              currentAlbum,
-            ) => {
-              if (
-                !currentAlbum
-              ) {
-                return null;
-              }
-
-              return (
-                albumsWithImages.find(
-                  (album) =>
-                    album.id ===
-                    currentAlbum.id,
-                ) || null
-              );
-            },
-          );
-        } else {
-          setGalleryAlbums([]);
-          setGalleryItems([]);
-          setSelectedAlbum(
-            null,
-          );
-        }
-      } catch (err) {
-        console.error(
-          'Gallery loading error:',
-          err,
-        );
-
-        setError(t('galleryScreen.loadError'));
-
-        setGalleryAlbums([]);
-        setGalleryItems([]);
-        setSelectedAlbum(null);
-      } finally {
-        setLoading(false);
       }
-    }, [t, currentLanguage]);
-
-  /*
-   * Initial load.
-   */
+      try {
+        const response = await apiRequest<{
+          success: boolean;
+          data: GalleryAlbum[];
+        }>(
+          `/gallery/albums?lang=${encodeURIComponent(currentLanguage)}`
+        );
+        if (!isCurrent()) {
+          return;
+        }
+        // Never replace gallery data while viewing a photo.
+        if (galleryViewerOpenRef.current) {
+          return;
+        }
+        if (
+          !response.success ||
+          !Array.isArray(response.data)
+        ) {
+          throw new Error('Invalid gallery response');
+        }
+        const albumsWithImages = response.data.filter(
+          album =>
+            album &&
+            Array.isArray(album.images) &&
+            album.images.length > 0
+        );
+        setGalleryAlbums(albumsWithImages);
+        setGalleryItems(
+          albumsWithImages.flatMap(album => album.images)
+        );
+        setSelectedAlbum(currentAlbum => {
+          if (!currentAlbum) {
+            return null;
+          }
+          return albumsWithImages.find(
+            album => album.id === currentAlbum.id
+          ) || null;
+        });
+        galleryHasLoadedRef.current = true;
+        setError(null);
+      } catch {
+        if (!isCurrent()) {
+          return;
+        }
+        if (!silent) {
+          setError(t('galleryScreen.loadError'));
+          if (!galleryHasLoadedRef.current) {
+            setGalleryAlbums([]);
+            setGalleryItems([]);
+            setSelectedAlbum(null);
+          }
+        }
+        // Background failures preserve existing photos.
+      } finally {
+        if (isCurrent()) {
+          galleryBusyRef.current = false;
+          if (!silent) {
+            setLoading(false);
+          }
+        }
+      }
+    },
+    [t, currentLanguage]
+  );
   useEffect(() => {
-    loadGallery();
-  }, [loadGallery]);
-
-  /*
-   * Refresh every 60 seconds.
-   */
-  useEffect(() => {
-    const interval =
-      setInterval(() => {
-        loadGallery();
-      }, 60000);
-
-    return () =>
-      clearInterval(
-        interval,
-      );
+    galleryMountedRef.current = true;
+    void loadGallery();
+    const interval = setInterval(() => {
+      void loadGallery(true);
+    }, 60000);
+    return () => {
+      galleryMountedRef.current = false;
+      galleryRequestRef.current += 1;
+      galleryBusyRef.current = false;
+      clearInterval(interval);
+    };
   }, [loadGallery]);
 
   /*
@@ -343,9 +323,8 @@ export default function GalleryScreen() {
    * ===================================================
    */
 
-  const openAlbum = (
-    album: GalleryAlbum,
-  ) => {
+  const openAlbum = (album: GalleryAlbum) => {
+    galleryViewerOpenRef.current = false;
     setSelectedAlbum(album);
 
     setSelectedImageIndex(
@@ -362,6 +341,7 @@ export default function GalleryScreen() {
    */
 
   const closeAlbum = () => {
+    galleryViewerOpenRef.current = false;
     setShowAllPhotos(false);
 
     setSelectedImageIndex(
@@ -396,6 +376,7 @@ export default function GalleryScreen() {
     index: number,
     album?: GalleryAlbum,
   ) => {
+    galleryViewerOpenRef.current = true;
     /*
      * When opening directly from one of
      * the main-page album previews,
@@ -419,6 +400,7 @@ export default function GalleryScreen() {
    */
 
   const closeImage = () => {
+    galleryViewerOpenRef.current = false;
     setSelectedImageIndex(
       null,
     );
@@ -496,11 +478,8 @@ export default function GalleryScreen() {
    */
 
   const selectedImage =
-    selectedImageIndex !==
-      null
-      ? viewerImages[
-          selectedImageIndex
-        ]
+    selectedImageIndex !== null
+      ? (viewerImages[selectedImageIndex] ?? null)
       : null;
 
   /*
@@ -709,9 +688,7 @@ const downloadSelectedImage = async () => {
                 </Text>
 
             <Pressable
-              onPress={
-                loadGallery
-              }
+              onPress={() => { void loadGallery(); }}
               style={({
                 pressed,
               }) => [
@@ -875,14 +852,19 @@ const downloadSelectedImage = async () => {
                     >
                       <Image
                         source={{
-                          uri: getImageUrl(
-                            item.image_url,
+                          uri: getOptimizedGalleryImage(
+                            item.id,
+                            getImageUrl(item.image_url),
+                            'thumbnail',
                           ),
                         }}
                         style={
                           styles.fullGalleryImage
                         }
-                        resizeMode="cover"
+                        contentFit="cover"
+                         cachePolicy="memory-disk"
+                         transition={150}
+                         allowDownscaling={true}
                       />
                     </Pressable>
 
@@ -1141,14 +1123,19 @@ const downloadSelectedImage = async () => {
                               >
                                 <Image
                                   source={{
-                                    uri: getImageUrl(
-                                      item.image_url,
-                                    ),
+                                    uri: getOptimizedGalleryImage(
+                            item.id,
+                            getImageUrl(item.image_url),
+                            'thumbnail',
+                          ),
                                   }}
                                   style={
                                     styles.albumPreviewImage
                                   }
-                                  resizeMode="cover"
+                                  contentFit="cover"
+                         cachePolicy="memory-disk"
+                         transition={150}
+                         allowDownscaling={true}
                                 />
                               </Pressable>
                             ),
@@ -1230,11 +1217,11 @@ const downloadSelectedImage = async () => {
         }
         statusBarTranslucent
       >
-        <View
-          style={
-            styles.modalContainer
-          }
-        >
+        <SafeAreaProvider style={styles.modalContainer}>
+          <SafeAreaView
+            style={styles.galleryViewerSafeArea}
+            edges={['top', 'bottom', 'left', 'right']}
+          >
           <StatusBar
             barStyle="light-content"
             backgroundColor="#080706"
@@ -1290,7 +1277,7 @@ const downloadSelectedImage = async () => {
           </View>
 
           {/* IMAGE */}
-
+          <View style={styles.viewerStage}>
           {selectedImage && (
             <View
               style={
@@ -1299,14 +1286,20 @@ const downloadSelectedImage = async () => {
             >
               <Image
                 source={{
-                  uri: getImageUrl(
-                    selectedImage.image_url,
+                  uri: getOptimizedGalleryImage(
+                    selectedImage.id,
+                    getImageUrl(selectedImage.image_url),
+                    'viewer',
                   ),
                 }}
                 style={
                   styles.modalImage
                 }
-                resizeMode="contain"
+                contentFit="contain"
+                 cachePolicy="memory-disk"
+                 priority="high"
+                 transition={150}
+                 allowDownscaling={true}
               />
             </View>
           )}
@@ -1366,6 +1359,8 @@ const downloadSelectedImage = async () => {
               </Text>
             </Pressable>
           )}
+
+          </View>
 
           {/* SHARE / DOWNLOAD */}
 
@@ -1450,7 +1445,8 @@ const downloadSelectedImage = async () => {
               </Text>
             </Pressable>
           </View>
-        </View>
+        </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
     </SafeAreaView>
   );
@@ -2166,11 +2162,9 @@ const styles = StyleSheet.create({
   },
 
   modalTopBar: {
-    position: 'absolute',
     zIndex: 10,
-    top: 45,
-    left: 18,
-    right: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -2210,24 +2204,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+  galleryViewerSafeArea: {
+    flex: 1,
+    backgroundColor: '#080706',
+  },
+  viewerStage: {
+    flex: 1,
+    minHeight: 0,
+    position: 'relative',
+    justifyContent: 'center',
+  },
   modalImageContainer: {
-    position: 'absolute',
-    top: 90,
-    left: 0,
-    right: 0,
-    bottom: 105,
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   modalImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.65,
+    width: '100%',
+    height: '100%',
   },
 
   navigationButton: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.48,
+    top: '50%',
+    marginTop: -23,
+    zIndex: 5,
     width: 46,
     height: 46,
     borderRadius: 23,
@@ -2255,19 +2258,21 @@ const styles = StyleSheet.create({
   },
 
   imageActionsBar: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexShrink: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
   },
 
   imageActionButton: {
-    minWidth: 125,
-    height: 48,
-    paddingHorizontal: 18,
+    flex: 1,
+    minWidth: 0,
+    maxWidth: 220,
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.14)',
     borderWidth: 1,
