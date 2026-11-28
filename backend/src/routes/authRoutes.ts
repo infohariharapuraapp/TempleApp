@@ -17,6 +17,7 @@ import {
 } from '../middleware/authMiddleware';
 
 import {
+  deleteAccountLimiter,
   forgotPasswordLimiter,
   loginLimiter,
   resetPasswordLimiter,
@@ -85,6 +86,7 @@ router.get(
 router.delete(
   '/account',
   authenticateToken,
+  deleteAccountLimiter,
   deleteAccount
 );
 

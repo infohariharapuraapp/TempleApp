@@ -848,7 +848,7 @@
     "something_went_wrong_please_try_again": "Something went wrong. Please try again."
   },
   "accountLocal": {
-    "confirm_personal_volunteer_records": "I confirm that the volunteer records linked to my account and matching my personal details belong to me. I request permanent deletion of those records, including certificates, ID cards, photographs and attendance.",
+    "confirm_personal_volunteer_records": "I confirm that individual volunteer records linked to my account and matching my name and mobile number belong to me. Delete these records, including certificates, ID cards and attendance. Eligible photographs will be scheduled for removal.",
     "temple_account": "TEMPLE ACCOUNT",
     "my_account": "My Account",
     "my_profile": "My Profile",
@@ -937,7 +937,7 @@
     "account_settings": "ACCOUNT SETTINGS",
     "permanent_account_deletion": "Permanent Account Deletion",
     "deleting_your_account_is_permanent_and_cannot_be_undone": "Deleting your account is permanent and cannot be undone.",
-    "your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name": "Your temple app profile and login credentials will be removed. Some community contributions may remain without your name.",
+    "your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name": "Your profile and login credentials will be permanently deleted. If you do not select the checkbox, volunteer records will be retained. Group registrations and records with mismatched details will be retained and disconnected from your account. Community contributions may remain without your name. Previously downloaded documents cannot be removed from other devices.",
     "room_and_seva_bookings_made_through_the_separate_temple_website_are_managed_by_that_website": "Room and seva bookings made through the separate temple website are managed by that website.",
     "confirm_your_password": "Confirm your password",
     "enter_your_password": "Enter your password",

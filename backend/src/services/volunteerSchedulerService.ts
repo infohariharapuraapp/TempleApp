@@ -1,4 +1,7 @@
 import {
+  processAccountPhotoDeletions,
+} from './accountPhotoDeletionWorker';
+import {
   cleanupExpiredVolunteerPhotos,
 } from './volunteerPhotoCleanupService';
 import {
@@ -267,6 +270,17 @@ export function startVolunteerScheduler(): void {
     generation
   );
 
+  if (
+    process.env.ACCOUNT_PHOTO_DELETION_ENABLED === 'true'
+  ) {
+    scheduleTask(
+      'Account photograph cleanup',
+      processAccountPhotoDeletions,
+      QUEUE_INTERVAL_MS,
+      STARTUP_DELAY_MS + 30000,
+      generation
+    );
+  }
   console.log(
     '[Volunteer Scheduler] Started successfully'
   );

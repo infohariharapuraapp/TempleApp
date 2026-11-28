@@ -848,7 +848,7 @@
     "something_went_wrong_please_try_again": "कुछ गलत हुआ। पुनः प्रयास करें।"
   },
   "accountLocal": {
-    "confirm_personal_volunteer_records": "मैं पुष्टि करता/करती हूँ कि मेरे खाते से जुड़े और मेरे व्यक्तिगत विवरण से मेल खाने वाले स्वयंसेवा रिकॉर्ड मेरे हैं। मैं प्रमाणपत्र, पहचान पत्र, फोटो और उपस्थिति सहित इन रिकॉर्ड को स्थायी रूप से हटाने का अनुरोध करता/करती हूँ।",
+    "confirm_personal_volunteer_records": "मैं पुष्टि करता हूँ कि मेरे खाते से जुड़े और मेरे नाम तथा मोबाइल नंबर से मेल खाने वाले व्यक्तिगत स्वयंसेवक रिकॉर्ड मेरे हैं। प्रमाणपत्र, पहचान पत्र और उपस्थिति सहित इन रिकॉर्ड को हटाएँ। पात्र तस्वीरों को हटाने के लिए निर्धारित किया जाएगा।",
     "temple_account": "मंदिर खाता",
     "my_account": "मेरा खाता",
     "my_profile": "मेरी प्रोफ़ाइल",
@@ -937,7 +937,7 @@
     "account_settings": "खाता सेटिंग्स",
     "permanent_account_deletion": "खाता स्थायी रूप से हटाना",
     "deleting_your_account_is_permanent_and_cannot_be_undone": "आपका खाता हटाना स्थायी है और इसे वापस नहीं लिया जा सकता।",
-    "your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name": "आपकी मंदिर ऐप प्रोफ़ाइल और लॉगिन विवरण हटा दिए जाएँगे। समुदाय में आपके कुछ योगदान आपके नाम के बिना रह सकते हैं।",
+    "your_temple_app_profile_and_login_credentials_will_be_removed_some_community_contributions_may_remain_without_your_name": "आपकी प्रोफाइल और लॉगिन विवरण स्थायी रूप से हटाए जाएंगे। चेकबॉक्स नहीं चुनने पर स्वयंसेवक रिकॉर्ड सुरक्षित रहेंगे। समूह पंजीकरण और मेल न खाने वाले रिकॉर्ड सुरक्षित रखकर आपके खाते से अलग किए जाएंगे। सामुदायिक योगदान आपके नाम के बिना रह सकते हैं। पहले डाउनलोड किए गए दस्तावेज अन्य उपकरणों से नहीं हटाए जा सकते।",
     "room_and_seva_bookings_made_through_the_separate_temple_website_are_managed_by_that_website": "अलग मंदिर वेबसाइट से की गई कमरे और सेवा की बुकिंग उसी वेबसाइट द्वारा प्रबंधित होती हैं।",
     "confirm_your_password": "अपने पासवर्ड की पुष्टि करें",
     "enter_your_password": "अपना पासवर्ड दर्ज करें",

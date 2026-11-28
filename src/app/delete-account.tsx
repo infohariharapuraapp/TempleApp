@@ -215,6 +215,7 @@ export default function DeleteAccountScreen() {
   // ========================================
 
   const [password, setPassword] = useState('');
+  const [confirmPersonalVolunteerRecords, setConfirmPersonalVolunteerRecords] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const deletionInProgress = useRef(false);
@@ -334,7 +335,7 @@ export default function DeleteAccountScreen() {
         apiRequest('/auth/account', {
           method: 'DELETE',
           token: originalToken,
-          body: { password },
+          body: { password, confirmPersonalVolunteerRecords },
           timeoutMs: DELETION_TIMEOUT_MS,
         }),
         DELETION_TIMEOUT_MS + 1000
@@ -692,6 +693,52 @@ export default function DeleteAccountScreen() {
           </Text>
         </View>
 
+        <TouchableOpacity
+          accessibilityRole="checkbox"
+          accessibilityState={{
+            checked: confirmPersonalVolunteerRecords,
+            disabled: deleting,
+          }}
+          disabled={deleting}
+          onPress={() =>
+            setConfirmPersonalVolunteerRecords(value => !value)
+          }
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            padding: 14,
+            borderWidth: 1,
+            borderColor: '#E8DCCB',
+            borderRadius: 12,
+            marginBottom: 20,
+          }}
+        >
+          <View style={{
+            width: 24,
+            height: 24,
+            borderWidth: 1,
+            borderRadius: 5,
+            borderColor: '#6B1720',
+            backgroundColor: confirmPersonalVolunteerRecords
+              ? '#6B1720'
+              : '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
+              {confirmPersonalVolunteerRecords ? '\u2713' : ''}
+            </Text>
+          </View>
+          <Text style={{
+            flex: 1,
+            color: '#4A2C18',
+            fontSize: 14,
+            lineHeight: 22,
+          }}>
+            {t('accountLocal.confirm_personal_volunteer_records')}
+          </Text>
+        </TouchableOpacity>
         <Text style={styles.inputLabel}>
           {t('accountLocal.confirm_your_password')}
         </Text>

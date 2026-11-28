@@ -1,3 +1,15 @@
+import {
+  deleteVerifiedVolunteerMember,
+} from '../services/accountVolunteerDeletionService';
+import {
+  classifyVolunteerOwnership,
+} from '../services/accountDeletionOwnershipService';
+import {
+  queueAccountPhotos,
+} from '../services/accountPhotoQueueService';
+import {
+  getAccountPhotoPublicId,
+} from '../services/accountPhotoValidationService';
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import bcrypt from 'bcryptjs';
@@ -1012,7 +1024,19 @@ export const deleteAccount = async (
   res: Response
 ) => {
   const userId = req.user?.userId;
-  const { password } = req.body ?? {};
+  const {
+    password,
+    confirmPersonalVolunteerRecords,
+  } = req.body ?? {};
+  if (
+    confirmPersonalVolunteerRecords !== undefined &&
+    typeof confirmPersonalVolunteerRecords !== 'boolean'
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid deletion confirmation',
+    });
+  }
 
   if (!userId) {
     return res.status(401).json({
@@ -1023,7 +1047,8 @@ export const deleteAccount = async (
 
   if (
     typeof password !== 'string' ||
-    password.length === 0
+    password.length === 0 ||
+    Buffer.byteLength(password, 'utf8') > 72
   ) {
     return res.status(400).json({
       success: false,
@@ -1032,14 +1057,17 @@ export const deleteAccount = async (
   }
 
   let client;
+  let discardClient = false;
 
   try {
     client = await pool.connect();
 
     await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SET LOCAL statement_timeout = '20s'");
 
     const result = await client.query(
-      `SELECT id, password_hash, role
+      `SELECT id, password_hash, role, full_name, phone
        FROM users
        WHERE id = $1
        FOR UPDATE`,
@@ -1097,12 +1125,76 @@ await client.query(
   `
   DELETE FROM volunteer_notification_jobs
   WHERE recipient_user_id = $1
-    AND target_type = 'user'
   `,
   [userId]
 );
 
 // ========================================
+    if (confirmPersonalVolunteerRecords === true) {
+      const candidates = await client.query(
+        `
+        SELECT
+          m.id,
+          m.user_id,
+          m.full_name,
+          m.mobile,
+          m.registration_id
+        FROM volunteer_members m
+        JOIN volunteer_registrations r
+          ON r.id = m.registration_id
+        WHERE m.user_id = $1
+          AND r.user_id = $1
+          AND r.registration_type = 'individual'
+          AND r.total_members = 1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM volunteer_members other
+            WHERE other.registration_id = r.id
+              AND other.id <> m.id
+          )
+        ORDER BY m.id
+        FOR UPDATE OF m, r
+        `,
+        [userId]
+      );
+      for (const member of candidates.rows) {
+        if (
+          classifyVolunteerOwnership(user, member)
+            !== 'matching_identity'
+        ) {
+          continue;
+        }
+        await deleteVerifiedVolunteerMember(
+          client,
+          userId,
+          member.id
+        );
+        await client.query(
+          `DELETE FROM volunteer_notification_jobs
+           WHERE registration_id = $1`,
+          [member.registration_id]
+        );
+        const removed = await client.query(
+          `
+          DELETE FROM volunteer_registrations r
+          WHERE r.id = $1
+            AND r.user_id = $2
+            AND r.registration_type = 'individual'
+            AND NOT EXISTS (
+              SELECT 1
+              FROM volunteer_members m
+              WHERE m.registration_id = r.id
+            )
+          `,
+          [member.registration_id, userId]
+        );
+        if (removed.rowCount !== 1) {
+          throw new Error(
+            'Registration deletion consistency check failed'
+          );
+        }
+      }
+    }
 // DETACH VOLUNTEER REGISTRATION OWNERSHIP
 // ========================================
 
@@ -1133,6 +1225,23 @@ await client.query(
 );
 
 // ========================================
+const photoUploads = await client.query(
+  `
+  SELECT photo_url
+  FROM volunteer_photo_uploads
+  WHERE user_id = $1
+  FOR UPDATE
+  `,
+  [userId]
+);
+const safePhotoUrls = photoUploads.rows
+  .map(row => row.photo_url)
+  .filter(url => getAccountPhotoPublicId(url) !== null);
+await queueAccountPhotos(client, safePhotoUrls);
+await client.query(
+  'DELETE FROM volunteer_photo_uploads WHERE user_id = $1',
+  [userId]
+);
 // DELETE USER ACCOUNT
 // ========================================
 
@@ -1153,11 +1262,11 @@ await client.query(
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error('Rollback error:', rollbackError);
+        discardClient = true; console.error('Account deletion rollback failed');
       }
     }
 
-    console.error('Delete account error:', error);
+    console.error('Account deletion failed');
 
     return res.status(500).json({
       success: false,
@@ -1166,7 +1275,7 @@ await client.query(
 
   } finally {
     if (client) {
-      client.release();
+      client.release(discardClient);
     }
   }
 };
