@@ -19,12 +19,16 @@ const createAuthLimiter = (
     message: rateLimitResponse,
   });
 
-// 10 login requests per 15 minutes per IP.
-// A separate account-based limiter is recommended later.
-export const loginLimiter = createAuthLimiter(
-  15 * 60 * 1000,
-  10
-);
+// Count unsuccessful login requests per IP.
+// Successful authentication does not consume the allowance.
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: rateLimitResponse,
+});
 
 // 5 registration requests per hour per IP.
 export const registerLimiter = createAuthLimiter(
@@ -49,4 +53,9 @@ export const verifyOtpLimiter = createAuthLimiter(
 export const resetPasswordLimiter = createAuthLimiter(
   15 * 60 * 1000,
   10
+);
+// Account deletion: 5 attempts per 15 minutes per IP.
+export const deleteAccountLimiter = createAuthLimiter(
+  15 * 60 * 1000,
+  5
 );

@@ -741,6 +741,10 @@
     "something_went_wrong_please_try_again": "Something went wrong. Please try again."
   },
   "authLocal": {
+    "login_rate_limited": "Too many login attempts. Please try again later.",
+    "login_request_timeout": "Server response timed out. Please try again.",
+    "login_server_unavailable": "Server temporarily unavailable. Please try again later.",
+    "login_try_again": "Unable to complete login. Please try again.",
     "otp_attempts_exceeded": "Too many attempts. Request a new OTP.",
     "otp_delivery_guidance": "If the OTP does not arrive, check your spam folder. If you have requested several codes, wait 15 minutes before trying again.",
     "otp_email_unavailable": "Email service is temporarily unavailable. Please try again later.",
@@ -844,6 +848,7 @@
     "something_went_wrong_please_try_again": "Something went wrong. Please try again."
   },
   "accountLocal": {
+    "confirm_personal_volunteer_records": "I confirm that the volunteer records linked to my account and matching my personal details belong to me. I request permanent deletion of those records, including certificates, ID cards, photographs and attendance.",
     "temple_account": "TEMPLE ACCOUNT",
     "my_account": "My Account",
     "my_profile": "My Profile",

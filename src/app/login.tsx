@@ -1,3 +1,4 @@
+import { useRef as useLoginRequestRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from '@/components/LanguageSelector';
 
@@ -20,7 +21,7 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { apiRequest } from '@/services/api';
+import { apiRequest, ApiError } from '@/services/api';
 import { saveToken } from '@/services/authStorage';
 import { registerForPushNotificationsAsync } from '@/services/notifications';
 
@@ -144,8 +145,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loginInProgress = useLoginRequestRef(false);
 
   const handleLogin = async () => {
+    if (loginInProgress.current) return;
     const loginId = identifier.trim();
 
     if (!loginId || !password) {
@@ -158,9 +161,11 @@ export default function LoginScreen() {
     Keyboard.dismiss();
 
     try {
+      loginInProgress.current = true;
       setLoading(true);
 
       const response = await apiRequest('/auth/login', {
+        token: '',
         method: 'POST',
         body: {
           email: loginId,
@@ -192,11 +197,35 @@ export default function LoginScreen() {
       Alert.alert(t('authLocal.login_failed'),
         localizeAuthError(response.message, t('authLocal.invalid_login_credentials'))
       );
-    } catch (error: any) {
-      Alert.alert(t('authLocal.login_failed'),
-        localizeAuthError(error?.message, t('authLocal.unable_to_connect_to_the_server'))
-      );
+    } catch (error: unknown) {
+      let message = t('authLocal.unable_to_connect_to_the_server');
+      if (error instanceof ApiError) {
+        if (error.status === 429) {
+          message = t('authLocal.login_rate_limited');
+        } else if (error.status === 401) {
+          message = t('authLocal.invalid_login_credentials');
+        } else if (
+          error.status === 408 ||
+          error.message === 'Request timed out. Please try again.'
+        ) {
+          message = t('authLocal.login_request_timeout');
+        } else if (
+          error.status !== undefined &&
+          error.status >= 500
+        ) {
+          message = t('authLocal.login_server_unavailable');
+        } else {
+          message = localizeAuthError(
+            error.message,
+            t('authLocal.login_try_again')
+          );
+        }
+      } else if (!(error instanceof TypeError)) {
+        message = t('authLocal.login_try_again');
+      }
+      Alert.alert(t('authLocal.login_failed'), message);
     } finally {
+      loginInProgress.current = false;
       setLoading(false);
     }
   };
