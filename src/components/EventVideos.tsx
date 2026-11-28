@@ -228,7 +228,7 @@ export default function EventVideos({
           `${video.youtube_video_id}/hqdefault.jpg`;
 
         const embedUrl =
-          `https://www.youtube.com/embed/` +
+          `https://www.youtube-nocookie.com/embed/` +
           `${video.youtube_video_id}` +
           `?playsinline=1&rel=0`;
 

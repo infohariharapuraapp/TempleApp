@@ -109,7 +109,7 @@ function VideoCard({
     `https://img.youtube.com/vi/${item.youtube_video_id}/hqdefault.jpg`;
 
   const embed =
-    `https://www.youtube.com/embed/${item.youtube_video_id}?playsinline=1&rel=0`;
+    `https://www.youtube-nocookie.com/embed/${item.youtube_video_id}?playsinline=1&rel=0`;
 
   return (
     <View style={styles.videoCard}>

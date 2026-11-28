@@ -122,7 +122,7 @@ function DarshanVideoCard({
   const { t, i18n } = useTranslation();
 
   const videoUrl =
-    `https://www.youtube.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`;
+    `https://www.youtube-nocookie.com/embed/${darshan.youtube_video_id}?playsinline=1&rel=0`;
 
   return (
     <View style={styles.videoCard}>

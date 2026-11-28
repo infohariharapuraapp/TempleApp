@@ -365,7 +365,7 @@ export default function ProgrammeDetails() {
                       <WebView
                         key={videoId}
                         source={{
-                          uri: `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0`,
+                          uri: `https://www.youtube-nocookie.com/embed/${videoId}?playsinline=1&rel=0`,
                           headers: {
                             Referer:
                               'https://www.divyakshetrahariharapura.com/',

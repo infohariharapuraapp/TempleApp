@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { Linking, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -303,6 +304,33 @@ export default function PoliciesScreen() {
 
               {isExpanded && (
                 <View style={styles.policyBody}>
+                  {index === 0 && (
+                    <TouchableOpacity
+                      accessibilityRole="link"
+                      style={styles.contactButton}
+                      onPress={async () => {
+                        try {
+                          await Linking.openURL(
+                            'https://hariharapura-temple-admin.onrender.com/privacy-policy/'
+                          );
+                        } catch {
+                          Alert.alert(
+                            t('templePoliciesLocal.complete_privacy_policy'),
+                            'https://hariharapura-temple-admin.onrender.com/privacy-policy/'
+                          );
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.contactButtonText,
+                          { textAlign: 'center', paddingHorizontal: 8 }
+                        ]}
+                      >
+                        {t('templePoliciesLocal.complete_privacy_policy')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   {policy.sections.map((section, sectionIndex) => (
                     <View
                       key={section.title}
